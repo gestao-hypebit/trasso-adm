@@ -62,10 +62,11 @@ export default function DashboardPage() {
 
   // Mês selecionado (filtro)
   const [mesSel, setMesSel] = useState(() => startOfMonth(new Date()))
-  const mesStart = format(mesSel, 'yyyy-MM-01')
-  const mesEnd = format(endOfMonth(mesSel), 'yyyy-MM-dd')
-  const mesLabel = format(mesSel, 'MMMM yyyy', { locale: ptBR })
-  const isCurrentMes = format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
+  const [allTime, setAllTime] = useState(false)
+  const mesStart = allTime ? '0000-01-01' : format(mesSel, 'yyyy-MM-01')
+  const mesEnd = allTime ? '9999-12-31' : format(endOfMonth(mesSel), 'yyyy-MM-dd')
+  const mesLabel = allTime ? 'Desde o início' : format(mesSel, 'MMMM yyyy', { locale: ptBR })
+  const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
   useEffect(() => {
     const supabase = createClient()
@@ -183,31 +184,44 @@ export default function DashboardPage() {
       <div className="p-6 space-y-6">
 
         {/* Seletor de mês */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
-            <button
-              onClick={() => setMesSel(d => subMonths(d, 1))}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-medium text-brand-lavanda min-w-[120px] text-center capitalize">
-              {mesLabel}
-            </span>
-            <button
-              onClick={() => setMesSel(d => addMonths(d, 1))}
-              disabled={isCurrentMes}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          {!isCurrentMes && (
+        <div className="flex items-center gap-3">
+          {!allTime && (
+            <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
+              <button
+                onClick={() => setMesSel(d => subMonths(d, 1))}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm font-medium text-brand-lavanda min-w-[120px] text-center capitalize">
+                {mesLabel}
+              </span>
+              <button
+                onClick={() => setMesSel(d => addMonths(d, 1))}
+                disabled={isCurrentMes}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {allTime && (
+            <div className="flex items-center gap-2 rounded-xl border border-brand-lima/30 bg-brand-lima/[0.04] px-4 py-2">
+              <span className="text-sm font-medium text-brand-lima">Desde o início</span>
+            </div>
+          )}
+          <button
+            onClick={() => setAllTime(v => !v)}
+            className={cn('text-xs px-3 py-1.5 rounded-lg border transition-colors', allTime ? 'border-brand-lima/30 text-brand-lima bg-brand-lima/[0.08] hover:bg-brand-lima/[0.12]' : 'border-white/[0.08] text-brand-lavanda/40 hover:text-brand-lavanda/70 hover:border-white/[0.14]')}
+          >
+            {allTime ? 'Ver por mês' : 'Desde o início'}
+          </button>
+          {!allTime && !isCurrentMes && (
             <button
               onClick={() => setMesSel(startOfMonth(new Date()))}
               className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors"
             >
-              Voltar ao mês atual
+              Mês atual
             </button>
           )}
         </div>
@@ -222,23 +236,6 @@ export default function DashboardPage() {
                   <p className="text-2xl font-bold text-brand-lima" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
                     {loading ? '...' : formatCurrency(faturamento)}
                   </p>
-                  {!loading && (saasFaturadoMes > 0 || mrrSaas > 0) && (
-                    <div className="mt-2 space-y-0.5">
-                      <p className="text-[11px] text-brand-lavanda/40">
-                        Agência: <span className="text-brand-lavanda/60">{formatCurrency(receitaAgencia)}</span>
-                      </p>
-                      {saasFaturadoMes > 0 && (
-                        <p className="text-[11px] text-brand-lavanda/40">
-                          SaaS recebido: <span className="text-brand-lavanda/60">{formatCurrency(saasFaturadoMes)}</span>
-                        </p>
-                      )}
-                      {mrrSaas > saasFaturadoMes && (
-                        <p className="text-[11px] text-brand-lavanda/40">
-                          SaaS a receber: <span className="text-yellow-400/70">{formatCurrency(mrrSaas - saasFaturadoMes)}</span>
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
                 <DollarSign className="h-5 w-5 shrink-0 text-brand-lima" />
               </div>

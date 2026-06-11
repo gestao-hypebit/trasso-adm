@@ -67,10 +67,11 @@ export default function FinanceiroPage() {
   const [loading, setLoading] = useState(true)
 
   const [mesSel, setMesSel] = useState(() => startOfMonth(new Date()))
-  const mesStart = format(mesSel, 'yyyy-MM-01')
-  const mesEnd = format(endOfMonth(mesSel), 'yyyy-MM-dd')
-  const mesLabel = format(mesSel, 'MMMM yyyy', { locale: ptBR })
-  const isCurrentMes = format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
+  const [allTime, setAllTime] = useState(false)
+  const mesStart = allTime ? '0000-01-01' : format(mesSel, 'yyyy-MM-01')
+  const mesEnd = allTime ? '9999-12-31' : format(endOfMonth(mesSel), 'yyyy-MM-dd')
+  const mesLabel = allTime ? 'Desde o início' : format(mesSel, 'MMMM yyyy', { locale: ptBR })
+  const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
   useEffect(() => {
     const supabase = createClient()
@@ -148,6 +149,22 @@ export default function FinanceiroPage() {
   })()
 
   const cashflowData: DiaFluxo[] = (() => {
+    if (allTime) {
+      const porMes: Record<string, { entradas: number; saidas: number }> = {}
+      for (const l of [...lancamentos].sort((a, b) => a.data.localeCompare(b.data))) {
+        const k = l.data.slice(0, 7)
+        const lbl = format(new Date(k + '-01T12:00:00Z'), 'MMM/yy', { locale: ptBR })
+        const label = lbl.charAt(0).toUpperCase() + lbl.slice(1)
+        if (!porMes[label]) porMes[label] = { entradas: 0, saidas: 0 }
+        if (l.tipo === 'receita' && l.status === 'recebido') porMes[label].entradas += l.valor
+        if (l.tipo === 'despesa' && l.status === 'pago') porMes[label].saidas += l.valor
+      }
+      let saldo = 0
+      return Object.entries(porMes).map(([dia, vals]) => {
+        saldo += vals.entradas - vals.saidas
+        return { dia, ...vals, saldo }
+      })
+    }
     const doMesOrdenado = [...doMes].sort((a, b) => a.data.localeCompare(b.data))
     const porDia: Record<string, { entradas: number; saidas: number }> = {}
     for (const l of doMesOrdenado) {
@@ -165,11 +182,11 @@ export default function FinanceiroPage() {
 
   const kpis = [
     {
-      label: 'Faturamento do Mês',
+      label: allTime ? 'Faturamento Total' : 'Faturamento do Mês',
       valor: totalReceitas,
       sub: saasFaturadoMes > 0
         ? `Agência + SaaS recebido (${formatCurrency(saasFaturadoMes)})`
-        : `Receitas recebidas em ${format(mesSel, 'MMMM', { locale: ptBR })}`,
+        : allTime ? 'Total de receitas recebidas' : `Receitas recebidas em ${format(mesSel, 'MMMM', { locale: ptBR })}`,
       icon: DollarSign, cor: 'text-brand-lima', bgIcon: 'bg-brand-lima/10',
     },
     { label: 'A Receber', valor: aReceber, sub: saasAReceber > 0 ? `${receitasMes.filter(l => l.status === 'pendente').length} lançamentos + ${saasVencMes.length} SaaS` : `${receitasMes.filter(l => l.status === 'pendente').length} pendentes`, icon: Clock, cor: 'text-yellow-400', bgIcon: 'bg-yellow-400/10' },
@@ -189,30 +206,43 @@ export default function FinanceiroPage() {
 
         {/* Seletor de mês */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
-            <button
-              onClick={() => setMesSel(d => subMonths(d, 1))}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-medium text-brand-lavanda min-w-[130px] text-center capitalize">
-              {mesLabel}
-            </span>
-            <button
-              onClick={() => setMesSel(d => addMonths(d, 1))}
-              disabled={isCurrentMes}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          {!isCurrentMes && (
+          {!allTime && (
+            <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
+              <button
+                onClick={() => setMesSel(d => subMonths(d, 1))}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm font-medium text-brand-lavanda min-w-[130px] text-center capitalize">
+                {mesLabel}
+              </span>
+              <button
+                onClick={() => setMesSel(d => addMonths(d, 1))}
+                disabled={isCurrentMes}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {allTime && (
+            <div className="flex items-center gap-2 rounded-xl border border-brand-lima/30 bg-brand-lima/[0.04] px-4 py-2">
+              <span className="text-sm font-medium text-brand-lima">Desde o início</span>
+            </div>
+          )}
+          <button
+            onClick={() => setAllTime(v => !v)}
+            className={cn('text-xs px-3 py-1.5 rounded-lg border transition-colors', allTime ? 'border-brand-lima/30 text-brand-lima bg-brand-lima/[0.08] hover:bg-brand-lima/[0.12]' : 'border-white/[0.08] text-brand-lavanda/40 hover:text-brand-lavanda/70 hover:border-white/[0.14]')}
+          >
+            {allTime ? 'Ver por mês' : 'Desde o início'}
+          </button>
+          {!allTime && !isCurrentMes && (
             <button
               onClick={() => setMesSel(startOfMonth(new Date()))}
               className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors"
             >
-              Voltar ao mês atual
+              Mês atual
             </button>
           )}
         </div>
@@ -283,9 +313,9 @@ export default function FinanceiroPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">
-                  Fluxo de Caixa — {mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}
+                  Fluxo de Caixa — {allTime ? 'Desde o início' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}
                 </CardTitle>
-                <span className="text-xs text-brand-lavanda/50">Saldo do mês: {formatCurrency(totalReceitas - totalDespesas)}</span>
+                <span className="text-xs text-brand-lavanda/50">{allTime ? 'Saldo total:' : 'Saldo do mês:'} {formatCurrency(totalReceitas - totalDespesas)}</span>
               </div>
             </CardHeader>
             <CardContent>
@@ -312,7 +342,7 @@ export default function FinanceiroPage() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-base">Resumo do Mês</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="text-base">{allTime ? 'Resumo Geral' : 'Resumo do Mês'}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
