@@ -139,10 +139,6 @@ export default function FinanceiroPage() {
     return s
   }, 0) + saasAll.filter(s => s.ultimo_pagamento).reduce((sum, s) => sum + s.mrr, 0)
 
-  const recentes = [...lancamentos]
-    .sort((a, b) => b.data.localeCompare(a.data))
-    .slice(0, 8)
-
   // SaaS: agrupamento por mês baseado em ultimo_pagamento
   const saasPorMes = (() => {
     const mapa: Record<string, { mrr: number; clientes: number }> = {}
@@ -498,137 +494,136 @@ export default function FinanceiroPage() {
           </Card>
         </div>
 
-        {/* Tabela de Despesas */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">
-                Despesas — <span className="font-normal text-brand-lavanda/50 capitalize">{mesLabel}</span>
-              </CardTitle>
-              <Link href="/financeiro/despesas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">
-                Ver todas →
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-3">Descrição</th>
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Categoria</th>
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Data</th>
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Pagamento</th>
-                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Valor</th>
-                    <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={7} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
-                  ) : despesasMes.length === 0 ? (
-                    <tr><td colSpan={7} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">Nenhuma despesa neste período.</td></tr>
-                  ) : despesasMes.sort((a, b) => b.data.localeCompare(a.data)).map((d) => (
-                    <tr key={d.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
-                      <td className="px-6 py-3">
-                        <p className="text-brand-lavanda font-medium truncate max-w-[200px]">{d.descricao}</p>
-                        {d.clientes?.nome && <p className="text-xs text-brand-lavanda/40 mt-0.5">{d.clientes.nome}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">{d.categorias_financeiras?.nome ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">{formatDate(d.data)}</td>
-                      <td className="px-4 py-3 text-xs text-brand-lavanda/50 capitalize whitespace-nowrap">{(d.forma_pagamento ?? '—').replace(/_/g, ' ')}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-brand-rosa whitespace-nowrap">{formatCurrency(d.valor)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge variant={d.status === 'pago' ? 'concluido' : d.status === 'pendente' ? 'pendente' : 'inativo'}>
-                          {d.status === 'pago' ? 'Pago' : d.status === 'pendente' ? 'Pendente' : 'Cancelado'}
-                        </Badge>
-                      </td>
-                      <td className="px-2 py-3 text-center">
-                        {deletingId === d.id ? (
-                          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                            <button onClick={() => deleteLancamento(d.id)} className="text-xs text-brand-rosa font-medium hover:text-brand-rosa/80 transition-colors">Excluir</button>
-                            <span className="text-brand-lavanda/20">·</span>
-                            <button onClick={() => setDeletingId(null)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Cancelar</button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeletingId(d.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors mx-auto"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                {despesasMes.length > 0 && (
-                  <tfoot>
-                    <tr className="border-t border-white/[0.06]">
-                      <td colSpan={4} className="px-6 py-3 text-xs text-brand-lavanda/40">
-                        {despesasMes.length} despesa{despesasMes.length !== 1 ? 's' : ''}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-brand-rosa whitespace-nowrap">
-                        {formatCurrency(despesasMes.reduce((s, d) => s + d.valor, 0))}
-                      </td>
-                      <td /><td />
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Receitas e Despesas lado a lado */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Lançamentos Recentes</CardTitle>
-              <Link href="/financeiro/receitas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">
-                Ver todos →
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <p className="text-center text-brand-lavanda/40 text-sm py-8">Carregando...</p>
-            ) : recentes.length === 0 ? (
-              <p className="text-center text-brand-lavanda/40 text-sm py-8">Nenhum lançamento encontrado.</p>
-            ) : (
-              <div className="divide-y divide-brand-violeta/10">
-                {recentes.map((l) => (
-                  <div key={l.id} className="flex items-center gap-4 px-6 py-3.5 hover:bg-white/[0.02] transition-colors">
-                    <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', l.tipo === 'receita' ? 'bg-brand-lima/10' : 'bg-brand-rosa/10')}>
-                      {l.tipo === 'receita'
-                        ? <TrendingUp className="h-4 w-4 text-brand-lima" />
-                        : <TrendingDown className="h-4 w-4 text-brand-rosa" />
-                      }
-                    </div>
+          {/* Receitas */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-brand-lima" />
+                  <CardTitle className="text-base">Receitas</CardTitle>
+                  <span className="text-xs text-brand-lavanda/40 capitalize font-normal">{mesLabel}</span>
+                </div>
+                <Link href="/financeiro/receitas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">Ver todas →</Link>
+              </div>
+              {!loading && (
+                <div className="flex items-center gap-4 pt-1">
+                  <span className="text-xs text-brand-lavanda/50">Recebido: <span className="text-brand-lima font-semibold">{formatCurrency(receitasMes.filter(l => l.status === 'recebido').reduce((s, l) => s + l.valor, 0))}</span></span>
+                  {receitasMes.filter(l => l.status === 'pendente').length > 0 && (
+                    <span className="text-xs text-brand-lavanda/50">Pendente: <span className="text-yellow-400 font-semibold">{formatCurrency(receitasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0))}</span></span>
+                  )}
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-white/[0.04]">
+                {loading ? (
+                  <p className="text-center text-brand-lavanda/40 text-sm py-8">Carregando...</p>
+                ) : receitasMes.length === 0 ? (
+                  <p className="text-center text-brand-lavanda/40 text-sm py-8">Nenhuma receita neste período.</p>
+                ) : [...receitasMes].sort((a, b) => b.data.localeCompare(a.data)).map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors group">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-brand-lavanda truncate">{l.descricao}</p>
-                      <p className="text-xs text-brand-lavanda/40">
-                        {l.categorias_financeiras?.nome ?? '—'}{l.clientes?.nome ? ` • ${l.clientes.nome}` : ''}
+                      <p className="text-sm text-brand-lavanda font-medium truncate">{r.descricao}</p>
+                      <p className="text-xs text-brand-lavanda/40 mt-0.5">
+                        {r.categorias_financeiras?.nome ?? '—'}{r.clientes?.nome ? ` · ${r.clientes.nome}` : ''} · {formatDate(r.data)}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className={cn('text-sm font-semibold', l.tipo === 'receita' ? 'text-brand-lima' : 'text-brand-rosa')}>
-                        {l.tipo === 'receita' ? '+' : '-'}{formatCurrency(l.valor)}
-                      </p>
-                      <p className="text-xs text-brand-lavanda/40">{formatDate(l.data)}</p>
-                    </div>
-                    <Badge
-                      variant={l.status === 'recebido' || l.status === 'pago' ? 'concluido' : l.status === 'pendente' ? 'pendente' : 'inativo'}
-                      className="shrink-0"
-                    >
-                      {l.status === 'recebido' ? 'Recebido' : l.status === 'pago' ? 'Pago' : l.status === 'pendente' ? 'Pendente' : 'Cancelado'}
+                    <span className="text-sm font-semibold text-brand-lima shrink-0">+{formatCurrency(r.valor)}</span>
+                    <Badge variant={r.status === 'recebido' ? 'concluido' : r.status === 'pendente' ? 'pendente' : 'inativo'} className="shrink-0">
+                      {r.status === 'recebido' ? 'Recebido' : r.status === 'pendente' ? 'Pendente' : 'Cancelado'}
                     </Badge>
+                    <div className="shrink-0 w-14 flex justify-end">
+                      {deletingId === r.id ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => deleteLancamento(r.id)} className="text-[11px] text-brand-rosa font-medium">Excluir</button>
+                          <span className="text-brand-lavanda/20">·</span>
+                          <button onClick={() => setDeletingId(null)} className="text-[11px] text-brand-lavanda/40">Cancelar</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeletingId(r.id)} className="flex h-6 w-6 items-center justify-center rounded text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+              {receitasMes.length > 0 && (
+                <div className="border-t border-white/[0.06] px-4 py-2.5 flex justify-between text-xs text-brand-lavanda/40">
+                  <span>{receitasMes.length} lançamento{receitasMes.length !== 1 ? 's' : ''}</span>
+                  <span className="font-bold text-brand-lima">{formatCurrency(receitasMes.reduce((s, r) => s + r.valor, 0))}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Despesas */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-brand-rosa" />
+                  <CardTitle className="text-base">Despesas</CardTitle>
+                  <span className="text-xs text-brand-lavanda/40 capitalize font-normal">{mesLabel}</span>
+                </div>
+                <Link href="/financeiro/despesas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">Ver todas →</Link>
+              </div>
+              {!loading && (
+                <div className="flex items-center gap-4 pt-1">
+                  <span className="text-xs text-brand-lavanda/50">Pago: <span className="text-brand-rosa font-semibold">{formatCurrency(despesasMes.filter(l => l.status === 'pago').reduce((s, l) => s + l.valor, 0))}</span></span>
+                  {despesasMes.filter(l => l.status === 'pendente').length > 0 && (
+                    <span className="text-xs text-brand-lavanda/50">Pendente: <span className="text-yellow-400 font-semibold">{formatCurrency(despesasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0))}</span></span>
+                  )}
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-white/[0.04]">
+                {loading ? (
+                  <p className="text-center text-brand-lavanda/40 text-sm py-8">Carregando...</p>
+                ) : despesasMes.length === 0 ? (
+                  <p className="text-center text-brand-lavanda/40 text-sm py-8">Nenhuma despesa neste período.</p>
+                ) : [...despesasMes].sort((a, b) => b.data.localeCompare(a.data)).map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors group">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-brand-lavanda font-medium truncate">{d.descricao}</p>
+                      <p className="text-xs text-brand-lavanda/40 mt-0.5">
+                        {d.categorias_financeiras?.nome ?? '—'} · {formatDate(d.data)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-brand-rosa shrink-0">-{formatCurrency(d.valor)}</span>
+                    <Badge variant={d.status === 'pago' ? 'concluido' : d.status === 'pendente' ? 'pendente' : 'inativo'} className="shrink-0">
+                      {d.status === 'pago' ? 'Pago' : d.status === 'pendente' ? 'Pendente' : 'Cancelado'}
+                    </Badge>
+                    <div className="shrink-0 w-14 flex justify-end">
+                      {deletingId === d.id ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => deleteLancamento(d.id)} className="text-[11px] text-brand-rosa font-medium">Excluir</button>
+                          <span className="text-brand-lavanda/20">·</span>
+                          <button onClick={() => setDeletingId(null)} className="text-[11px] text-brand-lavanda/40">Cancelar</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeletingId(d.id)} className="flex h-6 w-6 items-center justify-center rounded text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {despesasMes.length > 0 && (
+                <div className="border-t border-white/[0.06] px-4 py-2.5 flex justify-between text-xs text-brand-lavanda/40">
+                  <span>{despesasMes.length} despesa{despesasMes.length !== 1 ? 's' : ''}</span>
+                  <span className="font-bold text-brand-rosa">{formatCurrency(despesasMes.reduce((s, d) => s + d.valor, 0))}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+        </div>
       </main>
     </div>
   )

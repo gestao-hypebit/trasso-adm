@@ -57,6 +57,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function RelatoriosPage() {
   const [aba, setAba] = useState('financeiro')
   const [lancamentos, setLancamentos] = useState<any[]>([])
+  const [saasClientes, setSaasClientes] = useState<any[]>([])
   const [projetos, setProjetos] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
   const [propostas, setPropostas] = useState<any[]>([])
@@ -64,14 +65,17 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     const supabase = createClient()
+    const db = supabase as any
     async function load() {
-      const [{ data: l }, { data: p }, { data: c }, { data: prop }] = await Promise.all([
+      const [{ data: l }, { data: p }, { data: c }, { data: prop }, { data: sc }] = await Promise.all([
         supabase.from('lancamentos').select('tipo, valor, data, status, cliente_id, clientes(nome)').in('status', ['recebido', 'pago']),
         supabase.from('projetos').select('id, status, tipo, created_at'),
         supabase.from('clientes').select('id, origem, created_at'),
         supabase.from('propostas').select('id, status'),
+        db.from('saas_clientes').select('mrr, ultimo_pagamento').in('status', ['ativo', 'trial']).not('ultimo_pagamento', 'is', null),
       ])
       setLancamentos(l ?? [])
+      setSaasClientes(sc ?? [])
       setProjetos(p ?? [])
       setClientes(c ?? [])
       setPropostas(prop ?? [])
@@ -87,6 +91,12 @@ export default function RelatoriosPage() {
       if (!porMes[mesKey]) porMes[mesKey] = { receita: 0, despesa: 0 }
       if (l.tipo === 'receita') porMes[mesKey].receita += l.valor
       if (l.tipo === 'despesa') porMes[mesKey].despesa += l.valor
+    }
+    for (const sc of saasClientes) {
+      if (!sc.ultimo_pagamento) continue
+      const mesKey = sc.ultimo_pagamento.slice(0, 7)
+      if (!porMes[mesKey]) porMes[mesKey] = { receita: 0, despesa: 0 }
+      porMes[mesKey].receita += sc.mrr
     }
     return Object.entries(porMes)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -109,7 +119,8 @@ export default function RelatoriosPage() {
       .map(([nome, valor]) => ({ nome, valor }))
   })()
 
-  const totalReceita = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
+  const totalSaas = saasClientes.reduce((s: number, sc: any) => s + (sc.mrr ?? 0), 0)
+  const totalReceita = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0) + totalSaas
   const totalDespesa = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
 
   const projetosPorStatus = Object.entries(
