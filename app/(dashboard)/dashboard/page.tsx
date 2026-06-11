@@ -1,0 +1,450 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight } from 'lucide-react'
+import { KpiCard } from '@/components/dashboard/kpi-card'
+import { Header } from '@/components/layout/header'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts'
+import { createClient } from '@/lib/supabase/client'
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+
+type Lancamento = { tipo: string; valor: number; data: string; status: string; descricao: string; categorias_financeiras: { nome: string } | null }
+type Projeto = { id: string; status: string; data_entrega: string | null; nome: string }
+type ProdutoMrr = { id: string; nome: string; cor: string; mrr: number; clientes: number }
+type SaasAll = { id: string; nome: string; mrr: number; ultimo_pagamento: string | null; proximo_vencimento: string | null; produto_id: string }
+type PropostaCount = { id: string }
+type ClienteAll = { id: string; created_at: string }
+
+const STATUS_CORES: Record<string, string> = {
+  em_andamento: '#7C3AED',
+  aguardando_cliente: '#B8F000',
+  em_revisao: '#FF4D8D',
+  concluido: '#5B21B6',
+  backlog: '#F59E0B',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  em_andamento: 'Em Andamento',
+  aguardando_cliente: 'Aguardando',
+  em_revisao: 'Em Revisão',
+  concluido: 'Concluído',
+  backlog: 'Backlog',
+}
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-[#141318] border border-white/[0.1] rounded-xl p-3 text-xs">
+      <p className="text-brand-lavanda font-semibold mb-1">{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.name} style={{ color: p.fill ?? p.color }}>{p.name}: {formatCurrency(p.value)}</p>
+      ))}
+    </div>
+  )
+}
+
+export default function DashboardPage() {
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [projetos, setProjetos] = useState<Projeto[]>([])
+  const [propostas, setPropostas] = useState<PropostaCount[]>([])
+  const [clientesAll, setClientesAll] = useState<ClienteAll[]>([])
+  const [produtosMrr, setProdutosMrr] = useState<ProdutoMrr[]>([])
+  const [saasAll, setSaasAll] = useState<SaasAll[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Mês selecionado (filtro)
+  const [mesSel, setMesSel] = useState(() => startOfMonth(new Date()))
+  const mesStart = format(mesSel, 'yyyy-MM-01')
+  const mesEnd = format(endOfMonth(mesSel), 'yyyy-MM-dd')
+  const mesLabel = format(mesSel, 'MMMM yyyy', { locale: ptBR })
+  const isCurrentMes = format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
+
+  useEffect(() => {
+    const supabase = createClient()
+    const db = supabase as any
+    async function load() {
+      const [{ data: l }, { data: p }, { data: prop }, { data: cl }, { data: prodsRaw }] = await Promise.all([
+        supabase.from('lancamentos').select('tipo, valor, data, status, descricao, categorias_financeiras(nome)').order('data', { ascending: true }),
+        supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false }),
+        supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao']),
+        supabase.from('clientes').select('id, created_at'),
+        db.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true) as Promise<{ data: { id: string; nome: string; cor: string }[] | null }>,
+      ])
+      const prods = prodsRaw as { id: string; nome: string; cor: string }[] | null
+      setLancamentos((l as Lancamento[]) ?? [])
+      setProjetos(p ?? [])
+      setPropostas(prop ?? [])
+      setClientesAll(cl ?? [])
+
+      if (prods && prods.length > 0) {
+        const [comMrr, saasResult] = await Promise.all([
+          Promise.all(prods.map(async (prod) => {
+            const { data: sc } = await db
+              .from('saas_clientes').select('mrr, status').eq('produto_id', prod.id).eq('status', 'ativo') as { data: { mrr: number; status: string }[] | null }
+            const mrr = sc?.reduce((s, c) => s + (c.mrr ?? 0), 0) ?? 0
+            return { id: prod.id, nome: prod.nome, cor: prod.cor, mrr, clientes: sc?.length ?? 0 }
+          })),
+          db.from('saas_clientes')
+            .select('id, nome, mrr, ultimo_pagamento, proximo_vencimento, produto_id')
+            .in('status', ['ativo', 'trial']) as Promise<{ data: SaasAll[] | null }>,
+        ])
+        setProdutosMrr(comMrr)
+        setSaasAll(saasResult.data ?? [])
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  // KPIs do mês selecionado
+  const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
+  const clientesMes = clientesAll.filter(c => c.created_at >= `${mesStart}T00:00:00` && c.created_at <= `${mesEnd}T23:59:59`)
+  const receitaAgencia = doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
+  const mrrSaas = produtosMrr.reduce((s, p) => s + p.mrr, 0)
+  const saasFaturadoMes = saasAll
+    .filter(s => s.ultimo_pagamento && s.ultimo_pagamento >= mesStart && s.ultimo_pagamento <= mesEnd)
+    .reduce((sum, s) => sum + s.mrr, 0)
+  const faturamento = receitaAgencia + saasFaturadoMes
+  const projetosAtivos = projetos.filter(p => p.status === 'em_andamento').length
+
+  // SaaS pendente no mês selecionado
+  const saasVencMes = saasAll
+    .filter(s => s.proximo_vencimento && s.proximo_vencimento >= mesStart && s.proximo_vencimento <= mesEnd)
+    .sort((a, b) => (a.proximo_vencimento ?? '').localeCompare(b.proximo_vencimento ?? ''))
+
+  // Gráfico histórico (todos os meses com dados)
+  const revenueData = (() => {
+    const porMes: Record<string, { agencia: number; saas: number; despesa: number; mesKey: string }> = {}
+    for (const l of lancamentos) {
+      if (l.status !== 'recebido' && l.status !== 'pago') continue
+      const k = l.data.slice(0, 7)
+      if (!porMes[k]) porMes[k] = { agencia: 0, saas: 0, despesa: 0, mesKey: k }
+      if (l.tipo === 'receita') porMes[k].agencia += l.valor
+      if (l.tipo === 'despesa') porMes[k].despesa += l.valor
+    }
+    for (const s of saasAll) {
+      if (!s.ultimo_pagamento) continue
+      const k = s.ultimo_pagamento.slice(0, 7)
+      if (!porMes[k]) porMes[k] = { agencia: 0, saas: 0, despesa: 0, mesKey: k }
+      porMes[k].saas += s.mrr
+    }
+    return Object.entries(porMes)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([k, v]) => {
+        const lbl = format(new Date(k + '-01T12:00:00Z'), 'MMM/yy', { locale: ptBR })
+        const isSel = k === format(mesSel, 'yyyy-MM')
+        return { mes: lbl.charAt(0).toUpperCase() + lbl.slice(1), ...v, isSel }
+      })
+  })()
+
+  const projetosStatusData = Object.entries(
+    projetos.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc }, {} as Record<string, number>)
+  ).map(([status, value]) => ({ name: STATUS_LABELS[status] || status, value, color: STATUS_CORES[status] || '#5B21B6' }))
+
+  const proximosVencimentos = projetos
+    .filter(p => p.data_entrega && p.status !== 'concluido' && p.status !== 'cancelado')
+    .sort((a, b) => (a.data_entrega ?? '').localeCompare(b.data_entrega ?? ''))
+    .slice(0, 5)
+
+  const recenteLancamentos = [...doMes]
+    .sort((a, b) => b.data.localeCompare(a.data))
+    .slice(0, 5)
+
+  type VencItem =
+    | { tipo: 'projeto'; id: string; nome: string; data: string; urgente: boolean }
+    | { tipo: 'saas'; id: string; nome: string; data: string; mrr: number; cor: string; produto: string }
+
+  const hoje = format(new Date(), 'yyyy-MM-dd')
+  const combinedVencimentos: VencItem[] = [
+    ...proximosVencimentos.map(p => ({
+      tipo: 'projeto' as const, id: p.id, nome: p.nome, data: p.data_entrega!,
+      urgente: p.data_entrega! <= format(new Date(Date.now() + 3 * 86400000), 'yyyy-MM-dd'),
+    })),
+    ...saasVencMes.map(sv => {
+      const prod = produtosMrr.find(p => p.id === sv.produto_id)
+      return { tipo: 'saas' as const, id: sv.id, nome: sv.nome, data: sv.proximo_vencimento!, mrr: sv.mrr, cor: prod?.cor ?? '#7C3AED', produto: prod?.nome ?? 'SaaS' }
+    }),
+  ].sort((a, b) => a.data.localeCompare(b.data)).slice(0, 6)
+
+  const hasSaas = saasAll.some(s => s.ultimo_pagamento)
+
+  return (
+    <div>
+      <Header title="Dashboard" description="Visão geral da Trasso" />
+      <div className="p-6 space-y-6">
+
+        {/* Seletor de mês */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
+            <button
+              onClick={() => setMesSel(d => subMonths(d, 1))}
+              className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-medium text-brand-lavanda min-w-[120px] text-center capitalize">
+              {mesLabel}
+            </span>
+            <button
+              onClick={() => setMesSel(d => addMonths(d, 1))}
+              disabled={isCurrentMes}
+              className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          {!isCurrentMes && (
+            <button
+              onClick={() => setMesSel(startOfMonth(new Date()))}
+              className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors"
+            >
+              Voltar ao mês atual
+            </button>
+          )}
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="sm:col-span-2 lg:col-span-1">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-xs text-brand-lavanda/40 mb-3">Receita Total</p>
+                  <p className="text-2xl font-bold text-brand-lima" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                    {loading ? '...' : formatCurrency(faturamento)}
+                  </p>
+                  {!loading && (saasFaturadoMes > 0 || mrrSaas > 0) && (
+                    <div className="mt-2 space-y-0.5">
+                      <p className="text-[11px] text-brand-lavanda/40">
+                        Agência: <span className="text-brand-lavanda/60">{formatCurrency(receitaAgencia)}</span>
+                      </p>
+                      {saasFaturadoMes > 0 && (
+                        <p className="text-[11px] text-brand-lavanda/40">
+                          SaaS recebido: <span className="text-brand-lavanda/60">{formatCurrency(saasFaturadoMes)}</span>
+                        </p>
+                      )}
+                      {mrrSaas > saasFaturadoMes && (
+                        <p className="text-[11px] text-brand-lavanda/40">
+                          SaaS a receber: <span className="text-yellow-400/70">{formatCurrency(mrrSaas - saasFaturadoMes)}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <DollarSign className="h-5 w-5 shrink-0 text-brand-lima" />
+              </div>
+            </CardContent>
+          </Card>
+          <KpiCard title="Projetos Ativos" value={loading ? '...' : String(projetosAtivos)} icon={FolderOpen} iconColor="text-brand-violeta" />
+          <KpiCard title="Propostas em Aberto" value={loading ? '...' : String(propostas.length)} icon={FileText} iconColor="text-brand-rosa" />
+          <KpiCard title="Novos Clientes" value={loading ? '...' : String(clientesMes.length)} icon={Users} iconColor="text-brand-lima" />
+        </div>
+
+        {/* Gráfico histórico */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">Receita x Despesa — últimos 12 meses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {revenueData.length === 0 ? (
+                <div className="h-[260px] flex items-center justify-center text-brand-lavanda/30 text-sm">
+                  {loading ? 'Carregando...' : 'Sem dados financeiros ainda'}
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={revenueData} barGap={2} barCategoryGap="30%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v === 0 ? '' : `${(v/1000).toFixed(0)}k`} width={36} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                      <Bar dataKey="agencia" name="Agência" stackId="rec" fill="#7C3AED" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="saas" name="SaaS" stackId="rec" fill="#B8F000" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="despesa" name="Despesa" fill="#FF4D8D" fillOpacity={0.35} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center gap-4 mt-2 justify-end">
+                    <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
+                      <span className="h-2 w-2 rounded-sm bg-brand-violeta" /> Agência
+                    </span>
+                    {hasSaas && (
+                      <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
+                        <span className="h-2 w-2 rounded-sm bg-brand-lima" /> SaaS
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
+                      <span className="h-2 w-2 rounded-sm bg-brand-rosa/50" /> Despesa
+                    </span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Projetos por Status</CardTitle></CardHeader>
+            <CardContent>
+              {projetos.length === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-brand-lavanda/30 text-sm">
+                  {loading ? 'Carregando...' : 'Sem projetos'}
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={projetosStatusData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={3}>
+                        {projetosStatusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(value) => [value, 'projetos']} contentStyle={{ background: '#141318', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-2 mt-2">
+                    {projetosStatusData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+                          <span className="text-brand-lavanda/70">{item.name}</span>
+                        </div>
+                        <span className="font-semibold text-brand-lavanda">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Lançamentos + Vencimentos */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Lançamentos — <span className="capitalize font-normal text-brand-lavanda/50">{mesLabel}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading ? (
+                <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
+              ) : recenteLancamentos.length === 0 ? (
+                <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhum lançamento neste mês.</p>
+              ) : recenteLancamentos.map((l, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', l.tipo === 'receita' ? 'bg-brand-lima/10' : 'bg-brand-rosa/10')}>
+                    {l.tipo === 'receita' ? <TrendingUp className="h-4 w-4 text-brand-lima" /> : <TrendingDown className="h-4 w-4 text-brand-rosa" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-brand-lavanda truncate">{l.descricao}</p>
+                    <p className="text-xs text-brand-lavanda/40 mt-0.5">{l.categorias_financeiras?.nome ?? '—'} • {formatDate(l.data)}</p>
+                  </div>
+                  <p className={cn('text-sm font-semibold shrink-0', l.tipo === 'receita' ? 'text-brand-lima' : 'text-brand-rosa')}>
+                    {l.tipo === 'receita' ? '+' : '-'}{formatCurrency(l.valor)}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Próximos Vencimentos</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {loading ? (
+                <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
+              ) : combinedVencimentos.length === 0 ? (
+                <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhum vencimento próximo.</p>
+              ) : combinedVencimentos.map((item) => (
+                <div key={`${item.tipo}-${item.id}`} className="flex items-center justify-between gap-3 rounded-xl p-3 bg-white/[0.02] border border-white/[0.04]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {item.tipo === 'saas' ? (
+                      <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: item.cor }} />
+                    ) : (
+                      <Clock className={cn('h-4 w-4 shrink-0', item.urgente ? 'text-brand-rosa' : 'text-brand-lavanda/40')} />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm text-brand-lavanda truncate">{item.nome}</p>
+                      {item.tipo === 'saas' && <p className="text-[11px] text-brand-lavanda/40">{item.produto}</p>}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={cn('text-xs font-medium', item.tipo === 'projeto' && item.urgente ? 'text-brand-rosa' : item.tipo === 'saas' && item.data < hoje ? 'text-brand-rosa' : 'text-brand-lavanda/60')}>
+                      {formatDate(item.data)}
+                    </p>
+                    {item.tipo === 'saas' && <p className="text-[11px] text-brand-lima">{formatCurrency(item.mrr)}</p>}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Receita por Produto */}
+        {produtosMrr.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-brand-lavanda/40" />
+                <h2 className="text-sm font-semibold text-brand-lavanda/70">Receita por Produto</h2>
+              </div>
+              <Link href="/saas" className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Ver todos →</Link>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-white/[0.06] bg-[#141318] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-2 w-2 rounded-full bg-brand-lavanda/40" />
+                  <span className="text-xs font-medium text-brand-lavanda/60">Trasso Agência</span>
+                </div>
+                <p className="text-lg font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                  {loading ? '...' : formatCurrency(receitaAgencia)}
+                </p>
+                <p className="text-[11px] text-brand-lavanda/30 mt-1">receita do mês</p>
+              </div>
+              {produtosMrr.map(prod => {
+                const recebidoProd = saasAll
+                  .filter(s => s.ultimo_pagamento && s.ultimo_pagamento >= mesStart && s.ultimo_pagamento <= mesEnd && s.produto_id === prod.id)
+                  .reduce((sum, s) => sum + s.mrr, 0)
+                return (
+                  <Link href={`/saas/${prod.id}`} key={prod.id}>
+                    <div className="rounded-xl border border-white/[0.06] bg-[#141318] p-4 hover:border-white/[0.12] transition-colors cursor-pointer">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-2 w-2 rounded-full" style={{ background: prod.cor }} />
+                        <span className="text-xs font-medium text-brand-lavanda/60">{prod.nome}</span>
+                      </div>
+                      <p className="text-lg font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                        {formatCurrency(prod.mrr)}
+                      </p>
+                      <p className="text-[11px] text-brand-lavanda/30 mt-1">MRR · {prod.clientes} assinante{prod.clientes !== 1 ? 's' : ''}</p>
+                      {recebidoProd > 0
+                        ? <p className="text-[11px] text-brand-lima/60 mt-0.5">✓ {formatCurrency(recebidoProd)} recebido</p>
+                        : <p className="text-[11px] text-yellow-400/50 mt-0.5">Aguardando cobrança</p>
+                      }
+                    </div>
+                  </Link>
+                )
+              })}
+              <div className="rounded-xl border border-brand-lima/20 bg-brand-lima/[0.04] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-2 w-2 rounded-full bg-brand-lima" />
+                  <span className="text-xs font-medium text-brand-lima/70">Total Consolidado</span>
+                </div>
+                <p className="text-lg font-bold text-brand-lima" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                  {loading ? '...' : formatCurrency(faturamento)}
+                </p>
+                <p className="text-[11px] text-brand-lima/40 mt-1">agência + SaaS recebido</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

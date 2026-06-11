@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-noite: #0C0B10;
+  --color-brand-violeta: #7C3AED;
+  --color-brand-medio: #111015;
+  --color-brand-lima: #B8F000;
+  --color-brand-limaClaro: #C9F020;
+  --color-brand-lavanda: #E8E4F8;
+  --color-brand-violetaS: #5B21B6;
+  --color-brand-rosa: #FF4D8D;
+  --color-brand-preto: #0D0D0D;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0C0B10;
+  --foreground: #E8E4F8;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0C0B10;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.18);
 }
