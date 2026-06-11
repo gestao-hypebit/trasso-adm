@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
+import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, ChevronDown, Wallet } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -63,6 +63,8 @@ export default function DashboardPage() {
   // Mês selecionado (filtro)
   const [mesSel, setMesSel] = useState(() => startOfMonth(new Date()))
   const [allTime, setAllTime] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear())
   const mesStart = allTime ? '0000-01-01' : format(mesSel, 'yyyy-MM-01')
   const mesEnd = allTime ? '9999-12-31' : format(endOfMonth(mesSel), 'yyyy-MM-dd')
   const mesLabel = allTime ? 'Desde o início' : format(mesSel, 'MMMM yyyy', { locale: ptBR })
@@ -199,9 +201,49 @@ export default function DashboardPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm font-medium text-brand-lavanda min-w-[120px] text-center capitalize">
-                {mesLabel}
-              </span>
+              <div className="relative">
+                <button
+                  onClick={() => { setPickerYear(mesSel.getFullYear()); setShowPicker(v => !v) }}
+                  className="flex items-center gap-1 text-sm font-medium text-brand-lavanda min-w-[120px] justify-center capitalize hover:text-brand-lavanda/80 transition-colors"
+                >
+                  {mesLabel}
+                  <ChevronDown className="h-3 w-3 text-brand-lavanda/40 shrink-0" />
+                </button>
+                {showPicker && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowPicker(false)} />
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 rounded-xl border border-white/[0.1] bg-[#1A0533] shadow-2xl p-3 w-56">
+                      <div className="flex items-center justify-between mb-3">
+                        <button onClick={() => setPickerYear(y => y - 1)} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors">
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="text-sm font-semibold text-brand-lavanda">{pickerYear}</span>
+                        <button onClick={() => setPickerYear(y => y + 1)} disabled={pickerYear >= new Date().getFullYear()} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const d = new Date(pickerYear, i, 1)
+                          const isSelected = format(d, 'yyyy-MM') === format(mesSel, 'yyyy-MM')
+                          const isFuture = d > new Date()
+                          const lbl = format(d, 'MMM', { locale: ptBR })
+                          return (
+                            <button
+                              key={i}
+                              disabled={isFuture}
+                              onClick={() => { setMesSel(startOfMonth(d)); setAllTime(false); setShowPicker(false) }}
+                              className={cn('py-1.5 rounded-lg text-xs transition-colors capitalize', isSelected ? 'bg-brand-lima text-brand-noite font-semibold' : 'text-brand-lavanda/60 hover:bg-white/[0.06] hover:text-brand-lavanda', isFuture && 'opacity-25 cursor-not-allowed')}
+                            >
+                              {lbl.charAt(0).toUpperCase() + lbl.slice(1, 3)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => setMesSel(d => addMonths(d, 1))}
                 disabled={isCurrentMes}
