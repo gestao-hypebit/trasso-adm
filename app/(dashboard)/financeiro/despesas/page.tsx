@@ -1,9 +1,9 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Search, TrendingDown, CheckCircle2, Clock, Download } from 'lucide-react'
+import { Search, TrendingDown, CheckCircle2, Clock, Download, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,20 +67,26 @@ export default function DespesasPage() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     const supabase = createClient()
-    async function load() {
-      const { data } = await supabase
-        .from('lancamentos')
-        .select('id, descricao, valor, data, status, forma_pagamento, categorias_financeiras(nome)')
-        .eq('tipo', 'despesa')
-        .order('data', { ascending: false })
-      setDespesas((data as Lancamento[]) ?? [])
-      setLoading(false)
-    }
-    load()
+    const { data } = await supabase
+      .from('lancamentos')
+      .select('id, descricao, valor, data, status, forma_pagamento, categorias_financeiras(nome)')
+      .eq('tipo', 'despesa')
+      .order('data', { ascending: false })
+    setDespesas((data as Lancamento[]) ?? [])
+    setLoading(false)
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function deleteLancamento(id: string) {
+    const { error } = await createClient().from('lancamentos').delete().eq('id', id)
+    if (!error) setDespesas(prev => prev.filter(d => d.id !== id))
+    setDeletingId(null)
+  }
 
   const filtradas = despesas.filter((d) => {
     const matchBusca = d.descricao.toLowerCase().includes(busca.toLowerCase())
@@ -182,18 +188,19 @@ export default function DespesasPage() {
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Pagamento</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Valor</th>
                     <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                    <tr><td colSpan={7} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
                   ) : filtradas.length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhuma despesa encontrada.</td></tr>
-                  ) : filtradas.map((d, idx) => {
+                    <tr><td colSpan={7} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhuma despesa encontrada.</td></tr>
+                  ) : filtradas.map((d) => {
                     const sc = statusConfig[d.status as keyof typeof statusConfig]
                     const cor = CORES[porCategoria.findIndex(c => c.name === (d.categorias_financeiras?.nome ?? 'Outros')) % CORES.length] || CORES[0]
                     return (
-                      <tr key={d.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      <tr key={d.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
                         <td className="px-6 py-3.5">
                           <p className="text-brand-lavanda font-medium">{d.descricao}</p>
                         </td>
@@ -211,6 +218,22 @@ export default function DespesasPage() {
                         <td className="px-4 py-3.5 text-center">
                           {sc && <Badge variant={sc.variant}>{sc.label}</Badge>}
                         </td>
+                        <td className="px-2 py-3.5 text-center">
+                          {deletingId === d.id ? (
+                            <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                              <button onClick={() => deleteLancamento(d.id)} className="text-xs text-brand-rosa hover:text-brand-rosa/80 font-medium transition-colors">Excluir</button>
+                              <span className="text-brand-lavanda/20">·</span>
+                              <button onClick={() => setDeletingId(null)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Cancelar</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeletingId(d.id)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors mx-auto"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -224,7 +247,7 @@ export default function DespesasPage() {
                       <td className="px-4 py-3 text-right font-bold text-brand-lavanda whitespace-nowrap">
                         {formatCurrency(filtradas.reduce((s, d) => s + d.valor, 0))}
                       </td>
-                      <td />
+                      <td /><td />
                     </tr>
                   </tfoot>
                 )}

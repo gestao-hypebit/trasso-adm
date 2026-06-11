@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Search, TrendingUp, CheckCircle2, Clock, XCircle, Download, Layers, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
+import { Search, TrendingUp, CheckCircle2, Clock, XCircle, Download, Layers, RefreshCw, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -94,6 +94,7 @@ export default function ReceitasPage() {
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [expandedSeries, setExpandedSeries] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -136,6 +137,15 @@ export default function ReceitasPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  async function deleteLancamento(id: string) {
+    const { error } = await createClient().from('lancamentos').delete().eq('id', id)
+    if (!error) {
+      setReceitas(prev => prev.filter(r => r.id !== id))
+      setRecorrentes(prev => prev.filter(r => r.id !== id))
+    }
+    setDeletingId(null)
+  }
 
   async function confirmarRecebimento(id: string) {
     const { error } = await (createClient() as any).from('lancamentos').update({ status: 'recebido' }).eq('id', id)
@@ -281,7 +291,7 @@ export default function ReceitasPage() {
                     {expanded && (
                       <div className="bg-white/[0.01] border-t border-white/[0.04]">
                         {serie.entradas.map((entrada) => (
-                          <div key={entrada.id} className="flex items-center gap-3 px-6 py-2.5 pl-[72px] border-b border-white/[0.03] last:border-0">
+                          <div key={entrada.id} className="flex items-center gap-3 px-6 py-2.5 pl-[72px] border-b border-white/[0.03] last:border-0 group">
                             <div className="flex-1">
                               <span className="text-xs text-brand-lavanda/60">{formatDate(entrada.data)}</span>
                             </div>
@@ -301,6 +311,22 @@ export default function ReceitasPage() {
                                 <Badge variant={statusConfig[entrada.status as keyof typeof statusConfig]?.variant ?? 'outline'}>
                                   {statusConfig[entrada.status as keyof typeof statusConfig]?.label ?? entrada.status}
                                 </Badge>
+                              )}
+                            </div>
+                            <div className="w-16 flex justify-end shrink-0">
+                              {deletingId === entrada.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => deleteLancamento(entrada.id)} className="text-[11px] text-brand-rosa font-medium">Excluir</button>
+                                  <span className="text-brand-lavanda/20">·</span>
+                                  <button onClick={() => setDeletingId(null)} className="text-[11px] text-brand-lavanda/40">Cancelar</button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setDeletingId(entrada.id)}
+                                  className="flex h-6 w-6 items-center justify-center rounded text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
                               )}
                             </div>
                           </div>
@@ -345,17 +371,18 @@ export default function ReceitasPage() {
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Pagamento</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Valor</th>
                     <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={7} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
                   ) : filtradas.length === 0 ? (
-                    <tr><td colSpan={7} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhuma receita encontrada.</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhuma receita encontrada.</td></tr>
                   ) : filtradas.map((r) => {
                     const sc = statusConfig[r.status as keyof typeof statusConfig]
                     return (
-                      <tr key={r.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      <tr key={r.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
                         <td className="px-6 py-3.5">
                           <p className="text-brand-lavanda font-medium truncate max-w-xs">{r.descricao}</p>
                         </td>
@@ -371,6 +398,22 @@ export default function ReceitasPage() {
                         <td className="px-4 py-3.5 text-center">
                           {sc && <Badge variant={sc.variant}>{sc.label}</Badge>}
                         </td>
+                        <td className="px-2 py-3.5 text-center">
+                          {deletingId === r.id ? (
+                            <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                              <button onClick={() => deleteLancamento(r.id)} className="text-xs text-brand-rosa hover:text-brand-rosa/80 font-medium transition-colors">Excluir</button>
+                              <span className="text-brand-lavanda/20">·</span>
+                              <button onClick={() => setDeletingId(null)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Cancelar</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeletingId(r.id)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors mx-auto"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -384,7 +427,7 @@ export default function ReceitasPage() {
                       <td className="px-4 py-3 text-right font-bold text-brand-lavanda whitespace-nowrap">
                         {formatCurrency(filtradas.reduce((s, r) => s + r.valor, 0))}
                       </td>
-                      <td />
+                      <td /><td />
                     </tr>
                   </tfoot>
                 )}

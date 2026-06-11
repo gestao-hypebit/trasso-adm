@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -122,6 +122,12 @@ export default function FinanceiroPage() {
   const saasAReceber = saasVencMes.reduce((s, c) => s + c.mrr, 0)
   const aReceber = aReceberLanc + saasAReceber
   const aPagar = despesasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0)
+
+  const saldoAtual = lancamentos.reduce((s, l) => {
+    if (l.tipo === 'receita' && l.status === 'recebido') return s + l.valor
+    if (l.tipo === 'despesa' && l.status === 'pago') return s - l.valor
+    return s
+  }, 0) + saasAll.filter(s => s.ultimo_pagamento).reduce((sum, s) => sum + s.mrr, 0)
 
   const recentes = [...lancamentos]
     .sort((a, b) => b.data.localeCompare(a.data))
@@ -245,6 +251,18 @@ export default function FinanceiroPage() {
               Mês atual
             </button>
           )}
+        </div>
+
+        {/* Saldo em Conta */}
+        <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
+          <div>
+            <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
+            <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+              {loading ? '...' : formatCurrency(saldoAtual)}
+            </p>
+            <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
+          </div>
+          <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
