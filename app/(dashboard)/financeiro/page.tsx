@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, Wallet, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale'
 
 type Lancamento = {
   id: string; tipo: string; descricao: string; valor: number; data: string; status: string
+  forma_pagamento: string | null
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string } | null
 }
@@ -73,39 +74,46 @@ export default function FinanceiroPage() {
   const mesLabel = allTime ? 'Desde o início' : format(mesSel, 'MMMM yyyy', { locale: ptBR })
   const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
-  useEffect(() => {
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
     const supabase = createClient()
     const db = supabase as any
-    async function load() {
-      const { data } = await supabase
-        .from('lancamentos')
-        .select('id, tipo, descricao, valor, data, status, categorias_financeiras(nome), clientes(nome)')
-        .order('data', { ascending: false })
-      setLancamentos((data as Lancamento[]) ?? [])
+    const { data } = await supabase
+      .from('lancamentos')
+      .select('id, tipo, descricao, valor, data, status, forma_pagamento, categorias_financeiras(nome), clientes(nome)')
+      .order('data', { ascending: false })
+    setLancamentos((data as Lancamento[]) ?? [])
 
-      const { data: prods } = await db.from('produtos').select('id, nome, cor').eq('ativo', true)
-      if (prods?.length) {
-        const [mrrList, saasResult] = await Promise.all([
-          Promise.all(prods.map(async (p: any) => {
-            const { data: clientes } = await db
-              .from('saas_clientes').select('mrr').eq('produto_id', p.id).in('status', ['ativo', 'trial'])
-            return {
-              id: p.id, nome: p.nome, cor: p.cor,
-              mrr: Math.round((clientes ?? []).reduce((s: number, c: any) => s + (c.mrr ?? 0), 0) * 100) / 100,
-            }
-          })),
-          db.from('saas_clientes')
-            .select('id, nome, mrr, ultimo_pagamento, proximo_vencimento, produto_id')
-            .in('status', ['ativo', 'trial']) as Promise<{ data: SaasAll[] | null }>,
-        ])
-        setProdutosMrr(mrrList)
-        setSaasAll(saasResult.data ?? [])
-      }
-
-      setLoading(false)
+    const { data: prods } = await db.from('produtos').select('id, nome, cor').eq('ativo', true)
+    if (prods?.length) {
+      const [mrrList, saasResult] = await Promise.all([
+        Promise.all(prods.map(async (p: any) => {
+          const { data: clientes } = await db
+            .from('saas_clientes').select('mrr').eq('produto_id', p.id).in('status', ['ativo', 'trial'])
+          return {
+            id: p.id, nome: p.nome, cor: p.cor,
+            mrr: Math.round((clientes ?? []).reduce((s: number, c: any) => s + (c.mrr ?? 0), 0) * 100) / 100,
+          }
+        })),
+        db.from('saas_clientes')
+          .select('id, nome, mrr, ultimo_pagamento, proximo_vencimento, produto_id')
+          .in('status', ['ativo', 'trial']) as Promise<{ data: SaasAll[] | null }>,
+      ])
+      setProdutosMrr(mrrList)
+      setSaasAll(saasResult.data ?? [])
     }
-    load()
+
+    setLoading(false)
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function deleteLancamento(id: string) {
+    const { error } = await createClient().from('lancamentos').delete().eq('id', id)
+    if (!error) setLancamentos(prev => prev.filter(l => l.id !== id))
+    setDeletingId(null)
+  }
 
   const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
   const receitasMes = doMes.filter(l => l.tipo === 'receita')
@@ -217,7 +225,7 @@ export default function FinanceiroPage() {
       <Header title="Financeiro" description="Controle financeiro da agência" />
       <main className="flex-1 p-6">
         <PageHeader title="Financeiro" description={loading ? 'Carregando...' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}>
-          <LancamentoForm />
+          <LancamentoForm onSuccess={load} />
         </PageHeader>
 
         <FinanceiroSubNav pathname={pathname} />
@@ -447,6 +455,89 @@ export default function FinanceiroPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Tabela de Despesas */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">
+                Despesas — <span className="font-normal text-brand-lavanda/50 capitalize">{mesLabel}</span>
+              </CardTitle>
+              <Link href="/financeiro/despesas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">
+                Ver todas →
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.06]">
+                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-3">Descrição</th>
+                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Categoria</th>
+                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Data</th>
+                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Pagamento</th>
+                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Valor</th>
+                    <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={7} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                  ) : despesasMes.length === 0 ? (
+                    <tr><td colSpan={7} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">Nenhuma despesa neste período.</td></tr>
+                  ) : despesasMes.sort((a, b) => b.data.localeCompare(a.data)).map((d) => (
+                    <tr key={d.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                      <td className="px-6 py-3">
+                        <p className="text-brand-lavanda font-medium truncate max-w-[200px]">{d.descricao}</p>
+                        {d.clientes?.nome && <p className="text-xs text-brand-lavanda/40 mt-0.5">{d.clientes.nome}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">{d.categorias_financeiras?.nome ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">{formatDate(d.data)}</td>
+                      <td className="px-4 py-3 text-xs text-brand-lavanda/50 capitalize whitespace-nowrap">{(d.forma_pagamento ?? '—').replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-brand-rosa whitespace-nowrap">{formatCurrency(d.valor)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge variant={d.status === 'pago' ? 'concluido' : d.status === 'pendente' ? 'pendente' : 'inativo'}>
+                          {d.status === 'pago' ? 'Pago' : d.status === 'pendente' ? 'Pendente' : 'Cancelado'}
+                        </Badge>
+                      </td>
+                      <td className="px-2 py-3 text-center">
+                        {deletingId === d.id ? (
+                          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                            <button onClick={() => deleteLancamento(d.id)} className="text-xs text-brand-rosa font-medium hover:text-brand-rosa/80 transition-colors">Excluir</button>
+                            <span className="text-brand-lavanda/20">·</span>
+                            <button onClick={() => setDeletingId(null)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Cancelar</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeletingId(d.id)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors mx-auto"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {despesasMes.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-white/[0.06]">
+                      <td colSpan={4} className="px-6 py-3 text-xs text-brand-lavanda/40">
+                        {despesasMes.length} despesa{despesasMes.length !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-brand-rosa whitespace-nowrap">
+                        {formatCurrency(despesasMes.reduce((s, d) => s + d.valor, 0))}
+                      </td>
+                      <td /><td />
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="pb-3">
