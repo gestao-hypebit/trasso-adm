@@ -196,8 +196,20 @@ export default function FinanceiroPage() {
       icon: DollarSign, cor: 'text-brand-lima', bgIcon: 'bg-brand-lima/10',
     },
     { label: 'A Receber', valor: aReceber, sub: saasAReceber > 0 ? `${receitasMes.filter(l => l.status === 'pendente').length} lançamentos + ${saasVencMes.length} SaaS` : `${receitasMes.filter(l => l.status === 'pendente').length} pendentes`, icon: Clock, cor: 'text-yellow-400', bgIcon: 'bg-yellow-400/10' },
-    { label: 'A Pagar', valor: aPagar, sub: `${despesasMes.filter(l => l.status === 'pendente').length} pendentes`, icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10' },
-    { label: 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: 'Receitas − Despesas', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
+    {
+      label: allTime ? 'Total Despesas' : 'Despesas do Mês',
+      valor: totalDespesas + aPagar,
+      sub: (() => {
+        const pagas = despesasMes.filter(l => l.status === 'pago').length
+        const pendentes = despesasMes.filter(l => l.status === 'pendente').length
+        const parts = []
+        if (pagas > 0) parts.push(`${pagas} paga${pagas !== 1 ? 's' : ''}`)
+        if (pendentes > 0) parts.push(`${pendentes} pendente${pendentes !== 1 ? 's' : ''}`)
+        return parts.length > 0 ? parts.join(' · ') : 'Sem despesas'
+      })(),
+      icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10',
+    },
+    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: 'Receitas recebidas − Despesas pagas', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
   ]
 
   return (
