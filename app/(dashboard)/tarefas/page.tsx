@@ -28,6 +28,10 @@ type Tarefa = {
   responsavel: { nome: string } | null
 }
 
+type ProjetoOpcao = { id: string; nome: string }
+
+const formVazio = { titulo: '', projeto_id: '', prioridade: 'media', data_vencimento: '', descricao: '' }
+
 const colunas = [
   { key: 'a_fazer', label: 'A Fazer', cor: 'border-brand-lavanda/20' },
   { key: 'em_andamento', label: 'Em Andamento', cor: 'border-white/[0.15]' },
@@ -52,23 +56,55 @@ function vencimentoLabel(data: string) {
 
 export default function TarefasPage() {
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
+  const [projetosOpcoes, setProjetosOpcoes] = useState<ProjetoOpcao[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroProj, setFiltroProj] = useState('todos')
   const [filtroPrio, setFiltroPrio] = useState('todas')
   const [busca, setBusca] = useState('')
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState(formVazio)
+  const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
     async function load() {
-      const { data } = await supabase
-        .from('tarefas')
-        .select('id, titulo, descricao, status, prioridade, data_vencimento, projetos(nome), responsavel:profiles!tarefas_responsavel_id_fkey(nome)')
-        .order('ordem', { ascending: true })
-      setTarefas((data as Tarefa[]) ?? [])
+      const [{ data: tarefasData }, { data: projetosData }] = await Promise.all([
+        supabase
+          .from('tarefas')
+          .select('id, titulo, descricao, status, prioridade, data_vencimento, projetos(nome), responsavel:profiles!tarefas_responsavel_id_fkey(nome)')
+          .order('ordem', { ascending: true }),
+        supabase.from('projetos').select('id, nome').order('nome'),
+      ])
+      setTarefas((tarefasData as Tarefa[]) ?? [])
+      setProjetosOpcoes((projetosData as ProjetoOpcao[]) ?? [])
       setLoading(false)
     }
     load()
   }, [])
+
+  async function criarTarefa() {
+    if (!form.titulo.trim()) return
+    setSalvando(true)
+    const supabase = createClient()
+    const { data, error } = await (supabase as any)
+      .from('tarefas')
+      .insert({
+        titulo: form.titulo.trim(),
+        projeto_id: form.projeto_id || null,
+        prioridade: form.prioridade,
+        data_vencimento: form.data_vencimento || null,
+        descricao: form.descricao.trim() || null,
+        status: 'a_fazer',
+      })
+      .select('id, titulo, descricao, status, prioridade, data_vencimento, projetos(nome), responsavel:profiles!tarefas_responsavel_id_fkey(nome)')
+      .single()
+    setSalvando(false)
+    if (!error && data) {
+      setTarefas(prev => [...prev, data as Tarefa])
+      setOpen(false)
+      setForm(formVazio)
+    }
+  }
 
   const projetos = Array.from(new Set(tarefas.map(t => t.projetos?.nome).filter(Boolean))) as string[]
 
@@ -85,7 +121,7 @@ export default function TarefasPage() {
 
       <main className="flex-1 p-6">
         <PageHeader title="Tarefas">
-          <Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4" />
@@ -99,22 +135,26 @@ export default function TarefasPage() {
               <div className="space-y-4 pt-2">
                 <div>
                   <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Título *</Label>
-                  <Input placeholder="Ex: Criar wireframes do app" />
+                  <Input
+                    placeholder="Ex: Criar wireframes do app"
+                    value={form.titulo}
+                    onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Projeto</Label>
-                    <Select>
+                    <Select value={form.projeto_id} onValueChange={v => setForm(f => ({ ...f, projeto_id: v }))}>
                       <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                       <SelectContent>
-                        {projetos.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        {projetosOpcoes.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Prioridade</Label>
-                    <Select>
-                      <SelectTrigger><SelectValue placeholder="Média" /></SelectTrigger>
+                    <Select value={form.prioridade} onValueChange={v => setForm(f => ({ ...f, prioridade: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(prioridadeConfig).map(([k, v]) => (
                           <SelectItem key={k} value={k}>{v.label}</SelectItem>
@@ -125,16 +165,27 @@ export default function TarefasPage() {
                 </div>
                 <div>
                   <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Data de Vencimento</Label>
-                  <Input type="date" />
+                  <Input
+                    type="date"
+                    value={form.data_vencimento}
+                    onChange={e => setForm(f => ({ ...f, data_vencimento: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Descrição</Label>
-                  <Textarea placeholder="Detalhes da tarefa..." rows={2} />
+                  <Textarea
+                    placeholder="Detalhes da tarefa..."
+                    rows={2}
+                    value={form.descricao}
+                    onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
+                  />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline">Cancelar</Button>
-                <Button>Criar Tarefa</Button>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button onClick={criarTarefa} disabled={!form.titulo.trim() || salvando}>
+                  {salvando ? 'Criando...' : 'Criar Tarefa'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

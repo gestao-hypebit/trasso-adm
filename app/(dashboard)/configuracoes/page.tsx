@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { Save, Plus, Trash2, Upload, User, Building2, Palette, DollarSign, Hash, Link, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react'
+import { Save, Plus, Trash2, Upload, User, Building2, Palette, DollarSign, Hash, Link, CheckCircle2, XCircle, Eye, EyeOff, Calendar, LogOut, Loader2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -81,6 +81,10 @@ export default function ConfiguracoesPage() {
   const [novaReceitaInput, setNovaReceitaInput] = useState('')
   const [novaDespesaInput, setNovaDespesaInput] = useState('')
 
+  // Google Calendar
+  const [gcalStatus, setGcalStatus] = useState<{ connected: boolean; email: string | null } | null>(null)
+  const [gcalLoading, setGcalLoading] = useState(false)
+
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   function showToast(msg: string, ok = true) {
@@ -127,6 +131,34 @@ export default function ConfiguracoesPage() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    fetch('/api/google-calendar/status')
+      .then(r => r.json())
+      .then(setGcalStatus)
+      .catch(() => {})
+
+    // Handle OAuth callback result
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    const gcal = params.get('gcal')
+    if (tab === 'integracoes') setAba('integracoes')
+    if (gcal === 'connected') showToast('Google Calendar conectado com sucesso!')
+    if (gcal === 'error') showToast('Erro ao conectar Google Calendar', false)
+    if (gcal) window.history.replaceState({}, '', '/configuracoes?tab=integracoes')
+  }, [])
+
+  async function connectGcal() {
+    window.location.href = '/api/google-calendar/auth'
+  }
+
+  async function disconnectGcal() {
+    setGcalLoading(true)
+    await fetch('/api/google-calendar/disconnect', { method: 'DELETE' })
+    setGcalStatus({ connected: false, email: null })
+    setGcalLoading(false)
+    showToast('Google Calendar desconectado')
+  }
 
   async function saveConfig() {
     setSaving(true)
@@ -654,13 +686,55 @@ export default function ConfiguracoesPage() {
                 {/* ── Integrações ── */}
                 {aba === 'integracoes' && (
                   <div className="space-y-4">
+                    {/* Google Calendar */}
+                    <Card>
+                      <CardContent className="p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0">
+                            <Calendar className="h-5 w-5 text-brand-lavanda/70" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-brand-lavanda text-sm">Google Calendar</p>
+                            <p className="text-xs text-brand-lavanda/50 mt-0.5">
+                              {gcalStatus?.connected
+                                ? `Conectado como ${gcalStatus.email}`
+                                : 'Sincronização bidirecional de eventos e deadlines'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {gcalStatus?.connected && (
+                            <Badge className="bg-brand-lima/20 text-brand-lima border-brand-lima/30 text-xs">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Conectado
+                            </Badge>
+                          )}
+                          {gcalStatus === null ? (
+                            <Button variant="outline" size="sm" disabled>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            </Button>
+                          ) : gcalStatus.connected ? (
+                            <Button variant="outline" size="sm" onClick={disconnectGcal} disabled={gcalLoading}>
+                              {gcalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <LogOut className="h-3.5 w-3.5 mr-1.5" />}
+                              Desconectar
+                            </Button>
+                          ) : (
+                            <Button size="sm" onClick={connectGcal}>
+                              <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                              Conectar
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Coming soon */}
                     {[
                       { nome: 'ClickSign', desc: 'Assinatura digital de contratos' },
                       { nome: 'D4Sign', desc: 'Assinatura eletrônica avançada' },
                       { nome: 'WhatsApp Business API', desc: 'Envio de notificações e propostas via WhatsApp' },
-                      { nome: 'Google Calendar', desc: 'Sincronização de eventos e deadlines' },
                     ].map((int) => (
-                      <Card key={int.nome} className="opacity-70">
+                      <Card key={int.nome} className="opacity-50">
                         <CardContent className="p-5 flex items-center justify-between">
                           <div>
                             <p className="font-semibold text-brand-lavanda text-sm">{int.nome}</p>
@@ -670,9 +744,6 @@ export default function ConfiguracoesPage() {
                         </CardContent>
                       </Card>
                     ))}
-                    <p className="text-xs text-brand-lavanda/30 text-center mt-4">
-                      As integrações serão disponibilizadas em breve.
-                    </p>
                   </div>
                 )}
               </>
