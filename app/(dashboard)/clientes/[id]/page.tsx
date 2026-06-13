@@ -14,9 +14,12 @@ import { formatDate, formatCurrency, getInitials } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
 
-type Cliente = Database['public']['Tables']['clientes']['Row']
+type ClienteRow = Database['public']['Tables']['clientes']['Row']
+type Cliente = ClienteRow & { produto: { id: string; nome: string; cor: string } | null }
 type Projeto = { id: string; nome: string; status: string; valor: number | null; data_entrega: string | null }
 type Interacao = { id: string; tipo: string; titulo: string; descricao: string | null; data: string }
+
+const tipoLabel: Record<string, string> = { agencia: 'Agência', saas: 'SaaS', ambos: 'Agência + SaaS' }
 
 const tipoIcons: Record<string, React.FC<any>> = {
   reuniao: Video, whatsapp: MessageCircle, ligacao: PhoneCall, email: Mail, nota: StickyNote, outro: FileText,
@@ -37,7 +40,7 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
     const supabase = createClient()
     async function load() {
       const [{ data: c }, { data: p }, { data: i }] = await Promise.all([
-        supabase.from('clientes').select('*').eq('id', id).single(),
+        supabase.from('clientes').select('*, produto:produtos(id,nome,cor)').eq('id', id).single(),
         supabase.from('projetos').select('id, nome, status, valor, data_entrega').eq('cliente_id', id).order('created_at', { ascending: false }),
         supabase.from('interacoes').select('id, tipo, titulo, descricao, data').eq('cliente_id', id).order('data', { ascending: false }),
       ])
@@ -90,6 +93,18 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
                   <Badge variant={statusVariant[cliente.status] || 'default'}>
                     {cliente.status}
                   </Badge>
+                  {cliente.produto ? (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full border font-medium"
+                      style={{ background: `${cliente.produto.cor}18`, borderColor: `${cliente.produto.cor}40`, color: cliente.produto.cor }}
+                    >
+                      {cliente.produto.nome}
+                    </span>
+                  ) : cliente.tipo && cliente.tipo !== 'agencia' ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-brand-lavanda/60">
+                      {tipoLabel[cliente.tipo]}
+                    </span>
+                  ) : null}
                 </div>
                 {cliente.empresa && <p className="text-brand-lavanda/60 mt-0.5">{cliente.empresa}</p>}
                 <div className="mt-3 flex flex-wrap gap-1">
@@ -154,6 +169,20 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
               <Card>
                 <CardHeader><CardTitle className="text-sm">Informações</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-brand-lavanda/50">Grupo</span>
+                    <span className="text-brand-lavanda">{tipoLabel[cliente.tipo] || 'Agência'}</span>
+                  </div>
+                  <Separator />
+                  {cliente.produto && (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-brand-lavanda/50">Produto</span>
+                        <span className="font-medium" style={{ color: cliente.produto.cor }}>{cliente.produto.nome}</span>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
                   {cliente.segmento && (
                     <>
                       <div className="flex justify-between">

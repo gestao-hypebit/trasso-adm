@@ -14,6 +14,8 @@ export const clienteSchema = z.object({
   segmento: z.string().optional(),
   origem: z.string().optional(),
   status: z.enum(['ativo', 'inativo', 'lead', 'prospecto']).default('ativo'),
+  tipo: z.enum(['agencia', 'saas', 'ambos']).default('agencia'),
+  produto_id: z.string().uuid().optional(),
   tags: z.array(z.string()).optional(),
   observacoes: z.string().optional(),
 })

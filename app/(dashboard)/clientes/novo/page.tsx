@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,12 +17,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 
+type Produto = { id: string; nome: string; cor: string }
+
 export default function NovoClientePage() {
   const router = useRouter()
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<ClienteFormData>({
+  const [produtos, setProdutos] = useState<Produto[]>([])
+
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema) as Resolver<ClienteFormData>,
-    defaultValues: { status: 'ativo' },
+    defaultValues: { status: 'ativo', tipo: 'agencia' },
   })
+
+  const tipoValue = watch('tipo')
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true)
+      .then(({ data }) => setProdutos(data ?? []))
+  }, [])
 
   async function onSubmit(data: ClienteFormData) {
     const supabase = createClient()
@@ -39,6 +52,8 @@ export default function NovoClientePage() {
       segmento: data.segmento ?? null,
       origem: data.origem ?? null,
       status: data.status,
+      tipo: data.tipo ?? 'agencia',
+      produto_id: data.produto_id ?? null,
       observacoes: data.observacoes ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
@@ -144,6 +159,38 @@ export default function NovoClientePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label>Grupo</Label>
+                    <Select onValueChange={(v) => { setValue('tipo', v as any); setValue('produto_id', undefined) }} defaultValue="agencia">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="agencia">Agência</SelectItem>
+                        <SelectItem value="saas">SaaS</SelectItem>
+                        <SelectItem value="ambos">Agência + SaaS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(tipoValue === 'saas' || tipoValue === 'ambos') && (
+                    <div className="space-y-2">
+                      <Label>Produto SaaS</Label>
+                      <Select onValueChange={(v) => setValue('produto_id', v)}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o produto..." /></SelectTrigger>
+                        <SelectContent>
+                          {produtos.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <span className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.cor }} />
+                                {p.nome}
+                              </span>
+                            </SelectItem>
+                          ))}
+                          {produtos.length === 0 && (
+                            <SelectItem value="_none" disabled>Nenhum produto SaaS cadastrado</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Segmento</Label>
                     <Select onValueChange={(v) => setValue('segmento', v)}>
