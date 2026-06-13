@@ -19,40 +19,52 @@ import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
+type Produto = { id: string; nome: string; cor: string }
 
 export default function EditarClientePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [produtos, setProdutos] = useState<Produto[]>([])
   const [loading, setLoading] = useState(true)
 
-  const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting } } = useForm<ClienteFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema) as Resolver<ClienteFormData>,
   })
+
+  const tipoValue = watch('tipo')
 
   useEffect(() => {
     const supabase = createClient()
     async function load() {
-      const { data } = await supabase.from('clientes').select('*').eq('id', id).single() as { data: Cliente | null }
-      if (data) {
-        setCliente(data)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any
+      const [{ data: c }, { data: p }] = await Promise.all([
+        sb.from('clientes').select('*').eq('id', id).single() as Promise<{ data: Cliente | null }>,
+        sb.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true) as Promise<{ data: Produto[] | null }>,
+      ])
+      if (c) {
+        setCliente(c)
         reset({
-          nome: data.nome,
-          empresa: data.empresa ?? '',
-          email: data.email ?? '',
-          telefone: data.telefone ?? '',
-          whatsapp: data.whatsapp ?? '',
-          cpf_cnpj: data.cpf_cnpj ?? '',
-          endereco: data.endereco ?? '',
-          cidade: data.cidade ?? '',
-          estado: data.estado ?? '',
-          cep: data.cep ?? '',
-          segmento: data.segmento ?? '',
-          origem: data.origem ?? '',
-          status: (data.status as ClienteFormData['status']) ?? 'ativo',
-          observacoes: data.observacoes ?? '',
+          nome: c.nome,
+          empresa: c.empresa ?? '',
+          email: c.email ?? '',
+          telefone: c.telefone ?? '',
+          whatsapp: c.whatsapp ?? '',
+          cpf_cnpj: c.cpf_cnpj ?? '',
+          endereco: c.endereco ?? '',
+          cidade: c.cidade ?? '',
+          estado: c.estado ?? '',
+          cep: c.cep ?? '',
+          segmento: c.segmento ?? '',
+          origem: c.origem ?? '',
+          status: (c.status as ClienteFormData['status']) ?? 'ativo',
+          tipo: (c.tipo as ClienteFormData['tipo']) ?? 'agencia',
+          produto_id: c.produto_id ?? undefined,
+          observacoes: c.observacoes ?? '',
         })
       }
+      setProdutos(p ?? [])
       setLoading(false)
     }
     load()
@@ -75,6 +87,8 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
       segmento: data.segmento || null,
       origem: data.origem || null,
       status: data.status,
+      tipo: data.tipo ?? 'agencia',
+      produto_id: data.produto_id || null,
       observacoes: data.observacoes || null,
     }).eq('id', id)
     if (!error) router.push(`/clientes/${id}`)
@@ -190,6 +204,44 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label>Grupo</Label>
+                    <Select
+                      defaultValue={cliente.tipo ?? 'agencia'}
+                      onValueChange={(v) => { setValue('tipo', v as ClienteFormData['tipo']); setValue('produto_id', undefined) }}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="agencia">Agência</SelectItem>
+                        <SelectItem value="saas">SaaS</SelectItem>
+                        <SelectItem value="ambos">Agência + SaaS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(tipoValue === 'saas' || tipoValue === 'ambos') && (
+                    <div className="space-y-2">
+                      <Label>Produto SaaS</Label>
+                      <Select
+                        defaultValue={cliente.produto_id ?? undefined}
+                        onValueChange={(v) => setValue('produto_id', v)}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecione o produto..." /></SelectTrigger>
+                        <SelectContent>
+                          {produtos.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <span className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.cor }} />
+                                {p.nome}
+                              </span>
+                            </SelectItem>
+                          ))}
+                          {produtos.length === 0 && (
+                            <SelectItem value="_none" disabled>Nenhum produto SaaS cadastrado</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Segmento</Label>
                     <Select
