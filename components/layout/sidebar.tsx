@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
-  FileSignature, CheckSquare, Calendar, BarChart2, Settings, LogOut, Layers
+  FileSignature, CheckSquare, Calendar, BarChart2, Settings, LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -24,7 +24,6 @@ const navItems = [
   { href: '/tarefas',       icon: CheckSquare,     label: 'Tarefas' },
   { href: '/agenda',        icon: Calendar,        label: 'Agenda' },
   { href: '/relatorios',    icon: BarChart2,       label: 'Relatórios' },
-  { href: '/saas',          icon: Layers,          label: 'Produtos SaaS' },
   { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
 ]
 

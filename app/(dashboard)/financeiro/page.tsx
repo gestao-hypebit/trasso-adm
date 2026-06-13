@@ -23,10 +23,7 @@ type Lancamento = {
   clientes: { nome: string } | null
 }
 
-type ProdutoMrr = { id: string; nome: string; cor: string; mrr: number }
-type SaasAll = { id: string; nome: string; mrr: number; ultimo_pagamento: string | null; proximo_vencimento: string | null; produto_id: string }
-
-type DiaFluxo = { dia: string; entradas: number; saidas: number; saldo: number }
+type DiaFluxo ={ dia: string; entradas: number; saidas: number; saldo: number }
 
 const subNav = [
   { href: '/financeiro', label: 'Visão Geral' },
@@ -63,8 +60,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function FinanceiroPage() {
   const pathname = usePathname()
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
-  const [produtosMrr, setProdutosMrr] = useState<ProdutoMrr[]>([])
-  const [saasAll, setSaasAll] = useState<SaasAll[]>([])
   const [loading, setLoading] = useState(true)
 
   const [mesSel, setMesSel] = useState(() => startOfMonth(new Date()))
@@ -80,32 +75,11 @@ export default function FinanceiroPage() {
 
   const load = useCallback(async () => {
     const supabase = createClient()
-    const db = supabase as any
     const { data } = await supabase
       .from('lancamentos')
       .select('id, tipo, descricao, valor, data, status, forma_pagamento, categorias_financeiras(nome), clientes(nome)')
       .order('data', { ascending: false })
     setLancamentos((data as Lancamento[]) ?? [])
-
-    const { data: prods } = await db.from('produtos').select('id, nome, cor').eq('ativo', true)
-    if (prods?.length) {
-      const [mrrList, saasResult] = await Promise.all([
-        Promise.all(prods.map(async (p: any) => {
-          const { data: clientes } = await db
-            .from('saas_clientes').select('mrr').eq('produto_id', p.id).in('status', ['ativo', 'trial'])
-          return {
-            id: p.id, nome: p.nome, cor: p.cor,
-            mrr: Math.round((clientes ?? []).reduce((s: number, c: any) => s + (c.mrr ?? 0), 0) * 100) / 100,
-          }
-        })),
-        db.from('saas_clientes')
-          .select('id, nome, mrr, ultimo_pagamento, proximo_vencimento, produto_id')
-          .in('status', ['ativo', 'trial']) as Promise<{ data: SaasAll[] | null }>,
-      ])
-      setProdutosMrr(mrrList)
-      setSaasAll(saasResult.data ?? [])
-    }
-
     setLoading(false)
   }, [])
 
@@ -120,45 +94,16 @@ export default function FinanceiroPage() {
   const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
   const receitasMes = doMes.filter(l => l.tipo === 'receita')
   const despesasMes = doMes.filter(l => l.tipo === 'despesa')
-  const receitasAgencia = receitasMes.filter(l => l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
-  const mrrSaas = produtosMrr.reduce((s, p) => s + p.mrr, 0)
-  const saasFaturadoMes = saasAll
-    .filter(s => s.ultimo_pagamento && s.ultimo_pagamento >= mesStart && s.ultimo_pagamento <= mesEnd)
-    .reduce((sum, s) => sum + s.mrr, 0)
-  const totalReceitas = receitasAgencia + saasFaturadoMes
+  const totalReceitas = receitasMes.filter(l => l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
   const totalDespesas = despesasMes.filter(l => l.status === 'pago').reduce((s, l) => s + l.valor, 0)
-  const aReceberLanc = receitasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0)
-  const saasVencMes = saasAll.filter(s => s.proximo_vencimento && s.proximo_vencimento >= mesStart && s.proximo_vencimento <= mesEnd)
-  const saasAReceber = saasVencMes.reduce((s, c) => s + c.mrr, 0)
-  const aReceber = aReceberLanc + saasAReceber
+  const aReceber = receitasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0)
   const aPagar = despesasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0)
 
   const saldoAtual = lancamentos.reduce((s, l) => {
     if (l.tipo === 'receita' && l.status === 'recebido') return s + l.valor
     if (l.tipo === 'despesa' && l.status === 'pago') return s - l.valor
     return s
-  }, 0) + saasAll.filter(s => s.ultimo_pagamento).reduce((sum, s) => sum + s.mrr, 0)
-
-  // SaaS: agrupamento por mês baseado em ultimo_pagamento
-  const saasPorMes = (() => {
-    const mapa: Record<string, { mrr: number; clientes: number }> = {}
-    for (const s of saasAll) {
-      if (!s.ultimo_pagamento) continue
-      const k = s.ultimo_pagamento.slice(0, 7)
-      if (!mapa[k]) mapa[k] = { mrr: 0, clientes: 0 }
-      mapa[k].mrr += s.mrr
-      mapa[k].clientes++
-    }
-    return Object.entries(mapa)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .slice(0, 6)
-      .map(([k, v]) => ({
-        mesKey: k,
-        label: format(new Date(k + '-01T12:00:00Z'), 'MMM/yy', { locale: ptBR }),
-        mrr: Math.round(v.mrr * 100) / 100,
-        clientes: v.clientes,
-      }))
-  })()
+  }, 0)
 
   const cashflowData: DiaFluxo[] = (() => {
     if (allTime) {
@@ -196,12 +141,10 @@ export default function FinanceiroPage() {
     {
       label: allTime ? 'Faturamento Total' : 'Faturamento do Mês',
       valor: totalReceitas,
-      sub: saasFaturadoMes > 0
-        ? `Agência + SaaS recebido (${formatCurrency(saasFaturadoMes)})`
-        : allTime ? 'Total de receitas recebidas' : `Receitas recebidas em ${format(mesSel, 'MMMM', { locale: ptBR })}`,
+      sub: allTime ? 'Total de receitas recebidas' : `Receitas recebidas em ${format(mesSel, 'MMMM', { locale: ptBR })}`,
       icon: DollarSign, cor: 'text-brand-lima', bgIcon: 'bg-brand-lima/10',
     },
-    { label: 'A Receber', valor: aReceber, sub: saasAReceber > 0 ? `${receitasMes.filter(l => l.status === 'pendente').length} lançamentos + ${saasVencMes.length} SaaS` : `${receitasMes.filter(l => l.status === 'pendente').length} pendentes`, icon: Clock, cor: 'text-yellow-400', bgIcon: 'bg-yellow-400/10' },
+    { label: 'A Receber', valor: aReceber, sub: `${receitasMes.filter(l => l.status === 'pendente').length} pendentes`, icon: Clock, cor: 'text-yellow-400', bgIcon: 'bg-yellow-400/10' },
     {
       label: allTime ? 'Total Despesas' : 'Despesas do Mês',
       valor: totalDespesas + aPagar,
@@ -342,48 +285,6 @@ export default function FinanceiroPage() {
           ))}
         </div>
 
-        {/* SaaS: visão geral por mês */}
-        {saasPorMes.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Receita SaaS por Mês</CardTitle>
-                <span className="text-xs text-brand-lavanda/40">
-                  MRR atual: <span className="text-brand-lima font-semibold">{formatCurrency(mrrSaas)}</span>
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="text-left px-6 py-2.5 text-xs font-medium text-brand-lavanda/40">Mês</th>
-                    <th className="text-right px-6 py-2.5 text-xs font-medium text-brand-lavanda/40">Clientes pagantes</th>
-                    <th className="text-right px-6 py-2.5 text-xs font-medium text-brand-lavanda/40">Receita</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {saasPorMes.map(({ mesKey, label, mrr, clientes }) => {
-                    const isCurrent = mesKey === format(mesSel, 'yyyy-MM')
-                    return (
-                      <tr key={mesKey} className={cn('hover:bg-white/[0.02] transition-colors', isCurrent && 'bg-brand-lima/[0.03]')}>
-                        <td className="px-6 py-3">
-                          <span className={cn('text-sm font-medium', isCurrent ? 'text-brand-lima' : 'text-brand-lavanda')}>
-                            {label.charAt(0).toUpperCase() + label.slice(1)}
-                          </span>
-                          {isCurrent && <span className="ml-2 text-[10px] bg-brand-lima/20 text-brand-lima px-1.5 py-0.5 rounded-full">atual</span>}
-                        </td>
-                        <td className="px-6 py-3 text-right text-xs text-brand-lavanda/60">{clientes} cliente{clientes !== 1 ? 's' : ''}</td>
-                        <td className="px-6 py-3 text-right font-semibold text-brand-lima">{formatCurrency(mrr)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <Card className="lg:col-span-2">
             <CardHeader className="pb-3">
@@ -428,24 +329,6 @@ export default function FinanceiroPage() {
                 <div className="h-2 rounded-full bg-brand-noite overflow-hidden">
                   <div className="h-full rounded-full bg-brand-lima transition-all" style={{ width: totalReceitas + totalDespesas > 0 ? `${(totalReceitas / (totalReceitas + totalDespesas)) * 100}%` : '0%' }} />
                 </div>
-                <div className="space-y-1 pl-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-brand-lavanda/40">Agência</span>
-                    <span className="text-brand-lavanda/60">{formatCurrency(receitasAgencia)}</span>
-                  </div>
-                  {saasFaturadoMes > 0 && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-brand-lavanda/40">SaaS recebido</span>
-                      <span className="text-brand-lavanda/60">{formatCurrency(saasFaturadoMes)}</span>
-                    </div>
-                  )}
-                  {mrrSaas > 0 && (
-                    <div className="flex justify-between text-[11px] opacity-60">
-                      <span className="text-brand-lavanda/40">MRR total (ref.)</span>
-                      <span className="text-brand-lavanda/40">{formatCurrency(mrrSaas)}</span>
-                    </div>
-                  )}
-                </div>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -469,22 +352,6 @@ export default function FinanceiroPage() {
                   <span className="text-brand-lavanda/40">A Receber</span>
                   <span className="text-yellow-400">{formatCurrency(aReceber)}</span>
                 </div>
-                {saasVencMes.length > 0 && (
-                  <div className="pl-3 space-y-1 mt-1">
-                    {saasVencMes.map((sv: SaasAll) => {
-                      const prod = produtosMrr.find(p => p.id === sv.produto_id)
-                      return (
-                        <div key={sv.id} className="flex justify-between text-[11px]">
-                          <span className="flex items-center gap-1.5 text-brand-lavanda/40 truncate max-w-[55%]">
-                            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: prod?.cor ?? '#7C3AED' }} />
-                            {sv.nome}
-                          </span>
-                          <span className="text-yellow-400/70">{formatDate(sv.proximo_vencimento)} · {formatCurrency(sv.mrr)}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
                 <div className="flex justify-between text-xs mt-1">
                   <span className="text-brand-lavanda/40">A Pagar</span>
                   <span className="text-brand-rosa/70">{formatCurrency(aPagar)}</span>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, ChevronDown, Wallet } from 'lucide-react'
+import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, ChevronDown, Wallet } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,8 +18,6 @@ import { ptBR } from 'date-fns/locale'
 
 type Lancamento = { tipo: string; valor: number; data: string; status: string; descricao: string; categorias_financeiras: { nome: string } | null }
 type Projeto = { id: string; status: string; data_entrega: string | null; nome: string }
-type ProdutoMrr = { id: string; nome: string; cor: string; mrr: number; clientes: number }
-type SaasAll = { id: string; nome: string; mrr: number; ultimo_pagamento: string | null; proximo_vencimento: string | null; produto_id: string }
 type PropostaCount = { id: string }
 type ClienteAll = { id: string; created_at: string }
 
@@ -56,8 +54,6 @@ export default function DashboardPage() {
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [propostas, setPropostas] = useState<PropostaCount[]>([])
   const [clientesAll, setClientesAll] = useState<ClienteAll[]>([])
-  const [produtosMrr, setProdutosMrr] = useState<ProdutoMrr[]>([])
-  const [saasAll, setSaasAll] = useState<SaasAll[]>([])
   const [loading, setLoading] = useState(true)
 
   // Mês selecionado (filtro)
@@ -72,36 +68,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    const db = supabase as any
     async function load() {
-      const [{ data: l }, { data: p }, { data: prop }, { data: cl }, { data: prodsRaw }] = await Promise.all([
+      const [{ data: l }, { data: p }, { data: prop }, { data: cl }] = await Promise.all([
         supabase.from('lancamentos').select('tipo, valor, data, status, descricao, categorias_financeiras(nome)').order('data', { ascending: true }),
         supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false }),
         supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao']),
         supabase.from('clientes').select('id, created_at'),
-        db.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true) as Promise<{ data: { id: string; nome: string; cor: string }[] | null }>,
       ])
-      const prods = prodsRaw as { id: string; nome: string; cor: string }[] | null
       setLancamentos((l as Lancamento[]) ?? [])
       setProjetos(p ?? [])
       setPropostas(prop ?? [])
       setClientesAll(cl ?? [])
-
-      if (prods && prods.length > 0) {
-        const [comMrr, saasResult] = await Promise.all([
-          Promise.all(prods.map(async (prod) => {
-            const { data: sc } = await db
-              .from('saas_clientes').select('mrr, status').eq('produto_id', prod.id).eq('status', 'ativo') as { data: { mrr: number; status: string }[] | null }
-            const mrr = sc?.reduce((s, c) => s + (c.mrr ?? 0), 0) ?? 0
-            return { id: prod.id, nome: prod.nome, cor: prod.cor, mrr, clientes: sc?.length ?? 0 }
-          })),
-          db.from('saas_clientes')
-            .select('id, nome, mrr, ultimo_pagamento, proximo_vencimento, produto_id')
-            .in('status', ['ativo', 'trial']) as Promise<{ data: SaasAll[] | null }>,
-        ])
-        setProdutosMrr(comMrr)
-        setSaasAll(saasResult.data ?? [])
-      }
       setLoading(false)
     }
     load()
@@ -110,34 +87,18 @@ export default function DashboardPage() {
   // KPIs do mês selecionado
   const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
   const clientesMes = clientesAll.filter(c => c.created_at >= `${mesStart}T00:00:00` && c.created_at <= `${mesEnd}T23:59:59`)
-  const receitaAgencia = doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
-  const mrrSaas = produtosMrr.reduce((s, p) => s + p.mrr, 0)
-  const saasFaturadoMes = saasAll
-    .filter(s => s.ultimo_pagamento && s.ultimo_pagamento >= mesStart && s.ultimo_pagamento <= mesEnd)
-    .reduce((sum, s) => sum + s.mrr, 0)
-  const faturamento = receitaAgencia + saasFaturadoMes
+  const faturamento = doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
   const projetosAtivos = projetos.filter(p => p.status === 'em_andamento').length
-
-  // SaaS pendente no mês selecionado
-  const saasVencMes = saasAll
-    .filter(s => s.proximo_vencimento && s.proximo_vencimento >= mesStart && s.proximo_vencimento <= mesEnd)
-    .sort((a, b) => (a.proximo_vencimento ?? '').localeCompare(b.proximo_vencimento ?? ''))
 
   // Gráfico histórico (todos os meses com dados)
   const revenueData = (() => {
-    const porMes: Record<string, { agencia: number; saas: number; despesa: number; mesKey: string }> = {}
+    const porMes: Record<string, { agencia: number; despesa: number; mesKey: string }> = {}
     for (const l of lancamentos) {
       if (l.status !== 'recebido' && l.status !== 'pago') continue
       const k = l.data.slice(0, 7)
-      if (!porMes[k]) porMes[k] = { agencia: 0, saas: 0, despesa: 0, mesKey: k }
+      if (!porMes[k]) porMes[k] = { agencia: 0, despesa: 0, mesKey: k }
       if (l.tipo === 'receita') porMes[k].agencia += l.valor
       if (l.tipo === 'despesa') porMes[k].despesa += l.valor
-    }
-    for (const s of saasAll) {
-      if (!s.ultimo_pagamento) continue
-      const k = s.ultimo_pagamento.slice(0, 7)
-      if (!porMes[k]) porMes[k] = { agencia: 0, saas: 0, despesa: 0, mesKey: k }
-      porMes[k].saas += s.mrr
     }
     return Object.entries(porMes)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -156,35 +117,17 @@ export default function DashboardPage() {
   const proximosVencimentos = projetos
     .filter(p => p.data_entrega && p.status !== 'concluido' && p.status !== 'cancelado')
     .sort((a, b) => (a.data_entrega ?? '').localeCompare(b.data_entrega ?? ''))
-    .slice(0, 5)
+    .slice(0, 6)
 
   const recenteLancamentos = [...doMes]
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, 5)
 
-  type VencItem =
-    | { tipo: 'projeto'; id: string; nome: string; data: string; urgente: boolean }
-    | { tipo: 'saas'; id: string; nome: string; data: string; mrr: number; cor: string; produto: string }
-
-  const hoje = format(new Date(), 'yyyy-MM-dd')
-  const combinedVencimentos: VencItem[] = [
-    ...proximosVencimentos.map(p => ({
-      tipo: 'projeto' as const, id: p.id, nome: p.nome, data: p.data_entrega!,
-      urgente: p.data_entrega! <= format(new Date(Date.now() + 3 * 86400000), 'yyyy-MM-dd'),
-    })),
-    ...saasVencMes.map(sv => {
-      const prod = produtosMrr.find(p => p.id === sv.produto_id)
-      return { tipo: 'saas' as const, id: sv.id, nome: sv.nome, data: sv.proximo_vencimento!, mrr: sv.mrr, cor: prod?.cor ?? '#7C3AED', produto: prod?.nome ?? 'SaaS' }
-    }),
-  ].sort((a, b) => a.data.localeCompare(b.data)).slice(0, 6)
-
   const saldoAtual = lancamentos.reduce((s, l) => {
     if (l.tipo === 'receita' && l.status === 'recebido') return s + l.valor
     if (l.tipo === 'despesa' && l.status === 'pago') return s - l.valor
     return s
-  }, 0) + saasAll.filter(s => s.ultimo_pagamento).reduce((sum, s) => sum + s.mrr, 0)
-
-  const hasSaas = saasAll.some(s => s.ultimo_pagamento)
+  }, 0)
 
   return (
     <div>
@@ -325,20 +268,14 @@ export default function DashboardPage() {
                       <XAxis dataKey="mes" tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v === 0 ? '' : `${(v/1000).toFixed(0)}k`} width={36} />
                       <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                      <Bar dataKey="agencia" name="Agência" stackId="rec" fill="#7C3AED" radius={[0, 0, 0, 0]} />
-                      <Bar dataKey="saas" name="SaaS" stackId="rec" fill="#B8F000" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="agencia" name="Receita" fill="#7C3AED" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="despesa" name="Despesa" fill="#FF4D8D" fillOpacity={0.35} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                   <div className="flex items-center gap-4 mt-2 justify-end">
                     <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
-                      <span className="h-2 w-2 rounded-sm bg-brand-violeta" /> Agência
+                      <span className="h-2 w-2 rounded-sm bg-brand-violeta" /> Receita
                     </span>
-                    {hasSaas && (
-                      <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
-                        <span className="h-2 w-2 rounded-sm bg-brand-lima" /> SaaS
-                      </span>
-                    )}
                     <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
                       <span className="h-2 w-2 rounded-sm bg-brand-rosa/50" /> Despesa
                     </span>
@@ -413,94 +350,30 @@ export default function DashboardPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Próximos Vencimentos</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Próximas Entregas</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {loading ? (
                 <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
-              ) : combinedVencimentos.length === 0 ? (
-                <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhum vencimento próximo.</p>
-              ) : combinedVencimentos.map((item) => (
-                <div key={`${item.tipo}-${item.id}`} className="flex items-center justify-between gap-3 rounded-xl p-3 bg-white/[0.02] border border-white/[0.04]">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {item.tipo === 'saas' ? (
-                      <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: item.cor }} />
-                    ) : (
-                      <Clock className={cn('h-4 w-4 shrink-0', item.urgente ? 'text-brand-rosa' : 'text-brand-lavanda/40')} />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm text-brand-lavanda truncate">{item.nome}</p>
-                      {item.tipo === 'saas' && <p className="text-[11px] text-brand-lavanda/40">{item.produto}</p>}
+              ) : proximosVencimentos.length === 0 ? (
+                <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhuma entrega próxima.</p>
+              ) : proximosVencimentos.map((p) => {
+                const urgente = p.data_entrega! <= format(new Date(Date.now() + 3 * 86400000), 'yyyy-MM-dd')
+                return (
+                  <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 bg-white/[0.02] border border-white/[0.04]">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Clock className={cn('h-4 w-4 shrink-0', urgente ? 'text-brand-rosa' : 'text-brand-lavanda/40')} />
+                      <p className="text-sm text-brand-lavanda truncate">{p.nome}</p>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={cn('text-xs font-medium', item.tipo === 'projeto' && item.urgente ? 'text-brand-rosa' : item.tipo === 'saas' && item.data < hoje ? 'text-brand-rosa' : 'text-brand-lavanda/60')}>
-                      {formatDate(item.data)}
+                    <p className={cn('text-xs font-medium shrink-0', urgente ? 'text-brand-rosa' : 'text-brand-lavanda/60')}>
+                      {formatDate(p.data_entrega)}
                     </p>
-                    {item.tipo === 'saas' && <p className="text-[11px] text-brand-lima">{formatCurrency(item.mrr)}</p>}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </CardContent>
           </Card>
         </div>
 
-        {/* Receita por Produto */}
-        {produtosMrr.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-brand-lavanda/40" />
-                <h2 className="text-sm font-semibold text-brand-lavanda/70">Receita por Produto</h2>
-              </div>
-              <Link href="/saas" className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Ver todos →</Link>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-white/[0.06] bg-[#141318] p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-2 w-2 rounded-full bg-brand-lavanda/40" />
-                  <span className="text-xs font-medium text-brand-lavanda/60">Trasso Agência</span>
-                </div>
-                <p className="text-lg font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                  {loading ? '...' : formatCurrency(receitaAgencia)}
-                </p>
-                <p className="text-[11px] text-brand-lavanda/30 mt-1">receita do mês</p>
-              </div>
-              {produtosMrr.map(prod => {
-                const recebidoProd = saasAll
-                  .filter(s => s.ultimo_pagamento && s.ultimo_pagamento >= mesStart && s.ultimo_pagamento <= mesEnd && s.produto_id === prod.id)
-                  .reduce((sum, s) => sum + s.mrr, 0)
-                return (
-                  <Link href={`/saas/${prod.id}`} key={prod.id}>
-                    <div className="rounded-xl border border-white/[0.06] bg-[#141318] p-4 hover:border-white/[0.12] transition-colors cursor-pointer">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="h-2 w-2 rounded-full" style={{ background: prod.cor }} />
-                        <span className="text-xs font-medium text-brand-lavanda/60">{prod.nome}</span>
-                      </div>
-                      <p className="text-lg font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                        {formatCurrency(prod.mrr)}
-                      </p>
-                      <p className="text-[11px] text-brand-lavanda/30 mt-1">MRR · {prod.clientes} assinante{prod.clientes !== 1 ? 's' : ''}</p>
-                      {recebidoProd > 0
-                        ? <p className="text-[11px] text-brand-lima/60 mt-0.5">✓ {formatCurrency(recebidoProd)} recebido</p>
-                        : <p className="text-[11px] text-yellow-400/50 mt-0.5">Aguardando cobrança</p>
-                      }
-                    </div>
-                  </Link>
-                )
-              })}
-              <div className="rounded-xl border border-brand-lima/20 bg-brand-lima/[0.04] p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-2 w-2 rounded-full bg-brand-lima" />
-                  <span className="text-xs font-medium text-brand-lima/70">Total Consolidado</span>
-                </div>
-                <p className="text-lg font-bold text-brand-lima" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                  {loading ? '...' : formatCurrency(faturamento)}
-                </p>
-                <p className="text-[11px] text-brand-lima/40 mt-1">agência + SaaS recebido</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

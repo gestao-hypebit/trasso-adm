@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Search, TrendingUp, CheckCircle2, Clock, XCircle, Download, Layers, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Search, TrendingUp, CheckCircle2, Clock, XCircle, Download, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,8 +24,6 @@ type Lancamento = {
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string } | null
 }
-
-type ProdutoMrr = { id: string; nome: string; cor: string; mrr: number; clientes: number }
 
 type Serie = {
   key: string
@@ -91,7 +89,6 @@ export default function ReceitasPage() {
   const pathname = usePathname()
   const [receitas, setReceitas] = useState<Lancamento[]>([])
   const [recorrentes, setRecorrentes] = useState<Lancamento[]>([])
-  const [produtosMrr, setProdutosMrr] = useState<ProdutoMrr[]>([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
@@ -108,9 +105,8 @@ export default function ReceitasPage() {
 
   const load = useCallback(async () => {
     const supabase = createClient()
-    const db = supabase as any
 
-    const [receitasRes, recorrentesRes, prodsRes] = await Promise.all([
+    const [receitasRes, recorrentesRes] = await Promise.all([
       supabase
         .from('lancamentos')
         .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, categorias_financeiras(nome), clientes(nome)')
@@ -123,26 +119,10 @@ export default function ReceitasPage() {
         .eq('tipo', 'receita')
         .eq('recorrente', true)
         .order('data', { ascending: true }),
-      db.from('produtos').select('id, nome, cor').eq('ativo', true),
     ])
 
     setReceitas((receitasRes.data as Lancamento[]) ?? [])
     setRecorrentes((recorrentesRes.data as Lancamento[]) ?? [])
-
-    if (prodsRes.data?.length) {
-      const mrrList: ProdutoMrr[] = []
-      for (const p of prodsRes.data) {
-        const { data: clientes } = await db
-          .from('saas_clientes').select('mrr').eq('produto_id', p.id).in('status', ['ativo', 'trial'])
-        mrrList.push({
-          id: p.id, nome: p.nome, cor: p.cor,
-          mrr: Math.round((clientes ?? []).reduce((s: number, c: any) => s + (c.mrr ?? 0), 0) * 100) / 100,
-          clientes: (clientes ?? []).length,
-        })
-      }
-      setProdutosMrr(mrrList)
-    }
-
     setLoading(false)
   }, [])
 
@@ -172,7 +152,6 @@ export default function ReceitasPage() {
 
   const totalRecebido = filtradas.filter(r => r.status === 'recebido').reduce((s, r) => s + r.valor, 0)
   const totalPendente = filtradas.filter(r => r.status === 'pendente').reduce((s, r) => s + r.valor, 0)
-  const mrrSaas = produtosMrr.reduce((s, p) => s + p.mrr, 0)
   const series = groupBySerie(recorrentes)
 
   // Recorrentes stats for this month
@@ -203,10 +182,9 @@ export default function ReceitasPage() {
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Agência Recebido', valor: totalRecebido, cor: 'text-brand-lima', icon: CheckCircle2, bg: 'bg-brand-lima/10' },
+            { label: 'Recebido', valor: totalRecebido, cor: 'text-brand-lima', icon: CheckCircle2, bg: 'bg-brand-lima/10' },
             { label: 'A Receber (Pendente)', valor: totalPendente, cor: 'text-yellow-400', icon: Clock, bg: 'bg-yellow-400/10' },
-            { label: 'MRR SaaS', valor: mrrSaas, cor: 'text-brand-violeta', icon: Layers, bg: 'bg-brand-violeta/10' },
-            { label: 'Total Consolidado', valor: totalRecebido + mrrSaas, cor: 'text-brand-lima', icon: TrendingUp, bg: 'bg-brand-lima/10' },
+            { label: 'Total Lançamentos', valor: totalRecebido + totalPendente, cor: 'text-brand-violeta', icon: TrendingUp, bg: 'bg-brand-violeta/10' },
           ].map((item) => (
             <Card key={item.label}>
               <CardContent className="p-5 flex items-center gap-4">
@@ -502,46 +480,6 @@ export default function ReceitasPage() {
           </CardContent>
         </Card>
 
-        {/* SaaS MRR */}
-        {produtosMrr.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Receitas Recorrentes SaaS</CardTitle>
-                <span className="text-xs text-brand-lavanda/50">MRR mensal consolidado</span>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-white/[0.04]">
-                {produtosMrr.map(p => (
-                  <Link key={p.id} href={`/saas/${p.id}`}>
-                    <div className="flex items-center gap-4 px-6 py-3.5 hover:bg-white/[0.02] transition-colors">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-violeta/10">
-                        <Layers className="h-4 w-4 text-brand-violeta" />
-                      </div>
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.cor }} />
-                        <div>
-                          <p className="text-sm text-brand-lavanda font-medium">{p.nome}</p>
-                          <p className="text-xs text-brand-lavanda/40">{p.clientes} assinante{p.clientes !== 1 ? 's' : ''} ativos</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-brand-lima">+{formatCurrency(p.mrr)}</p>
-                        <p className="text-xs text-brand-lavanda/40">MRR</p>
-                      </div>
-                      <Badge variant="concluido">Recorrente</Badge>
-                    </div>
-                  </Link>
-                ))}
-                <div className="flex items-center justify-between px-6 py-3.5 bg-brand-lima/[0.03]">
-                  <span className="text-xs font-medium text-brand-lima/70">Total MRR SaaS</span>
-                  <span className="text-sm font-bold text-brand-lima">+{formatCurrency(mrrSaas)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </main>
     </div>
   )

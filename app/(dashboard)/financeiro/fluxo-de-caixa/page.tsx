@@ -19,7 +19,6 @@ import { ptBR } from 'date-fns/locale'
 type MesFluxo = {
   mes: string; mesKey: string
   entradas: number; saidas: number; resultado: number; saldo_final: number
-  temSaas?: boolean
 }
 
 const subNav = [
@@ -62,7 +61,6 @@ export default function FluxoCaixaPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    const db = supabase as any
     async function load() {
       const { data: rawData } = await supabase
         .from('lancamentos')
@@ -80,22 +78,6 @@ export default function FluxoCaixaPage() {
         if (l.tipo === 'despesa') porMes[mesKey].saidas += l.valor
       }
 
-      // Adiciona MRR SaaS ao mês corrente
-      const currentMonthKey = new Date().toISOString().slice(0, 7)
-      const { data: prods } = await db.from('produtos').select('id').eq('ativo', true)
-      let mrrSaas = 0
-      if (prods?.length) {
-        for (const p of prods) {
-          const { data: clientes } = await db
-            .from('saas_clientes').select('mrr').eq('produto_id', p.id).in('status', ['ativo', 'trial'])
-          mrrSaas += (clientes ?? []).reduce((s: number, c: any) => s + (c.mrr ?? 0), 0)
-        }
-      }
-      if (mrrSaas > 0) {
-        if (!porMes[currentMonthKey]) porMes[currentMonthKey] = { entradas: 0, saidas: 0 }
-        porMes[currentMonthKey].entradas += Math.round(mrrSaas * 100) / 100
-      }
-
       let saldoAcumulado = 0
       const fluxo: MesFluxo[] = Object.entries(porMes)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -110,7 +92,6 @@ export default function FluxoCaixaPage() {
             saidas: vals.saidas,
             resultado,
             saldo_final: saldoAcumulado,
-            temSaas: mesKey === currentMonthKey && mrrSaas > 0,
           }
         })
 
@@ -215,12 +196,7 @@ export default function FluxoCaixaPage() {
                   ) : fluxoMensal.map((m) => (
                     <tr key={m.mesKey} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
                       <td className="px-6 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-brand-lavanda">{m.mes}</span>
-                          {m.temSaas && (
-                            <span className="text-[10px] text-brand-violeta/70 border border-brand-violeta/30 rounded px-1 py-0.5">+ SaaS</span>
-                          )}
-                        </div>
+                        <span className="font-medium text-brand-lavanda">{m.mes}</span>
                       </td>
                       <td className="px-4 py-3.5 text-right font-medium text-brand-lima whitespace-nowrap">
                         +{formatCurrency(m.entradas)}
