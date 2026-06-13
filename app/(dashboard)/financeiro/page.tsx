@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, ChevronDown, Wallet, Trash2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, ChevronDown, Wallet, Trash2, CheckCircle2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -72,6 +72,7 @@ export default function FinanceiroPage() {
   const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -89,6 +90,15 @@ export default function FinanceiroPage() {
     const { error } = await createClient().from('lancamentos').delete().eq('id', id)
     if (!error) setLancamentos(prev => prev.filter(l => l.id !== id))
     setDeletingId(null)
+  }
+
+  async function confirmarLancamento(id: string, tipo: string) {
+    setConfirmingId(id)
+    const novoStatus = tipo === 'receita' ? 'recebido' : 'pago'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (createClient() as any).from('lancamentos').update({ status: novoStatus }).eq('id', id)
+    if (!error) setLancamentos(prev => prev.map(l => l.id === id ? { ...l, status: novoStatus } : l))
+    setConfirmingId(null)
   }
 
   const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
@@ -402,7 +412,17 @@ export default function FinanceiroPage() {
                     <Badge variant={r.status === 'recebido' ? 'concluido' : r.status === 'pendente' ? 'pendente' : 'inativo'} className="shrink-0">
                       {r.status === 'recebido' ? 'Recebido' : r.status === 'pendente' ? 'Pendente' : 'Cancelado'}
                     </Badge>
-                    <div className="shrink-0 w-14 flex justify-end">
+                    <div className="shrink-0 flex items-center gap-1">
+                      {r.status === 'pendente' && deletingId !== r.id && (
+                        <button
+                          onClick={() => confirmarLancamento(r.id, r.tipo)}
+                          disabled={confirmingId === r.id}
+                          className="flex h-6 w-6 items-center justify-center rounded text-brand-lavanda/0 group-hover:text-brand-lavanda/30 hover:!text-brand-lima hover:bg-brand-lima/10 transition-colors disabled:opacity-50"
+                          title="Confirmar recebimento"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {deletingId === r.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => deleteLancamento(r.id)} className="text-[11px] text-brand-rosa font-medium">Excluir</button>
@@ -465,7 +485,17 @@ export default function FinanceiroPage() {
                     <Badge variant={d.status === 'pago' ? 'concluido' : d.status === 'pendente' ? 'pendente' : 'inativo'} className="shrink-0">
                       {d.status === 'pago' ? 'Pago' : d.status === 'pendente' ? 'Pendente' : 'Cancelado'}
                     </Badge>
-                    <div className="shrink-0 w-14 flex justify-end">
+                    <div className="shrink-0 flex items-center gap-1">
+                      {d.status === 'pendente' && deletingId !== d.id && (
+                        <button
+                          onClick={() => confirmarLancamento(d.id, d.tipo)}
+                          disabled={confirmingId === d.id}
+                          className="flex h-6 w-6 items-center justify-center rounded text-brand-lavanda/0 group-hover:text-brand-lavanda/30 hover:!text-brand-lima hover:bg-brand-lima/10 transition-colors disabled:opacity-50"
+                          title="Confirmar pagamento"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {deletingId === d.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => deleteLancamento(d.id)} className="text-[11px] text-brand-rosa font-medium">Excluir</button>

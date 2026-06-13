@@ -69,9 +69,11 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
           </Link>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Edit className="h-4 w-4" /> Editar
-          </Button>
+          <Link href={`/clientes/${id}/editar`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Edit className="h-4 w-4" /> Editar
+            </Button>
+          </Link>
         </div>
 
         <Card className="mb-6">
