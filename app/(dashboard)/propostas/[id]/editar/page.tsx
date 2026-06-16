@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, useFieldArray, type Resolver } from 'react-hook-form'
@@ -44,24 +44,15 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const servicosBase = [
-  { nome: 'Pesquisa de marca e briefing', preco: 1500, recorrencia: 'avulso' as const },
-  { nome: 'Desenvolvimento de logotipo', preco: 3500, recorrencia: 'avulso' as const },
-  { nome: 'Manual de identidade visual', preco: 2500, recorrencia: 'avulso' as const },
-  { nome: 'Design UI/UX de site', preco: 4500, recorrencia: 'avulso' as const },
-  { nome: 'Desenvolvimento front-end', preco: 5500, recorrencia: 'avulso' as const },
-  { nome: 'Social media — gestão mensal', preco: 2800, recorrencia: 'mensal' as const },
-  { nome: 'Manutenção e suporte mensal', preco: 1500, recorrencia: 'mensal' as const },
-  { nome: 'Campanha Google Ads', preco: 1200, recorrencia: 'mensal' as const },
-  { nome: 'Fotografia editorial', preco: 2000, recorrencia: 'avulso' as const },
-]
-
-export default function NovaPropostaPage() {
+export default function EditarPropostaPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const router = useRouter()
   const [clientes, setClientes] = useState<ClienteOption[]>([])
+  const [loading, setLoading] = useState(true)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [numero, setNumero] = useState('')
 
-  const { register, handleSubmit, watch, setValue, control, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue, control, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: {
       desconto_percentual: 0,
@@ -72,6 +63,7 @@ export default function NovaPropostaPage() {
   const { fields, append, remove } = useFieldArray({ control, name: 'itens' })
   const itens = watch('itens')
   const desconto = watch('desconto_percentual') || 0
+  const clienteIdAtual = watch('cliente_id')
 
   const avulsos = itens.filter(i => i.recorrencia === 'avulso')
   const recorrentes = itens.filter(i => i.recorrencia !== 'avulso')
@@ -83,24 +75,47 @@ export default function NovaPropostaPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => {
-      setClientes(data ?? [])
-    })
-  }, [])
+    async function load() {
+      const [{ data: clientesData }, { data: proposta }] = await Promise.all([
+        supabase.from('clientes').select('id, nome').order('nome'),
+        (supabase as any).from('propostas')
+          .select('*, proposta_itens(*)')
+          .eq('id', id)
+          .single(),
+      ])
+      setClientes(clientesData ?? [])
+      if (proposta) {
+        setNumero(proposta.numero)
+        const itensOrdenados = [...(proposta.proposta_itens ?? [])].sort((a: any, b: any) => a.ordem - b.ordem)
+        reset({
+          cliente_id: proposta.cliente_id,
+          titulo: proposta.titulo,
+          descricao: proposta.descricao ?? '',
+          validade: proposta.validade ?? '',
+          condicoes_pagamento: proposta.condicoes_pagamento ?? '',
+          desconto_percentual: proposta.desconto_percentual ?? 0,
+          observacoes: proposta.observacoes ?? '',
+          itens: itensOrdenados.map((item: any) => ({
+            descricao: item.descricao,
+            quantidade: item.quantidade,
+            valor_unitario: item.valor_unitario,
+            recorrencia: item.recorrencia ?? 'avulso',
+          })),
+        })
+      }
+      setLoading(false)
+    }
+    load()
+  }, [id, reset])
 
   async function onSubmit(data: FormData) {
     setSubmitError(null)
     const supabase = createClient()
 
-    const { count } = await supabase
-      .from('propostas')
-      .select('id', { count: 'exact', head: true })
-    const numero = `TRS-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(3, '0')}`
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: propostaRaw, error } = await (supabase as any)
+    const { error } = await (supabase as any)
       .from('propostas')
-      .insert({
+      .update({
         cliente_id: data.cliente_id,
         titulo: data.titulo,
         descricao: data.descricao ?? null,
@@ -108,24 +123,21 @@ export default function NovaPropostaPage() {
         condicoes_pagamento: data.condicoes_pagamento ?? null,
         desconto_percentual: data.desconto_percentual,
         observacoes: data.observacoes ?? null,
-        status: 'rascunho',
-        numero,
         valor_total: subtotal,
       })
-      .select('id')
-      .single()
+      .eq('id', id)
 
     if (error) {
-      setSubmitError(`Erro ao salvar proposta: ${error.message}`)
+      setSubmitError(`Erro ao atualizar proposta: ${error.message}`)
       return
     }
 
-    const proposta = propostaRaw as { id: string }
+    await supabase.from('proposta_itens').delete().eq('proposta_id', id)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: itemsError } = await supabase.from('proposta_itens').insert(
       data.itens.map((item, idx) => ({
-        proposta_id: proposta.id,
+        proposta_id: id,
         descricao: item.descricao,
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
@@ -135,26 +147,28 @@ export default function NovaPropostaPage() {
     )
 
     if (itemsError) {
-      setSubmitError(`Proposta criada mas erro ao salvar itens: ${itemsError.message}`)
+      setSubmitError(`Proposta atualizada mas erro ao salvar itens: ${itemsError.message}`)
       return
     }
 
-    router.push('/propostas')
+    router.push(`/propostas/${id}`)
   }
+
+  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header title="Nova Proposta" description="Crie uma nova proposta comercial" />
+      <Header title="Editar Proposta" description={numero} />
 
       <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/propostas">
+          <Link href={`/propostas/${id}`}>
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <h1 className="text-2xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-            Nova Proposta
+            Editar Proposta <span className="text-brand-lavanda/40 font-mono text-base">{numero}</span>
           </h1>
         </div>
 
@@ -167,7 +181,11 @@ export default function NovaPropostaPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Cliente *</Label>
-                      <Select onValueChange={(v) => setValue('cliente_id', v)}>
+                      <Select
+                        key={clienteIdAtual}
+                        defaultValue={clienteIdAtual}
+                        onValueChange={(v) => setValue('cliente_id', v)}
+                      >
                         <SelectTrigger><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
                         <SelectContent>
                           {clientes.map((c) => (
@@ -204,22 +222,7 @@ export default function NovaPropostaPage() {
 
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">Itens da Proposta</CardTitle>
-                    <Select onValueChange={(v) => {
-                      const s = servicosBase.find(s => s.nome === v)
-                      if (s) append({ descricao: s.nome, quantidade: 1, valor_unitario: s.preco, recorrencia: s.recorrencia })
-                    }}>
-                      <SelectTrigger className="w-48 h-8 text-xs">
-                        <SelectValue placeholder="Adicionar do catálogo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {servicosBase.map((s) => (
-                          <SelectItem key={s.nome} value={s.nome}>{s.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <CardTitle className="text-base">Itens da Proposta</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -243,6 +246,7 @@ export default function NovaPropostaPage() {
                           </div>
                           <div className="col-span-2">
                             <Select
+                              key={`${field.id}-rec`}
                               defaultValue={rec}
                               onValueChange={(v) => setValue(`itens.${idx}.recorrencia`, v as 'avulso' | 'mensal' | 'trimestral' | 'anual')}
                             >
@@ -354,10 +358,10 @@ export default function NovaPropostaPage() {
                   <Separator className="bg-brand-violeta/20" />
                   <div className="space-y-2">
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar Proposta'}
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar Alterações'}
                     </Button>
                     <Button type="button" variant="outline" className="w-full" asChild>
-                      <Link href="/propostas">Cancelar</Link>
+                      <Link href={`/propostas/${id}`}>Cancelar</Link>
                     </Button>
                   </div>
                 </CardContent>
