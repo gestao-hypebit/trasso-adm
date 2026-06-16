@@ -53,6 +53,7 @@ const servicosBase = [
 export default function NovaPropostaPage() {
   const router = useRouter()
   const [clientes, setClientes] = useState<ClienteOption[]>([])
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, setValue, control, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
@@ -78,12 +79,13 @@ export default function NovaPropostaPage() {
   }, [])
 
   async function onSubmit(data: FormData) {
+    setSubmitError(null)
     const supabase = createClient()
 
-    const { data: contagem } = await supabase
+    const { count } = await supabase
       .from('propostas')
       .select('id', { count: 'exact', head: true })
-    const numero = `TRS-${new Date().getFullYear()}-${String((contagem as any)?.length ?? 0 + 1).padStart(3, '0')}`
+    const numero = `TRS-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(3, '0')}`
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: propostaRaw, error } = await (supabase as any)
@@ -103,12 +105,16 @@ export default function NovaPropostaPage() {
       })
       .select('id')
       .single()
-    const proposta = propostaRaw as { id: string } | null
 
-    if (error || !proposta) return
+    if (error) {
+      setSubmitError(`Erro ao salvar proposta: ${error.message}`)
+      return
+    }
+
+    const proposta = propostaRaw as { id: string }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('proposta_itens').insert(
+    const { error: itemsError } = await supabase.from('proposta_itens').insert(
       data.itens.map((item, idx) => ({
         proposta_id: proposta.id,
         descricao: item.descricao,
@@ -118,6 +124,11 @@ export default function NovaPropostaPage() {
         ordem: idx + 1,
       })) as any
     )
+
+    if (itemsError) {
+      setSubmitError(`Proposta criada mas erro ao salvar itens: ${itemsError.message}`)
+      return
+    }
 
     router.push('/propostas')
   }
@@ -312,6 +323,11 @@ export default function NovaPropostaPage() {
               </Card>
             </div>
           </div>
+          {submitError && (
+            <div className="mt-4 p-3 rounded-lg bg-brand-rosa/10 border border-brand-rosa/30 text-brand-rosa text-sm">
+              {submitError}
+            </div>
+          )}
         </form>
       </main>
     </div>
