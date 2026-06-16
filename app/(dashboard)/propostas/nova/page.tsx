@@ -101,7 +101,6 @@ export default function NovaPropostaPage() {
         status: 'rascunho',
         numero,
         valor_total: subtotal,
-        valor_final: total,
       })
       .select('id')
       .single()
