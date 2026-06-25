@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, X, GripVertical } from 'lucide-react'
+import { Plus, X, GripVertical, AlertCircle } from 'lucide-react'
 import {
   DndContext, DragEndEvent, useDraggable,
   PointerSensor, useSensor, useSensors,
@@ -123,6 +123,7 @@ function PostIt({ nota, onUpdate, onDelete }: {
 export default function AnotacoesPage() {
   const [notas, setNotas] = useState<Anotacao[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -131,14 +132,19 @@ export default function AnotacoesPage() {
   useEffect(() => {
     const supabase = createClient() as any
     async function load() {
-      const { data } = await supabase.from('anotacoes').select('*').order('created_at')
-      setNotas((data as Anotacao[]) ?? [])
+      const { data, error } = await supabase.from('anotacoes').select('*').order('created_at')
+      if (error) {
+        setErro('Tabela "anotacoes" não encontrada. Execute o DDL no Supabase.')
+      } else {
+        setNotas((data as Anotacao[]) ?? [])
+      }
       setLoading(false)
     }
     load()
   }, [])
 
   async function criarNota() {
+    setErro(null)
     const supabase = createClient() as any
     const nova = {
       conteudo: '',
@@ -147,7 +153,11 @@ export default function AnotacoesPage() {
       pos_y: 80 + Math.floor(Math.random() * 240),
     }
     const { data, error } = await supabase.from('anotacoes').insert(nova).select('*').single()
-    if (!error && data) setNotas(prev => [...prev, data as Anotacao])
+    if (error) {
+      setErro('Erro ao criar anotação: ' + error.message)
+      return
+    }
+    if (data) setNotas(prev => [...prev, data as Anotacao])
   }
 
   async function atualizarNota(id: string, patch: Partial<Anotacao>) {
@@ -173,12 +183,16 @@ export default function AnotacoesPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: '100vh' }}>
+    // overflow-hidden aqui impede o body de scrollar; o canvas scroll fica no div interno
+    <div className="flex flex-col overflow-hidden" style={{ height: '100vh' }}>
       <Header title="Anotações" description="Canvas de post-its" />
 
-      <div className="shrink-0 px-6 py-3 border-b border-white/[0.06] flex items-center justify-between">
+      {/* toolbar — fica fixo abaixo do header */}
+      <div className="shrink-0 px-6 py-3 border-b border-white/[0.06] flex items-center justify-between bg-brand-noite/95 backdrop-blur-sm">
         <p className="text-brand-lavanda/40 text-sm">
-          {notas.length > 0 ? `${notas.length} ${notas.length === 1 ? 'anotação' : 'anotações'}` : 'Canvas vazio'}
+          {loading ? '' : notas.length > 0
+            ? `${notas.length} ${notas.length === 1 ? 'anotação' : 'anotações'}`
+            : 'Canvas vazio'}
         </p>
         <Button onClick={criarNota} size="sm">
           <Plus className="h-4 w-4" />
@@ -186,12 +200,24 @@ export default function AnotacoesPage() {
         </Button>
       </div>
 
+      {/* erro de configuração */}
+      {erro && (
+        <div className="shrink-0 flex items-center gap-2 px-6 py-2.5 bg-brand-rosa/10 border-b border-brand-rosa/20 text-brand-rosa text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{erro}</span>
+          <button onClick={() => setErro(null)} className="ml-auto opacity-60 hover:opacity-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-brand-lavanda/40 text-sm">
           Carregando...
         </div>
       ) : (
-        <div className="flex-1 overflow-auto">
+        // min-h-0 é essencial — sem ele o flex-1 não encolhe abaixo do conteúdo (1600px)
+        <div className="flex-1 overflow-auto min-h-0">
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div
               className="relative"
@@ -202,7 +228,7 @@ export default function AnotacoesPage() {
                 backgroundSize: '24px 24px',
               }}
             >
-              {notas.length === 0 && (
+              {notas.length === 0 && !erro && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none">
                   <p className="text-brand-lavanda/20 text-base font-medium">Canvas vazio</p>
                   <p className="text-brand-lavanda/15 text-sm">Clique em &ldquo;Nova Anotação&rdquo; para começar</p>
