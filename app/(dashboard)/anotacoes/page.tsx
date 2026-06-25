@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, X, GripVertical, AlertCircle } from 'lucide-react'
 import {
   DndContext, DragEndEvent, useDraggable,
@@ -18,17 +18,23 @@ type Anotacao = {
   cor: string
   pos_x: number
   pos_y: number
+  largura: number
+  altura: number
   created_at: string
 }
 
 const CORES: Record<string, { bg: string; text: string; header: string; dot: string }> = {
-  amarelo: { bg: 'bg-yellow-300',  text: 'text-yellow-950',  header: 'bg-yellow-400/20',  dot: 'bg-yellow-300'  },
-  verde:   { bg: 'bg-lime-300',    text: 'text-lime-950',    header: 'bg-lime-400/20',    dot: 'bg-lime-300'    },
-  rosa:    { bg: 'bg-pink-300',    text: 'text-pink-950',    header: 'bg-pink-400/20',    dot: 'bg-pink-300'    },
-  violeta: { bg: 'bg-violet-300',  text: 'text-violet-950',  header: 'bg-violet-400/20',  dot: 'bg-violet-300'  },
-  azul:    { bg: 'bg-sky-300',     text: 'text-sky-950',     header: 'bg-sky-400/20',     dot: 'bg-sky-300'     },
+  amarelo: { bg: 'bg-yellow-300', text: 'text-yellow-950', header: 'bg-yellow-400/20', dot: 'bg-yellow-300' },
+  verde:   { bg: 'bg-lime-300',   text: 'text-lime-950',   header: 'bg-lime-400/20',   dot: 'bg-lime-300'   },
+  rosa:    { bg: 'bg-pink-300',   text: 'text-pink-950',   header: 'bg-pink-400/20',   dot: 'bg-pink-300'   },
+  violeta: { bg: 'bg-violet-300', text: 'text-violet-950', header: 'bg-violet-400/20', dot: 'bg-violet-300' },
+  azul:    { bg: 'bg-sky-300',    text: 'text-sky-950',    header: 'bg-sky-400/20',    dot: 'bg-sky-300'    },
 }
 
+const MIN_W = 160
+const MIN_H = 140
+const DEFAULT_W = 224
+const DEFAULT_H = 180
 const CANVAS_W = 2400
 const CANVAS_H = 1600
 
@@ -43,13 +49,25 @@ function PostIt({ nota, onUpdate, onDelete }: {
   const c = CORES[nota.cor] ?? CORES.amarelo
   const [texto, setTexto] = useState(nota.conteudo)
 
+  // tamanho local para resize fluido
+  const [liveSize, setLiveSize] = useState({ w: nota.largura ?? DEFAULT_W, h: nota.altura ?? DEFAULT_H })
+  const resizeRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
+
+  // sincroniza quando o parent atualiza (ex: reload)
+  useEffect(() => {
+    if (!resizeRef.current) {
+      setLiveSize({ w: nota.largura ?? DEFAULT_W, h: nota.altura ?? DEFAULT_H })
+    }
+  }, [nota.largura, nota.altura])
+
   const style: React.CSSProperties = {
     position: 'absolute',
     left: nota.pos_x,
     top: nota.pos_y,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 50 : 1,
-    width: 224,
+    width: liveSize.w,
+    height: liveSize.h,
     willChange: isDragging ? 'transform' : undefined,
   }
 
@@ -57,10 +75,38 @@ function PostIt({ nota, onUpdate, onDelete }: {
     if (texto !== nota.conteudo) onUpdate(nota.id, { conteudo: texto })
   }
 
+  function handleResizeDown(e: React.PointerEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    resizeRef.current = { x: e.clientX, y: e.clientY, w: liveSize.w, h: liveSize.h }
+
+    function onMove(ev: PointerEvent) {
+      if (!resizeRef.current) return
+      setLiveSize({
+        w: Math.max(MIN_W, resizeRef.current.w + ev.clientX - resizeRef.current.x),
+        h: Math.max(MIN_H, resizeRef.current.h + ev.clientY - resizeRef.current.y),
+      })
+    }
+
+    function onUp(ev: PointerEvent) {
+      if (!resizeRef.current) return
+      const finalW = Math.max(MIN_W, resizeRef.current.w + ev.clientX - resizeRef.current.x)
+      const finalH = Math.max(MIN_H, resizeRef.current.h + ev.clientY - resizeRef.current.y)
+      setLiveSize({ w: finalW, h: finalH })
+      onUpdate(nota.id, { largura: finalW, altura: finalH })
+      resizeRef.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   return (
-    <div ref={setNodeRef} style={style} className={cn('rounded shadow-xl shadow-black/40 flex flex-col select-none', c.bg)}>
-      {/* header */}
-      <div className={cn('flex items-center gap-1 px-1.5 py-1.5 rounded-t', c.header)}>
+    <div ref={setNodeRef} style={style} className={cn('rounded shadow-xl shadow-black/40 flex flex-col select-none group', c.bg)}>
+      {/* header com handle de arrastar + paleta + excluir */}
+      <div className={cn('flex items-center gap-1 px-1.5 py-1.5 rounded-t shrink-0', c.header)}>
         <button
           {...listeners}
           {...attributes}
@@ -96,11 +142,11 @@ function PostIt({ nota, onUpdate, onDelete }: {
         </button>
       </div>
 
-      {/* textarea */}
+      {/* área de texto (ocupa o espaço restante) */}
       <textarea
         className={cn(
-          'resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:opacity-30',
-          'min-h-[120px] select-text cursor-text',
+          'flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none',
+          'placeholder:opacity-30 select-text cursor-text min-h-0',
           c.text
         )}
         value={texto}
@@ -110,10 +156,28 @@ function PostIt({ nota, onUpdate, onDelete }: {
         placeholder="Escreva aqui..."
       />
 
-      {/* data */}
-      <p className={cn('text-[10px] px-3 pb-1.5 opacity-30 text-right font-medium', c.text)}>
-        {new Date(nota.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-      </p>
+      {/* rodapé: data + handle de redimensionar */}
+      <div className="flex items-end justify-between shrink-0 pb-1 pl-3">
+        <p className={cn('text-[10px] opacity-30 font-medium', c.text)}>
+          {new Date(nota.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+        </p>
+
+        {/* handle de resize — 3 pontos diagonais no canto inferior direito */}
+        <div
+          onPointerDown={handleResizeDown}
+          className={cn(
+            'p-1.5 cursor-se-resize opacity-0 group-hover:opacity-30 hover:!opacity-60 transition-opacity',
+            c.text
+          )}
+          title="Redimensionar"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <circle cx="4.5" cy="8.5" r="1.5" />
+            <circle cx="8.5" cy="4.5" r="1.5" />
+          </svg>
+        </div>
+      </div>
     </div>
   )
 }
@@ -151,6 +215,8 @@ export default function AnotacoesPage() {
       cor: 'amarelo',
       pos_x: 80 + Math.floor(Math.random() * 320),
       pos_y: 80 + Math.floor(Math.random() * 240),
+      largura: DEFAULT_W,
+      altura: DEFAULT_H,
     }
     const { data, error } = await supabase.from('anotacoes').insert(nova).select('*').single()
     if (error) {
@@ -183,11 +249,9 @@ export default function AnotacoesPage() {
   }
 
   return (
-    // overflow-hidden aqui impede o body de scrollar; o canvas scroll fica no div interno
     <div className="flex flex-col overflow-hidden" style={{ height: '100vh' }}>
       <Header title="Anotações" description="Canvas de post-its" />
 
-      {/* toolbar — fica fixo abaixo do header */}
       <div className="shrink-0 px-6 py-3 border-b border-white/[0.06] flex items-center justify-between bg-brand-noite/95 backdrop-blur-sm">
         <p className="text-brand-lavanda/40 text-sm">
           {loading ? '' : notas.length > 0
@@ -200,7 +264,6 @@ export default function AnotacoesPage() {
         </Button>
       </div>
 
-      {/* erro de configuração */}
       {erro && (
         <div className="shrink-0 flex items-center gap-2 px-6 py-2.5 bg-brand-rosa/10 border-b border-brand-rosa/20 text-brand-rosa text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -216,7 +279,6 @@ export default function AnotacoesPage() {
           Carregando...
         </div>
       ) : (
-        // min-h-0 é essencial — sem ele o flex-1 não encolhe abaixo do conteúdo (1600px)
         <div className="flex-1 overflow-auto min-h-0">
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div
