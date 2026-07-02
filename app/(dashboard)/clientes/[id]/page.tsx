@@ -45,6 +45,7 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [interacoes, setInteracoes] = useState<Interacao[]>([])
+  const [lancamentos, setLancamentos] = useState<{ valor: number; tipo: string; status: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [rotating, setRotating] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -55,20 +56,24 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     const supabase = createClient()
     async function load() {
-      const [{ data: c }, { data: p }, { data: i }] = await Promise.all([
+      const [{ data: c }, { data: p }, { data: i }, { data: l }] = await Promise.all([
         supabase.from('clientes').select('*, produto:produtos(id,nome,cor)').eq('id', id).single(),
         supabase.from('projetos').select('id, nome, status, valor, data_entrega').eq('cliente_id', id).order('created_at', { ascending: false }),
         supabase.from('interacoes').select('id, tipo, titulo, descricao, data').eq('cliente_id', id).order('data', { ascending: false }),
+        supabase.from('lancamentos').select('valor, tipo, status').eq('cliente_id', id),
       ])
       setCliente(c)
       setProjetos(p ?? [])
       setInteracoes(i ?? [])
+      setLancamentos(l ?? [])
       setLoading(false)
     }
     load()
   }, [id])
 
-  const totalFaturado = projetos.reduce((s, p) => s + (p.valor ?? 0), 0)
+  const totalFaturado = lancamentos
+    .filter((l) => l.tipo === 'receita' && l.status === 'recebido')
+    .reduce((s, l) => s + l.valor, 0)
   const projetosAtivos = projetos.filter((p) => p.status !== 'concluido').length
   const ultimaInteracao = interacoes[0] ?? null
   const portalUrl = cliente && typeof window !== 'undefined' ? `${window.location.origin}/portal/${cliente.portal_token}` : ''

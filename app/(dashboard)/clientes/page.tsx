@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { getInitials, formatDate } from '@/lib/utils'
+import { getInitials, formatDate, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
 
@@ -31,6 +31,8 @@ const grupoLabel: Record<string, string> = {
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [faturadoPorCliente, setFaturadoPorCliente] = useState<Record<string, number>>({})
+  const [projetosAtivosPorCliente, setProjetosAtivosPorCliente] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
@@ -38,14 +40,28 @@ export default function ClientesPage() {
   const [produtoFilter, setProdutoFilter] = useState('')
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient() as any
     async function load() {
-      const [{ data: c }, { data: p }] = await Promise.all([
+      const [{ data: c }, { data: p }, { data: lanc }, { data: proj }] = await Promise.all([
         supabase.from('clientes').select('*').order('created_at', { ascending: false }),
         supabase.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true),
+        supabase.from('lancamentos').select('cliente_id, valor').eq('tipo', 'receita').eq('status', 'recebido').not('cliente_id', 'is', null),
+        supabase.from('projetos').select('cliente_id, status').not('cliente_id', 'is', null),
       ])
       setClientes(c ?? [])
       setProdutos(p ?? [])
+
+      const faturado: Record<string, number> = {}
+      for (const l of lanc ?? []) faturado[l.cliente_id] = (faturado[l.cliente_id] ?? 0) + l.valor
+      setFaturadoPorCliente(faturado)
+
+      const ativos: Record<string, number> = {}
+      for (const pr of proj ?? []) {
+        if (pr.status === 'concluido') continue
+        ativos[pr.cliente_id] = (ativos[pr.cliente_id] ?? 0) + 1
+      }
+      setProjetosAtivosPorCliente(ativos)
+
       setLoading(false)
     }
     load()
@@ -158,6 +174,8 @@ export default function ClientesPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((cliente) => {
               const produto = cliente.produto_id ? produtoMap[cliente.produto_id] : null
+              const faturado = faturadoPorCliente[cliente.id] ?? 0
+              const projetosAtivos = projetosAtivosPorCliente[cliente.id] ?? 0
               return (
                 <Card key={cliente.id} className="hover:border-white/[0.12] transition-colors group">
                   <CardContent className="p-5">
@@ -235,6 +253,19 @@ export default function ClientesPage() {
                         </span>
                       ))}
                     </div>
+
+                    {(faturado > 0 || projetosAtivos > 0) && (
+                      <div className="mt-3 pt-3 border-t border-white/[0.04] grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-[10px] text-brand-lavanda/40">Faturado</p>
+                          <p className="text-sm font-semibold text-brand-lima">{formatCurrency(faturado)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-brand-lavanda/40">Projetos ativos</p>
+                          <p className="text-sm font-semibold text-brand-lavanda">{projetosAtivos}</p>
+                        </div>
+                      </div>
+                    )}
 
                     <p className="mt-3 text-[10px] text-brand-lavanda/30">
                       Cliente desde {formatDate(cliente.created_at, 'MMM yyyy')}
