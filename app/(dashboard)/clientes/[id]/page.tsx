@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Edit, Plus, MessageCircle, Video, PhoneCall, FileText, StickyNote, FolderOpen } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Edit, Plus, MessageCircle, Video, PhoneCall, FileText, StickyNote, FolderOpen, Copy, RefreshCw, Check } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { formatDate, formatCurrency, getInitials } from '@/lib/utils'
+import { formatDate, formatCurrency, getInitials, cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
 
@@ -35,6 +35,8 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [interacoes, setInteracoes] = useState<Interacao[]>([])
   const [loading, setLoading] = useState(true)
+  const [rotating, setRotating] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -53,6 +55,35 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
   }, [id])
 
   const totalFaturado = projetos.reduce((s, p) => s + (p.valor ?? 0), 0)
+  const portalUrl = cliente && typeof window !== 'undefined' ? `${window.location.origin}/portal/${cliente.portal_token}` : ''
+
+  async function handleCopyPortalLink() {
+    if (!cliente) return
+    await navigator.clipboard.writeText(`${window.location.origin}/portal/${cliente.portal_token}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleRotatePortalToken() {
+    setRotating(true)
+    const supabase = createClient()
+    const { data } = await (supabase as any)
+      .from('clientes')
+      .update({ portal_token: crypto.randomUUID(), portal_token_created_at: new Date().toISOString(), portal_ativo: true })
+      .eq('id', id)
+      .select('portal_token, portal_ativo, portal_token_created_at')
+      .single()
+    if (data) setCliente((prev) => (prev ? { ...prev, ...data } : prev))
+    setRotating(false)
+  }
+
+  async function handleTogglePortalAtivo() {
+    if (!cliente) return
+    const novoValor = !cliente.portal_ativo
+    const supabase = createClient()
+    const { error } = await (supabase as any).from('clientes').update({ portal_ativo: novoValor }).eq('id', id)
+    if (!error) setCliente((prev) => (prev ? { ...prev, portal_ativo: novoValor } : prev))
+  }
 
   if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
   if (!cliente) return (
@@ -216,6 +247,36 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </CardContent>
               </Card>
+              <Card className="lg:col-span-2">
+                <CardHeader><CardTitle className="text-sm">Portal do Cliente</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Badge variant={cliente.portal_ativo ? 'ativo' : 'inativo'}>
+                      {cliente.portal_ativo ? 'Ativo' : 'Desativado'}
+                    </Badge>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" className="gap-2" onClick={handleCopyPortalLink} disabled={!cliente.portal_ativo}>
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {copied ? 'Copiado' : 'Copiar link'}
+                      </Button>
+                      <Button size="sm" variant="outline" className="gap-2" onClick={handleRotatePortalToken} disabled={rotating}>
+                        <RefreshCw className={cn('h-4 w-4', rotating && 'animate-spin')} />
+                        Gerar novo link
+                      </Button>
+                      <Button size="sm" variant={cliente.portal_ativo ? 'destructive' : 'default'} onClick={handleTogglePortalAtivo}>
+                        {cliente.portal_ativo ? 'Revogar acesso' : 'Reativar acesso'}
+                      </Button>
+                    </div>
+                  </div>
+                  {cliente.portal_ativo && (
+                    <p className="text-xs text-brand-lavanda/40 font-mono break-all">{portalUrl}</p>
+                  )}
+                  {cliente.portal_last_accessed_at && (
+                    <p className="text-xs text-brand-lavanda/40">Último acesso: {formatDate(cliente.portal_last_accessed_at, 'dd/MM/yyyy HH:mm')}</p>
+                  )}
+                </CardContent>
+              </Card>
+
               {cliente.observacoes && (
                 <Card className="lg:col-span-2">
                   <CardHeader><CardTitle className="text-sm">Observações</CardTitle></CardHeader>
