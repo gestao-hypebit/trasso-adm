@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, ChevronDown, Wallet } from 'lucide-react'
+import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, ChevronDown, Wallet, Activity, MessageCircle, FileCheck, FileSignature, CheckSquare } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,6 +20,16 @@ type Lancamento = { tipo: string; valor: number; data: string; status: string; d
 type Projeto = { id: string; status: string; data_entrega: string | null; nome: string }
 type PropostaCount = { id: string }
 type ClienteAll = { id: string; created_at: string }
+
+type AtividadeTipo = 'interacao' | 'proposta_aprovada' | 'contrato_assinado' | 'tarefa_concluida'
+type Atividade = { id: string; tipo: AtividadeTipo; titulo: string; subtitulo: string | null; timestamp: string; href: string }
+
+const ATIVIDADE_ICONS: Record<AtividadeTipo, React.FC<any>> = {
+  interacao: MessageCircle, proposta_aprovada: FileCheck, contrato_assinado: FileSignature, tarefa_concluida: CheckSquare,
+}
+const ATIVIDADE_CORES: Record<AtividadeTipo, string> = {
+  interacao: 'text-brand-violeta', proposta_aprovada: 'text-brand-lima', contrato_assinado: 'text-brand-lima', tarefa_concluida: 'text-brand-rosa',
+}
 
 const STATUS_CORES: Record<string, string> = {
   em_andamento: '#7C3AED',
@@ -54,6 +64,7 @@ export default function DashboardPage() {
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [propostas, setPropostas] = useState<PropostaCount[]>([])
   const [clientesAll, setClientesAll] = useState<ClienteAll[]>([])
+  const [atividades, setAtividades] = useState<Atividade[]>([])
   const [loading, setLoading] = useState(true)
 
   // Mês selecionado (filtro)
@@ -67,18 +78,43 @@ export default function DashboardPage() {
   const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient() as any
     async function load() {
-      const [{ data: l }, { data: p }, { data: prop }, { data: cl }] = await Promise.all([
+      const [{ data: l }, { data: p }, { data: prop }, { data: cl }, { data: interacoes }, { data: propAprovadas }, { data: contratosAssinados }, { data: tarefasConcluidas }] = await Promise.all([
         supabase.from('lancamentos').select('tipo, valor, data, status, descricao, categorias_financeiras(nome)').order('data', { ascending: true }),
         supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false }),
         supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao']),
         supabase.from('clientes').select('id, created_at'),
+        supabase.from('interacoes').select('id, titulo, data, clientes(id, nome)').order('data', { ascending: false }).limit(8),
+        supabase.from('propostas').select('id, numero, titulo, aprovada_em, clientes(nome)').not('aprovada_em', 'is', null).order('aprovada_em', { ascending: false }).limit(8),
+        supabase.from('contratos').select('id, numero, titulo, assinado_em, clientes(nome)').not('assinado_em', 'is', null).order('assinado_em', { ascending: false }).limit(8),
+        supabase.from('tarefas').select('id, titulo, concluida_em, projeto_id, projetos(nome)').not('concluida_em', 'is', null).order('concluida_em', { ascending: false }).limit(8),
       ])
       setLancamentos((l as Lancamento[]) ?? [])
       setProjetos(p ?? [])
       setPropostas(prop ?? [])
       setClientesAll(cl ?? [])
+
+      const feed: Atividade[] = [
+        ...(interacoes ?? []).map((i: any) => ({
+          id: `interacao-${i.id}`, tipo: 'interacao' as const, titulo: i.titulo,
+          subtitulo: i.clientes?.nome ?? null, timestamp: i.data, href: i.clientes?.id ? `/clientes/${i.clientes.id}` : '/clientes',
+        })),
+        ...(propAprovadas ?? []).map((p: any) => ({
+          id: `proposta-${p.id}`, tipo: 'proposta_aprovada' as const, titulo: `Proposta aprovada · ${p.numero}`,
+          subtitulo: p.clientes?.nome ?? p.titulo, timestamp: p.aprovada_em, href: `/propostas/${p.id}`,
+        })),
+        ...(contratosAssinados ?? []).map((c: any) => ({
+          id: `contrato-${c.id}`, tipo: 'contrato_assinado' as const, titulo: `Contrato assinado · ${c.numero}`,
+          subtitulo: c.clientes?.nome ?? c.titulo, timestamp: c.assinado_em, href: `/contratos/${c.id}`,
+        })),
+        ...(tarefasConcluidas ?? []).map((t: any) => ({
+          id: `tarefa-${t.id}`, tipo: 'tarefa_concluida' as const, titulo: t.titulo,
+          subtitulo: t.projetos?.nome ?? null, timestamp: t.concluida_em, href: t.projeto_id ? `/projetos/${t.projeto_id}` : '/tarefas',
+        })),
+      ].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 8)
+      setAtividades(feed)
+
       setLoading(false)
     }
     load()
@@ -373,6 +409,35 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Atividade Recente */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4 text-brand-violeta" /> Atividade Recente
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loading ? (
+              <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
+            ) : atividades.length === 0 ? (
+              <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhuma atividade recente.</p>
+            ) : atividades.map((a) => {
+              const Icon = ATIVIDADE_ICONS[a.tipo]
+              return (
+                <Link key={a.id} href={a.href} className="flex items-start gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.06]">
+                    <Icon className={cn('h-4 w-4', ATIVIDADE_CORES[a.tipo])} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-brand-lavanda truncate">{a.titulo}</p>
+                    <p className="text-xs text-brand-lavanda/40 mt-0.5">{a.subtitulo ? `${a.subtitulo} • ` : ''}{formatDate(a.timestamp, 'dd/MM/yyyy HH:mm')}</p>
+                  </div>
+                </Link>
+              )
+            })}
+          </CardContent>
+        </Card>
 
       </div>
     </div>
