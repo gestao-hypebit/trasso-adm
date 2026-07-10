@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { gerarComissoesDoMes, type GerarComissoesResult } from '@/lib/comissoes/gerar'
 import { indicadorSchema, type IndicadorFormData } from '@/lib/validations/indicador'
-import { indicacaoSchema, type IndicacaoFormData } from '@/lib/validations/indicacao'
+import { indicacaoSchema, parseValorBr, type IndicacaoFormData } from '@/lib/validations/indicacao'
 
 export type ComissaoActionResult =
   | { success: true }
@@ -146,8 +146,8 @@ export async function criarIndicacaoAction(data: IndicacaoFormData): Promise<Com
       indicador_id: parsed.indicador_id,
       cliente_indicado_id: parsed.cliente_indicado_id,
       tipo_comissao: parsed.tipo_comissao,
-      valor_fixo: parsed.tipo_comissao === 'fixo' ? parsed.valor_fixo : null,
-      percentual: parsed.tipo_comissao === 'percentual' ? parsed.percentual : null,
+      valor_fixo: parsed.tipo_comissao === 'fixo' ? parseValorBr(parsed.valor_fixo) : null,
+      percentual: parsed.tipo_comissao === 'percentual' ? parseValorBr(parsed.percentual) : null,
       status: parsed.status,
       data_inicio: parsed.data_inicio,
       data_fim: parsed.data_fim || null,

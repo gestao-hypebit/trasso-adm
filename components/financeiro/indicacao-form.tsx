@@ -124,13 +124,13 @@ export function IndicacaoForm({ onSuccess }: IndicacaoFormProps) {
             {tipoComissao === 'fixo' ? (
               <div className="col-span-2">
                 <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Valor mensal (R$) *</Label>
-                <Input type="number" step="0.01" placeholder="15,00" {...register('valor_fixo', { valueAsNumber: true })} />
+                <Input inputMode="decimal" placeholder="15,00" {...register('valor_fixo')} />
                 {errors.valor_fixo && <p className="text-brand-rosa text-xs mt-1">{errors.valor_fixo.message}</p>}
               </div>
             ) : (
               <div className="col-span-2">
                 <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Percentual sobre a receita mensal (%) *</Label>
-                <Input type="number" step="0.01" placeholder="30" {...register('percentual', { valueAsNumber: true })} />
+                <Input inputMode="decimal" placeholder="30" {...register('percentual')} />
                 {errors.percentual && <p className="text-brand-rosa text-xs mt-1">{errors.percentual.message}</p>}
               </div>
             )}
