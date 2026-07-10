@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LancamentoForm } from '@/components/financeiro/lancamento-form'
+import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -24,26 +25,6 @@ type Lancamento = {
 }
 
 type DiaFluxo ={ dia: string; entradas: number; saidas: number; saldo: number }
-
-const subNav = [
-  { href: '/financeiro', label: 'Visão Geral' },
-  { href: '/financeiro/receitas', label: 'Receitas' },
-  { href: '/financeiro/despesas', label: 'Despesas' },
-  { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
-]
-
-function FinanceiroSubNav({ pathname }: { pathname: string }) {
-  return (
-    <div className="flex gap-1 border-b border-white/[0.06] mb-6">
-      {subNav.map(({ href, label }) => (
-        <Link key={href} href={href} className={cn(
-          'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-          pathname === href ? 'border-brand-lima text-brand-lima' : 'border-transparent text-brand-lavanda/60 hover:text-brand-lavanda hover:border-white/[0.12]'
-        )}>{label}</Link>
-      ))}
-    </div>
-  )
-}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null

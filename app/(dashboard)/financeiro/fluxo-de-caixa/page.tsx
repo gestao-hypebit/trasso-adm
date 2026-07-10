@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { Header } from '@/components/layout/header'
@@ -9,6 +8,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LancamentoForm } from '@/components/financeiro/lancamento-form'
+import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
@@ -19,26 +19,6 @@ import { ptBR } from 'date-fns/locale'
 type MesFluxo = {
   mes: string; mesKey: string
   entradas: number; saidas: number; resultado: number; saldo_final: number
-}
-
-const subNav = [
-  { href: '/financeiro', label: 'Visão Geral' },
-  { href: '/financeiro/receitas', label: 'Receitas' },
-  { href: '/financeiro/despesas', label: 'Despesas' },
-  { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
-]
-
-function FinanceiroSubNav({ pathname }: { pathname: string }) {
-  return (
-    <div className="flex gap-1 border-b border-white/[0.06] mb-6">
-      {subNav.map(({ href, label }) => (
-        <Link key={href} href={href} className={cn(
-          'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-          pathname === href ? 'border-brand-lima text-brand-lima' : 'border-transparent text-brand-lavanda/60 hover:text-brand-lavanda hover:border-white/[0.12]'
-        )}>{label}</Link>
-      ))}
-    </div>
-  )
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {

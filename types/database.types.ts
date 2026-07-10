@@ -58,6 +58,21 @@ export interface Database {
         Insert: { id?: string; tipo: string; descricao: string; valor: number; data: string; data_competencia?: string | null; status?: string; categoria_id?: string | null; cliente_id?: string | null; projeto_id?: string | null; produto_id?: string | null; forma_pagamento?: string | null; recorrente?: boolean; frequencia?: string | null; comprovante_url?: string | null; observacoes?: string | null; created_at?: string; updated_at?: string }
         Update: { id?: string; tipo?: string; descricao?: string; valor?: number; data?: string; data_competencia?: string | null; status?: string; categoria_id?: string | null; cliente_id?: string | null; projeto_id?: string | null; produto_id?: string | null; forma_pagamento?: string | null; recorrente?: boolean; frequencia?: string | null; comprovante_url?: string | null; observacoes?: string | null; created_at?: string; updated_at?: string }
       }
+      indicadores: {
+        Row: { id: string; tipo: string; cliente_id: string | null; nome: string; email: string | null; telefone: string | null; whatsapp: string | null; chave_pix: string | null; observacoes: string | null; ativo: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; tipo: string; cliente_id?: string | null; nome: string; email?: string | null; telefone?: string | null; whatsapp?: string | null; chave_pix?: string | null; observacoes?: string | null; ativo?: boolean; created_at?: string; updated_at?: string }
+        Update: { id?: string; tipo?: string; cliente_id?: string | null; nome?: string; email?: string | null; telefone?: string | null; whatsapp?: string | null; chave_pix?: string | null; observacoes?: string | null; ativo?: boolean; created_at?: string; updated_at?: string }
+      }
+      indicacoes: {
+        Row: { id: string; indicador_id: string; cliente_indicado_id: string; tipo_comissao: string; valor_fixo: number | null; percentual: number | null; status: string; data_inicio: string; data_fim: string | null; observacoes: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; indicador_id: string; cliente_indicado_id: string; tipo_comissao: string; valor_fixo?: number | null; percentual?: number | null; status?: string; data_inicio?: string; data_fim?: string | null; observacoes?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; indicador_id?: string; cliente_indicado_id?: string; tipo_comissao?: string; valor_fixo?: number | null; percentual?: number | null; status?: string; data_inicio?: string; data_fim?: string | null; observacoes?: string | null; created_at?: string; updated_at?: string }
+      }
+      comissoes: {
+        Row: { id: string; indicacao_id: string; indicador_id: string; competencia: string; valor: number; lancamento_id: string; observacoes: string | null; created_at: string }
+        Insert: { id?: string; indicacao_id: string; indicador_id: string; competencia: string; valor: number; lancamento_id: string; observacoes?: string | null; created_at?: string }
+        Update: { id?: string; indicacao_id?: string; indicador_id?: string; competencia?: string; valor?: number; lancamento_id?: string; observacoes?: string | null; created_at?: string }
+      }
       configuracoes_agencia: {
         Row: { id: string; nome: string; cnpj: string | null; email: string | null; telefone: string | null; site: string | null; cidade: string | null; endereco: string | null; logo_url: string | null; proposta_prefixo: string; proposta_contador: number; contrato_prefixo: string; contrato_contador: number; created_at: string; updated_at: string }
         Insert: { id?: string; nome?: string; cnpj?: string | null; email?: string | null; telefone?: string | null; site?: string | null; cidade?: string | null; endereco?: string | null; logo_url?: string | null; proposta_prefixo?: string; proposta_contador?: number; contrato_prefixo?: string; contrato_contador?: number; created_at?: string; updated_at?: string }
