@@ -179,3 +179,31 @@ export async function encerrarIndicacaoAction(id: string): Promise<ComissaoActio
     return { success: false, error: actionErrorMessage(e) }
   }
 }
+
+export async function excluirIndicacaoAction(id: string): Promise<ComissaoActionResult> {
+  try {
+    const supabase = (await createClient()) as any
+    const { error } = await supabase.from('indicacoes').delete().eq('id', id)
+    if (error) throw error
+
+    revalidatePath('/financeiro/comissoes')
+    return { success: true }
+  } catch (e) {
+    console.error('[comissoes] excluirIndicacaoAction', e)
+    return { success: false, error: actionErrorMessage(e) }
+  }
+}
+
+export async function excluirIndicadorAction(id: string): Promise<ComissaoActionResult> {
+  try {
+    const supabase = (await createClient()) as any
+    const { error } = await supabase.from('indicadores').delete().eq('id', id)
+    if (error) throw error
+
+    revalidatePath('/financeiro/comissoes')
+    return { success: true }
+  } catch (e) {
+    console.error('[comissoes] excluirIndicadorAction', e)
+    return { success: false, error: actionErrorMessage(e) }
+  }
+}

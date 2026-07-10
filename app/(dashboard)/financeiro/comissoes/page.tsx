@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import { usePathname } from 'next/navigation'
-import { CheckCircle2, XCircle, Clock, Wallet, RefreshCw } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, Wallet, RefreshCw, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +22,8 @@ import {
   marcarComissaoPagaAction,
   cancelarComissaoAction,
   encerrarIndicacaoAction,
+  excluirIndicacaoAction,
+  excluirIndicadorAction,
 } from './actions'
 
 type ComissaoRow = {
@@ -67,6 +69,8 @@ export default function ComissoesPage() {
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [isGenerating, startGenerating] = useTransition()
+  const [deletingIndicadorId, setDeletingIndicadorId] = useState<string | null>(null)
+  const [deletingIndicacaoId, setDeletingIndicacaoId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -123,6 +127,20 @@ export default function ComissoesPage() {
 
   async function handleEncerrarIndicacao(id: string) {
     const result = await encerrarIndicacaoAction(id)
+    if (!result.success) { setToast({ msg: result.error, ok: false }); return }
+    load()
+  }
+
+  async function handleExcluirIndicacao(id: string) {
+    const result = await excluirIndicacaoAction(id)
+    setDeletingIndicacaoId(null)
+    if (!result.success) { setToast({ msg: result.error, ok: false }); return }
+    load()
+  }
+
+  async function handleExcluirIndicador(id: string) {
+    const result = await excluirIndicadorAction(id)
+    setDeletingIndicadorId(null)
     if (!result.success) { setToast({ msg: result.error, ok: false }); return }
     load()
   }
@@ -265,7 +283,7 @@ export default function ComissoesPage() {
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Contato</th>
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">PIX</th>
                         <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
-                        <th className="w-10" />
+                        <th className="w-20" />
                       </tr>
                     </thead>
                     <tbody>
@@ -274,7 +292,7 @@ export default function ComissoesPage() {
                       ) : indicadores.length === 0 ? (
                         <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhum indicador cadastrado.</td></tr>
                       ) : indicadores.map((i) => (
-                        <tr key={i.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                        <tr key={i.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
                           <td className="px-6 py-3.5 text-brand-lavanda font-medium">{i.nome}</td>
                           <td className="px-4 py-3.5 text-brand-lavanda/60">{i.tipo === 'cliente' ? `Cliente (${i.clientes?.nome ?? '—'})` : 'Parceiro externo'}</td>
                           <td className="px-4 py-3.5 text-brand-lavanda/60 text-xs">{i.email || i.telefone || '—'}</td>
@@ -283,7 +301,23 @@ export default function ComissoesPage() {
                             <Badge variant={i.ativo ? 'ativo' : 'inativo'}>{i.ativo ? 'Ativo' : 'Inativo'}</Badge>
                           </td>
                           <td className="px-2 py-3.5 text-center">
-                            <IndicadorForm indicador={i} onSuccess={load} />
+                            {deletingIndicadorId === i.id ? (
+                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                <button onClick={() => handleExcluirIndicador(i.id)} className="text-xs text-brand-rosa hover:text-brand-rosa/80 font-medium transition-colors">Excluir</button>
+                                <span className="text-brand-lavanda/20">·</span>
+                                <button onClick={() => setDeletingIndicadorId(null)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Cancelar</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                <IndicadorForm indicador={i} onSuccess={load} />
+                                <button
+                                  onClick={() => setDeletingIndicadorId(i.id)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-md text-brand-lavanda/0 group-hover:text-brand-lavanda/25 hover:!text-brand-rosa hover:bg-brand-rosa/10 transition-colors"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -309,7 +343,7 @@ export default function ComissoesPage() {
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Comissão</th>
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Início</th>
                         <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
-                        <th className="w-24" />
+                        <th className="w-36" />
                       </tr>
                     </thead>
                     <tbody>
@@ -328,9 +362,23 @@ export default function ComissoesPage() {
                             </td>
                             <td className="px-4 py-3.5 text-brand-lavanda/60 text-xs">{formatDate(i.data_inicio)}</td>
                             <td className="px-4 py-3.5 text-center">{sc && <Badge variant={sc.variant}>{sc.label}</Badge>}</td>
-                            <td className="px-2 py-3.5 text-center">
-                              {i.status === 'ativa' && (
-                                <button onClick={() => handleEncerrarIndicacao(i.id)} className="text-xs text-brand-lavanda/40 hover:text-brand-rosa transition-colors">Encerrar</button>
+                            <td className="px-2 py-3.5 text-right whitespace-nowrap">
+                              {deletingIndicacaoId === i.id ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => handleExcluirIndicacao(i.id)} className="text-xs text-brand-rosa hover:text-brand-rosa/80 font-medium transition-colors">Excluir</button>
+                                  <span className="text-brand-lavanda/20">·</span>
+                                  <button onClick={() => setDeletingIndicacaoId(null)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Cancelar</button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-2">
+                                  {i.status === 'ativa' && (
+                                    <>
+                                      <button onClick={() => handleEncerrarIndicacao(i.id)} className="text-xs text-brand-lavanda/40 hover:text-brand-lavanda/70 transition-colors">Encerrar</button>
+                                      <span className="text-brand-lavanda/20">·</span>
+                                    </>
+                                  )}
+                                  <button onClick={() => setDeletingIndicacaoId(i.id)} className="text-xs text-brand-lavanda/40 hover:text-brand-rosa transition-colors">Excluir</button>
+                                </div>
                               )}
                             </td>
                           </tr>
