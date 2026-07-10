@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { startOfMonth, endOfMonth, addMonths, format } from 'date-fns'
+import { startOfMonth, endOfMonth, addMonths, subMonths, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Database } from '@/types/database.types'
 
@@ -162,7 +162,9 @@ export async function gerarComissoesPendentes(
   if (!indicacoes?.length) return resumo
 
   let cursor = startOfMonth(new Date(indicacoes[0].data_inicio))
-  const fim = startOfMonth(new Date())
+  // O mês corrente ainda não fechou — só gera competência de meses já
+  // encerrados (paga no mês seguinte ao fechamento, ver gerarComissoesDoMes).
+  const fim = startOfMonth(subMonths(new Date(), 1))
 
   while (cursor <= fim) {
     const result = await gerarComissoesDoMes(supabase, cursor)
