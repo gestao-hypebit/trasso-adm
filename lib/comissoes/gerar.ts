@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth, addMonths, format } from 'date-fns'
 import type { Database } from '@/types/database.types'
 
 export interface GerarComissoesResult {
@@ -125,4 +125,47 @@ export async function gerarComissoesDoMes(
   }
 
   return result
+}
+
+export interface GerarComissoesPendentesResult {
+  competencias: GerarComissoesResult[]
+  geradas: number
+  ignoradas: number
+  erros: { indicacaoId: string; erro: string }[]
+}
+
+/**
+ * Varre todas as competências desde a indicação ativa mais antiga até o mês
+ * atual, gerando as comissões que ainda faltam (idempotente por competência,
+ * então meses já processados são simplesmente pulados). Cobre o caso de uma
+ * indicação criada com `data_inicio` num mês passado — sem isso, só a
+ * competência do mês em que o botão foi clicado seria gerada.
+ */
+export async function gerarComissoesPendentes(
+  supabase: SupabaseClient<Database>
+): Promise<GerarComissoesPendentesResult> {
+  const db = supabase as any
+  const { data: indicacoes } = await db
+    .from('indicacoes')
+    .select('data_inicio')
+    .eq('status', 'ativa')
+    .order('data_inicio', { ascending: true })
+    .limit(1)
+
+  const resumo: GerarComissoesPendentesResult = { competencias: [], geradas: 0, ignoradas: 0, erros: [] }
+  if (!indicacoes?.length) return resumo
+
+  let cursor = startOfMonth(new Date(indicacoes[0].data_inicio))
+  const fim = startOfMonth(new Date())
+
+  while (cursor <= fim) {
+    const result = await gerarComissoesDoMes(supabase, cursor)
+    resumo.competencias.push(result)
+    resumo.geradas += result.geradas
+    resumo.ignoradas += result.ignoradas
+    resumo.erros.push(...result.erros)
+    cursor = addMonths(cursor, 1)
+  }
+
+  return resumo
 }

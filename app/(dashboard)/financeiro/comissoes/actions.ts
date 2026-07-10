@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { gerarComissoesDoMes, type GerarComissoesResult } from '@/lib/comissoes/gerar'
+import { gerarComissoesPendentes, type GerarComissoesPendentesResult } from '@/lib/comissoes/gerar'
 import { indicadorSchema, type IndicadorFormData } from '@/lib/validations/indicador'
 import { indicacaoSchema, parseValorBr, type IndicacaoFormData } from '@/lib/validations/indicacao'
 
@@ -21,16 +21,16 @@ function actionErrorMessage(e: unknown): string {
   return ERRO_GENERICO
 }
 
-export async function gerarComissoesAction(
-  competencia: string
-): Promise<{ success: true; result: GerarComissoesResult } | { success: false; error: string }> {
+export async function gerarComissoesPendentesAction(): Promise<
+  { success: true; result: GerarComissoesPendentesResult } | { success: false; error: string }
+> {
   try {
     const supabase = await createClient()
-    const result = await gerarComissoesDoMes(supabase, competencia)
+    const result = await gerarComissoesPendentes(supabase)
     revalidatePath('/financeiro/comissoes')
     return { success: true, result }
   } catch (e) {
-    console.error('[comissoes] gerarComissoesAction', e)
+    console.error('[comissoes] gerarComissoesPendentesAction', e)
     return { success: false, error: actionErrorMessage(e) }
   }
 }

@@ -17,10 +17,10 @@ import { IndicadorExtratoDialog } from '@/components/financeiro/indicador-extrat
 import type { ExtratoComissaoRow } from '@/components/financeiro/extrato-comissao-pdf'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { format, startOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
-  gerarComissoesAction,
+  gerarComissoesPendentesAction,
   marcarComissaoPagaAction,
   cancelarComissaoAction,
   encerrarIndicacaoAction,
@@ -104,8 +104,7 @@ export default function ComissoesPage() {
 
   function handleGerar() {
     startGenerating(async () => {
-      const competencia = format(startOfMonth(new Date()), 'yyyy-MM-dd')
-      const result = await gerarComissoesAction(competencia)
+      const result = await gerarComissoesPendentesAction()
       if (!result.success) {
         setToast({ msg: result.error, ok: false })
         return
@@ -189,7 +188,7 @@ export default function ComissoesPage() {
         <PageHeader title="Financeiro" description="Comissões">
           <Button onClick={handleGerar} disabled={isGenerating}>
             <RefreshCw className={cn('h-4 w-4', isGenerating && 'animate-spin')} />
-            {isGenerating ? 'Gerando...' : 'Gerar comissões do mês'}
+            {isGenerating ? 'Gerando...' : 'Gerar comissões pendentes'}
           </Button>
         </PageHeader>
         <FinanceiroSubNav pathname={pathname} />
