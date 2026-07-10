@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { startOfMonth, endOfMonth, addMonths, format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import type { Database } from '@/types/database.types'
 
 export interface GerarComissoesResult {
@@ -46,6 +47,11 @@ export async function gerarComissoesDoMes(
   const competenciaStr = format(inicio, 'yyyy-MM-dd')
   const inicioStr = format(inicio, 'yyyy-MM-dd')
   const fimStr = format(fim, 'yyyy-MM-dd')
+  // Comissão referente a um mês é paga/vence no mês seguinte (ex: uso de
+  // junho é pago em julho) — `data` reflete o vencimento, `data_competencia`
+  // continua marcando o mês de referência do uso/receita.
+  const vencimentoStr = format(addMonths(inicio, 1), 'yyyy-MM-dd')
+  const competenciaLabel = format(inicio, 'MMMM/yyyy', { locale: ptBR })
 
   const result: GerarComissoesResult = { competencia: competenciaStr, geradas: 0, ignoradas: 0, erros: [] }
 
@@ -96,9 +102,9 @@ export async function gerarComissoesDoMes(
         .from('lancamentos')
         .insert({
           tipo: 'despesa',
-          descricao: `Comissão de indicação — ${indicacao.indicadores?.nome ?? 'Indicador'} (ref. ${cliente.nome})`,
+          descricao: `Comissão de indicação — ${indicacao.indicadores?.nome ?? 'Indicador'} (ref. ${competenciaLabel} — cliente ${cliente.nome})`,
           valor,
-          data: competenciaStr,
+          data: vencimentoStr,
           data_competencia: competenciaStr,
           categoria_id: categoriaId,
           cliente_id: indicacao.cliente_indicado_id,
