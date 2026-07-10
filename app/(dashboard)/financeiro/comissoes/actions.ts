@@ -13,8 +13,11 @@ export type ComissaoActionResult =
 
 const ERRO_GENERICO = 'Ocorreu um erro. Tente novamente.'
 
-function zodErrorMessage(e: unknown): string {
+function actionErrorMessage(e: unknown): string {
   if (e instanceof z.ZodError) return e.issues[0]?.message ?? ERRO_GENERICO
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string' && (e as any).message) {
+    return (e as any).message
+  }
   return ERRO_GENERICO
 }
 
@@ -28,7 +31,7 @@ export async function gerarComissoesAction(
     return { success: true, result }
   } catch (e) {
     console.error('[comissoes] gerarComissoesAction', e)
-    return { success: false, error: ERRO_GENERICO }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
 
@@ -49,7 +52,7 @@ export async function marcarComissaoPagaAction(comissaoId: string): Promise<Comi
     return { success: true }
   } catch (e) {
     console.error('[comissoes] marcarComissaoPagaAction', e)
-    return { success: false, error: ERRO_GENERICO }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
 
@@ -70,7 +73,7 @@ export async function cancelarComissaoAction(comissaoId: string): Promise<Comiss
     return { success: true }
   } catch (e) {
     console.error('[comissoes] cancelarComissaoAction', e)
-    return { success: false, error: ERRO_GENERICO }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
 
@@ -95,7 +98,7 @@ export async function criarIndicadorAction(data: IndicadorFormData): Promise<Com
     return { success: true }
   } catch (e) {
     console.error('[comissoes] criarIndicadorAction', e)
-    return { success: false, error: zodErrorMessage(e) }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
 
@@ -120,7 +123,7 @@ export async function atualizarIndicadorAction(id: string, data: IndicadorFormDa
     return { success: true }
   } catch (e) {
     console.error('[comissoes] atualizarIndicadorAction', e)
-    return { success: false, error: zodErrorMessage(e) }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
 
@@ -156,7 +159,7 @@ export async function criarIndicacaoAction(data: IndicacaoFormData): Promise<Com
     return { success: true }
   } catch (e) {
     console.error('[comissoes] criarIndicacaoAction', e)
-    return { success: false, error: zodErrorMessage(e) }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
 
@@ -173,6 +176,6 @@ export async function encerrarIndicacaoAction(id: string): Promise<ComissaoActio
     return { success: true }
   } catch (e) {
     console.error('[comissoes] encerrarIndicacaoAction', e)
-    return { success: false, error: ERRO_GENERICO }
+    return { success: false, error: actionErrorMessage(e) }
   }
 }
