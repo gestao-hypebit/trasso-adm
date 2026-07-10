@@ -13,6 +13,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { IndicadorForm, type IndicadorExistente } from '@/components/financeiro/indicador-form'
 import { IndicacaoForm } from '@/components/financeiro/indicacao-form'
+import { IndicadorExtratoDialog } from '@/components/financeiro/indicador-extrato-dialog'
+import type { ExtratoComissaoRow } from '@/components/financeiro/extrato-comissao-pdf'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { format, startOfMonth } from 'date-fns'
@@ -30,6 +32,7 @@ type ComissaoRow = {
   id: string
   competencia: string
   valor: number
+  indicador_id: string
   indicadores: { nome: string } | null
   indicacoes: { clientes: { nome: string } | null } | null
   lancamentos: { status: string } | null
@@ -71,20 +74,23 @@ export default function ComissoesPage() {
   const [isGenerating, startGenerating] = useTransition()
   const [deletingIndicadorId, setDeletingIndicadorId] = useState<string | null>(null)
   const [deletingIndicacaoId, setDeletingIndicacaoId] = useState<string | null>(null)
+  const [agencia, setAgencia] = useState<{ logoUrl: string | null; nome: string }>({ logoUrl: null, nome: 'Trasso' })
 
   const load = useCallback(async () => {
     const supabase = createClient()
-    const [c, i, ind] = await Promise.all([
+    const [c, i, ind, ag] = await Promise.all([
       supabase
         .from('comissoes')
-        .select('id, competencia, valor, indicadores(nome), indicacoes(clientes(nome)), lancamentos(status)')
+        .select('id, competencia, valor, indicador_id, indicadores(nome), indicacoes(clientes(nome)), lancamentos(status)')
         .order('competencia', { ascending: false }),
       supabase.from('indicadores').select('id, tipo, cliente_id, nome, email, telefone, whatsapp, chave_pix, observacoes, ativo, clientes(nome)').order('nome'),
       supabase.from('indicacoes').select('id, tipo_comissao, valor_fixo, percentual, status, data_inicio, indicadores(nome), clientes:cliente_indicado_id(nome)').order('data_inicio', { ascending: false }),
+      (supabase as any).from('configuracoes_agencia').select('logo_url, nome').maybeSingle(),
     ])
     setComissoes((c.data as any) ?? [])
     setIndicadores((i.data as any) ?? [])
     setIndicacoes((ind.data as any) ?? [])
+    if (ag.data) setAgencia({ logoUrl: ag.data.logo_url, nome: ag.data.nome || 'Trasso' })
     setLoading(false)
   }, [])
 
@@ -152,6 +158,18 @@ export default function ComissoesPage() {
 
   const totalPendente = comissoes.filter((c) => (c.lancamentos?.status ?? 'pendente') === 'pendente').reduce((s, c) => s + c.valor, 0)
   const totalPago = comissoes.filter((c) => c.lancamentos?.status === 'pago').reduce((s, c) => s + c.valor, 0)
+
+  function extratoRowsFor(indicadorId: string): ExtratoComissaoRow[] {
+    return comissoes
+      .filter((c) => c.indicador_id === indicadorId)
+      .map((c) => ({
+        id: c.id,
+        competencia: c.competencia,
+        valor: c.valor,
+        status: c.lancamentos?.status ?? 'pendente',
+        clienteIndicadoNome: c.indicacoes?.clientes?.nome ?? '—',
+      }))
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -283,7 +301,7 @@ export default function ComissoesPage() {
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Contato</th>
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">PIX</th>
                         <th className="text-center text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
-                        <th className="w-20" />
+                        <th className="w-28" />
                       </tr>
                     </thead>
                     <tbody>
@@ -309,6 +327,12 @@ export default function ComissoesPage() {
                               </div>
                             ) : (
                               <div className="flex items-center justify-center gap-1">
+                                <IndicadorExtratoDialog
+                                  indicador={{ id: i.id, nome: i.nome, tipo: i.tipo, email: i.email, telefone: i.telefone, whatsapp: i.whatsapp, chavePix: i.chave_pix }}
+                                  comissoes={extratoRowsFor(i.id)}
+                                  logoUrl={agencia.logoUrl}
+                                  agenciaNome={agencia.nome}
+                                />
                                 <IndicadorForm indicador={i} onSuccess={load} />
                                 <button
                                   onClick={() => setDeletingIndicadorId(i.id)}
