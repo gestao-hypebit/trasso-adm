@@ -328,16 +328,15 @@ export default function ReceitasPage() {
                       <div className="flex items-center justify-between mb-3">
                         <button onClick={() => setPickerYear(y => y - 1)} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
                         <span className="text-sm font-semibold text-brand-lavanda">{pickerYear}</span>
-                        <button onClick={() => setPickerYear(y => y + 1)} disabled={pickerYear >= new Date().getFullYear()} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"><ChevronRight className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => setPickerYear(y => y + 1)} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"><ChevronRight className="h-3.5 w-3.5" /></button>
                       </div>
                       <div className="grid grid-cols-3 gap-1">
                         {Array.from({ length: 12 }, (_, i) => {
                           const d = new Date(pickerYear, i, 1)
                           const isSelected = format(d, 'yyyy-MM') === format(mesSel, 'yyyy-MM')
-                          const isFuture = d > new Date()
                           const lbl = format(d, 'MMM', { locale: ptBR })
                           return (
-                            <button key={i} disabled={isFuture} onClick={() => { setMesSel(startOfMonth(d)); setAllTime(false); setShowPicker(false) }} className={cn('py-1.5 rounded-lg text-xs transition-colors capitalize', isSelected ? 'bg-brand-lima text-brand-noite font-semibold' : 'text-brand-lavanda/60 hover:bg-white/[0.06] hover:text-brand-lavanda', isFuture && 'opacity-25 cursor-not-allowed')}>
+                            <button key={i} onClick={() => { setMesSel(startOfMonth(d)); setAllTime(false); setShowPicker(false) }} className={cn('py-1.5 rounded-lg text-xs transition-colors capitalize', isSelected ? 'bg-brand-lima text-brand-noite font-semibold' : 'text-brand-lavanda/60 hover:bg-white/[0.06] hover:text-brand-lavanda')}>
                               {lbl.charAt(0).toUpperCase() + lbl.slice(1, 3)}
                             </button>
                           )
@@ -347,7 +346,7 @@ export default function ReceitasPage() {
                   </>
                 )}
               </div>
-              <button onClick={() => setMesSel(d => addMonths(d, 1))} disabled={isCurrentMes} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+              <button onClick={() => setMesSel(d => addMonths(d, 1))} className="flex h-6 w-6 items-center justify-center rounded-md text-brand-lavanda/50 hover:text-brand-lavanda hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
