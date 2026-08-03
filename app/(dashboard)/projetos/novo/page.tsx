@@ -22,6 +22,7 @@ type ClienteOption = { id: string; nome: string }
 export default function NovoProjetoPage() {
   const router = useRouter()
   const [clientes, setClientes] = useState<ClienteOption[]>([])
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<ProjetoFormData>({
     resolver: zodResolver(projetoSchema) as Resolver<ProjetoFormData>,
     defaultValues: { status: 'backlog', prioridade: 'media', progresso: 0 },
@@ -35,6 +36,7 @@ export default function NovoProjetoPage() {
   }, [])
 
   async function onSubmit(data: ProjetoFormData) {
+    setSubmitError(null)
     const supabase = createClient()
     const { error } = await supabase.from('projetos').insert({
       nome: data.nome,
@@ -49,7 +51,12 @@ export default function NovoProjetoPage() {
       progresso: data.progresso,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
-    if (!error) router.push('/projetos')
+    if (!error) {
+      router.push('/projetos')
+    } else {
+      console.error('Erro ao criar projeto:', error)
+      setSubmitError(`${error.code ?? ''} ${error.message}`.trim())
+    }
   }
 
   return (
@@ -153,6 +160,9 @@ export default function NovoProjetoPage() {
                   </div>
                 </CardContent>
               </Card>
+              {submitError && (
+                <p className="text-xs text-brand-rosa break-words">{submitError}</p>
+              )}
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar Projeto'}
               </Button>
