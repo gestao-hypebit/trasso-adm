@@ -66,7 +66,8 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
   async function onSubmit(data: ProjetoFormData) {
     setSubmitError(null)
     const supabase = createClient()
-    const { error } = await supabase.from('projetos').update({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from('projetos').update({
       nome: data.nome,
       descricao: data.descricao ?? null,
       cliente_id: data.cliente_id ?? null,
@@ -77,8 +78,7 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
       data_inicio: data.data_inicio ?? null,
       data_entrega: data.data_entrega ?? null,
       progresso: data.progresso,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any).eq('id', id)
+    }).eq('id', id)
     if (!error) {
       router.push(`/projetos/${id}`)
     } else {
