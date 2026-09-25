@@ -8,6 +8,7 @@ export const projetoSchema = z.object({
   status: z.enum(['backlog', 'em_andamento', 'aguardando_cliente', 'em_revisao', 'concluido', 'cancelado']).default('backlog'),
   prioridade: z.enum(['baixa', 'media', 'alta', 'urgente']).default('media'),
   valor: z.number().positive().optional(),
+  horas_estimadas: z.number().positive().optional(),
   data_inicio: z.string().optional(),
   data_entrega: z.string().optional(),
   progresso: z.number().min(0).max(100).default(0),

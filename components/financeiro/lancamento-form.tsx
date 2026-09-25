@@ -21,6 +21,7 @@ const schema = z.object({
   data: z.string().min(1, 'Data obrigatória'),
   categoria: z.string().min(1, 'Categoria obrigatória'),
   cliente: z.string().optional(),
+  projeto: z.string().optional(),
   forma_pagamento: z.string().optional(),
   status: z.string(),
   observacoes: z.string().optional(),
@@ -75,11 +76,13 @@ interface LancamentoFormProps {
 
 type ClienteOption = { id: string; nome: string }
 type CategoriaOption = { id: string; nome: string }
+type ProjetoOption = { id: string; nome: string; cliente_id: string | null }
 
 export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: LancamentoFormProps) {
   const [open, setOpen] = useState(false)
   const [clientes, setClientes] = useState<ClienteOption[]>([])
   const [categorias, setCategorias] = useState<CategoriaOption[]>([])
+  const [projetos, setProjetos] = useState<ProjetoOption[]>([])
   const [isRecorrente, setIsRecorrente] = useState(false)
   const [frequencia, setFrequencia] = useState<Frequencia>('mensal')
   const [meses, setMeses] = useState(12)
@@ -97,9 +100,11 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
     Promise.all([
       supabase.from('clientes').select('id, nome').order('nome'),
       supabase.from('categorias_financeiras').select('id, nome').eq('tipo', tipo).order('nome'),
-    ]).then(([c, cat]) => {
+      supabase.from('projetos').select('id, nome, cliente_id').neq('status', 'cancelado').order('created_at', { ascending: false }),
+    ]).then(([c, cat, proj]) => {
       setClientes(c.data ?? [])
       setCategorias(cat.data ?? [])
+      setProjetos((proj.data ?? []) as ProjetoOption[])
     })
   }, [open, tipo])
 
@@ -140,7 +145,8 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
       descricao: data.descricao,
       valor: parseFloat(data.valor),
       categoria_id: categoriaId,
-      cliente_id: data.cliente || null,
+      cliente_id: data.cliente || projetos.find((p) => p.id === data.projeto)?.cliente_id || null,
+      projeto_id: data.projeto && data.projeto !== 'none' ? data.projeto : null,
       forma_pagamento: data.forma_pagamento || null,
       observacoes: data.observacoes || null,
     }
@@ -253,6 +259,17 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
                   {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-2">
+              <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Projeto (para rentabilidade)</Label>
+              <Select onValueChange={(v) => setValue('projeto', v)}>
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {projetos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

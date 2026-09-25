@@ -29,9 +29,9 @@ export interface Database {
         Update: { id?: string; numero?: string; cliente_id?: string | null; titulo?: string; descricao?: string | null; status?: string; validade?: string | null; valor_total?: number; desconto_percentual?: number; condicoes_pagamento?: string | null; observacoes?: string | null; responsavel_id?: string | null; enviada_em?: string | null; aprovada_em?: string | null; aprovada_ip?: string | null; aprovada_user_agent?: string | null; created_at?: string; updated_at?: string }
       }
       proposta_itens: {
-        Row: { id: string; proposta_id: string; servico_id: string | null; descricao: string; quantidade: number; valor_unitario: number; valor_total: number; ordem: number }
-        Insert: { id?: string; proposta_id: string; servico_id?: string | null; descricao: string; quantidade?: number; valor_unitario: number; ordem?: number }
-        Update: { id?: string; proposta_id?: string; servico_id?: string | null; descricao?: string; quantidade?: number; valor_unitario?: number; ordem?: number }
+        Row: { id: string; proposta_id: string; servico_id: string | null; descricao: string; quantidade: number; valor_unitario: number; valor_total: number; ordem: number; recorrencia: string | null }
+        Insert: { id?: string; proposta_id: string; servico_id?: string | null; descricao: string; quantidade?: number; valor_unitario: number; ordem?: number; recorrencia?: string | null }
+        Update: { id?: string; proposta_id?: string; servico_id?: string | null; descricao?: string; quantidade?: number; valor_unitario?: number; ordem?: number; recorrencia?: string | null }
       }
       contratos: {
         Row: { id: string; numero: string; proposta_id: string | null; cliente_id: string | null; titulo: string; tipo: string | null; status: string; valor_total: number; data_inicio: string | null; data_fim: string | null; condicoes_pagamento: string | null; clausulas: string | null; arquivo_url: string | null; assinado_em: string | null; assinado_ip: string | null; assinado_user_agent: string | null; assinado_nome: string | null; responsavel_id: string | null; created_at: string; updated_at: string }
@@ -39,14 +39,19 @@ export interface Database {
         Update: { id?: string; numero?: string; proposta_id?: string | null; cliente_id?: string | null; titulo?: string; tipo?: string | null; status?: string; valor_total?: number; data_inicio?: string | null; data_fim?: string | null; condicoes_pagamento?: string | null; clausulas?: string | null; arquivo_url?: string | null; assinado_em?: string | null; assinado_ip?: string | null; assinado_user_agent?: string | null; assinado_nome?: string | null; responsavel_id?: string | null; created_at?: string; updated_at?: string }
       }
       projetos: {
-        Row: { id: string; nome: string; descricao: string | null; cliente_id: string | null; contrato_id: string | null; tipo: string | null; status: string; prioridade: string; valor: number | null; data_inicio: string | null; data_entrega: string | null; data_conclusao: string | null; progresso: number; responsavel_id: string | null; tags: string[] | null; created_at: string; updated_at: string }
-        Insert: { id?: string; nome: string; descricao?: string | null; cliente_id?: string | null; contrato_id?: string | null; tipo?: string | null; status?: string; prioridade?: string; valor?: number | null; data_inicio?: string | null; data_entrega?: string | null; data_conclusao?: string | null; progresso?: number; responsavel_id?: string | null; tags?: string[] | null; created_at?: string; updated_at?: string }
-        Update: { id?: string; nome?: string; descricao?: string | null; cliente_id?: string | null; contrato_id?: string | null; tipo?: string | null; status?: string; prioridade?: string; valor?: number | null; data_inicio?: string | null; data_entrega?: string | null; data_conclusao?: string | null; progresso?: number; responsavel_id?: string | null; tags?: string[] | null; created_at?: string; updated_at?: string }
+        Row: { id: string; nome: string; descricao: string | null; cliente_id: string | null; contrato_id: string | null; tipo: string | null; status: string; prioridade: string; valor: number | null; data_inicio: string | null; data_entrega: string | null; data_conclusao: string | null; progresso: number; horas_estimadas: number | null; responsavel_id: string | null; tags: string[] | null; created_at: string; updated_at: string }
+        Insert: { id?: string; nome: string; descricao?: string | null; cliente_id?: string | null; contrato_id?: string | null; tipo?: string | null; status?: string; prioridade?: string; valor?: number | null; data_inicio?: string | null; data_entrega?: string | null; data_conclusao?: string | null; progresso?: number; horas_estimadas?: number | null; responsavel_id?: string | null; tags?: string[] | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; nome?: string; descricao?: string | null; cliente_id?: string | null; contrato_id?: string | null; tipo?: string | null; status?: string; prioridade?: string; valor?: number | null; data_inicio?: string | null; data_entrega?: string | null; data_conclusao?: string | null; progresso?: number; horas_estimadas?: number | null; responsavel_id?: string | null; tags?: string[] | null; created_at?: string; updated_at?: string }
       }
       tarefas: {
         Row: { id: string; projeto_id: string | null; titulo: string; descricao: string | null; status: string; prioridade: string; responsavel_id: string | null; data_vencimento: string | null; concluida_em: string | null; ordem: number; created_at: string; updated_at: string }
         Insert: { id?: string; projeto_id?: string | null; titulo: string; descricao?: string | null; status?: string; prioridade?: string; responsavel_id?: string | null; data_vencimento?: string | null; concluida_em?: string | null; ordem?: number; created_at?: string; updated_at?: string }
         Update: { id?: string; projeto_id?: string | null; titulo?: string; descricao?: string | null; status?: string; prioridade?: string; responsavel_id?: string | null; data_vencimento?: string | null; concluida_em?: string | null; ordem?: number; created_at?: string; updated_at?: string }
+      }
+      apontamentos_horas: {
+        Row: { id: string; projeto_id: string; usuario_id: string | null; data: string; horas: number; descricao: string | null; created_at: string }
+        Insert: { id?: string; projeto_id: string; usuario_id?: string | null; data?: string; horas: number; descricao?: string | null; created_at?: string }
+        Update: { id?: string; projeto_id?: string; usuario_id?: string | null; data?: string; horas?: number; descricao?: string | null; created_at?: string }
       }
       categorias_financeiras: {
         Row: { id: string; nome: string; tipo: string; cor: string; icone: string | null; created_at: string }
@@ -74,9 +79,9 @@ export interface Database {
         Update: { id?: string; indicacao_id?: string; indicador_id?: string; competencia?: string; valor?: number; lancamento_id?: string; observacoes?: string | null; created_at?: string }
       }
       configuracoes_agencia: {
-        Row: { id: string; nome: string; cnpj: string | null; email: string | null; telefone: string | null; site: string | null; cidade: string | null; endereco: string | null; logo_url: string | null; proposta_prefixo: string; proposta_contador: number; contrato_prefixo: string; contrato_contador: number; created_at: string; updated_at: string }
-        Insert: { id?: string; nome?: string; cnpj?: string | null; email?: string | null; telefone?: string | null; site?: string | null; cidade?: string | null; endereco?: string | null; logo_url?: string | null; proposta_prefixo?: string; proposta_contador?: number; contrato_prefixo?: string; contrato_contador?: number; created_at?: string; updated_at?: string }
-        Update: { id?: string; nome?: string; cnpj?: string | null; email?: string | null; telefone?: string | null; site?: string | null; cidade?: string | null; endereco?: string | null; logo_url?: string | null; proposta_prefixo?: string; proposta_contador?: number; contrato_prefixo?: string; contrato_contador?: number; created_at?: string; updated_at?: string }
+        Row: { id: string; nome: string; cnpj: string | null; email: string | null; telefone: string | null; site: string | null; cidade: string | null; endereco: string | null; logo_url: string | null; proposta_prefixo: string; proposta_contador: number; contrato_prefixo: string; contrato_contador: number; custo_hora: number; created_at: string; updated_at: string }
+        Insert: { id?: string; nome?: string; cnpj?: string | null; email?: string | null; telefone?: string | null; site?: string | null; cidade?: string | null; endereco?: string | null; logo_url?: string | null; proposta_prefixo?: string; proposta_contador?: number; contrato_prefixo?: string; contrato_contador?: number; custo_hora?: number; created_at?: string; updated_at?: string }
+        Update: { id?: string; nome?: string; cnpj?: string | null; email?: string | null; telefone?: string | null; site?: string | null; cidade?: string | null; endereco?: string | null; logo_url?: string | null; proposta_prefixo?: string; proposta_contador?: number; contrato_prefixo?: string; contrato_contador?: number; custo_hora?: number; created_at?: string; updated_at?: string }
       }
       produtos: {
         Row: { id: string; nome: string; tipo: string; descricao: string | null; cor: string; url: string | null; logo_url: string | null; ativo: boolean; stripe_secret_key: string | null; stripe_webhook_secret: string | null; last_synced_at: string | null; created_at: string }

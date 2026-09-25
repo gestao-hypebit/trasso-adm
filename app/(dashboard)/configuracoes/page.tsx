@@ -21,7 +21,7 @@ const tabs = [
   { key: 'servicos', label: 'Serviços', icon: Palette },
   { key: 'equipe', label: 'Equipe', icon: User },
   { key: 'financeiro', label: 'Financeiro', icon: DollarSign },
-  { key: 'numeracao', label: 'Numeração', icon: Hash },
+  { key: 'numeracao', label: 'Numeração e custos', icon: Hash },
   { key: 'integracoes', label: 'Integrações', icon: Link },
 ]
 
@@ -40,6 +40,7 @@ type Config = {
   site: string; cidade: string; endereco: string; logo_url: string | null
   proposta_prefixo: string; proposta_contador: number
   contrato_prefixo: string; contrato_contador: number
+  custo_hora: number
 }
 
 type Servico = { id: string; nome: string; categoria: string | null; preco_base: number | null; unidade: string; ativo: boolean }
@@ -51,6 +52,7 @@ const defaultConfig: Config = {
   cidade: '', endereco: '', logo_url: null,
   proposta_prefixo: 'TRS', proposta_contador: 1,
   contrato_prefixo: 'CONT', contrato_contador: 1,
+  custo_hora: 0,
 }
 
 function getInitials(name: string) {
@@ -119,6 +121,7 @@ export default function ConfiguracoesPage() {
           proposta_contador: c.proposta_contador ?? 1,
           contrato_prefixo: c.contrato_prefixo ?? 'CONT',
           contrato_contador: c.contrato_contador ?? 1,
+          custo_hora: Number(c.custo_hora ?? 0),
         })
       }
 
@@ -189,6 +192,7 @@ export default function ConfiguracoesPage() {
       proposta_contador: config.proposta_contador,
       contrato_prefixo: config.contrato_prefixo,
       contrato_contador: config.contrato_contador,
+      custo_hora: config.custo_hora,
     }).eq('id', config.id)
     setSaving(false)
     showToast(error ? `Erro: ${error.message}` : 'Configurações salvas!', !error)
@@ -673,6 +677,25 @@ export default function ConfiguracoesPage() {
                           <Separator className="mt-4 bg-brand-violeta/20" />
                         </div>
                       ))}
+                      <div>
+                        <h4 className="text-sm font-semibold text-brand-lavanda mb-1">Custo/hora da equipe</h4>
+                        <p className="text-xs text-brand-lavanda/50 mb-3">
+                          Quanto custa, em média, uma hora de trabalho (salários + encargos + ferramentas ÷ horas produtivas). Usado na rentabilidade dos projetos.
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">R$ por hora</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={config.custo_hora}
+                              onChange={e => setConfig(prev => ({ ...prev, custo_hora: parseFloat(e.target.value) || 0 }))}
+                            />
+                          </div>
+                        </div>
+                        <Separator className="mt-4 bg-brand-violeta/20" />
+                      </div>
                       <div className="flex justify-end">
                         <Button onClick={saveNumeracao} disabled={saving}>
                           <Save className="h-4 w-4" />

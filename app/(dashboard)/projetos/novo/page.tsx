@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, type Resolver } from 'react-hook-form'
@@ -19,14 +19,16 @@ import { createClient } from '@/lib/supabase/client'
 
 type ClienteOption = { id: string; nome: string }
 
-export default function NovoProjetoPage() {
+export default function NovoProjetoPage({ searchParams }: { searchParams: Promise<{ cliente?: string }> }) {
+  const { cliente: clienteInicial } = use(searchParams)
   const router = useRouter()
   const [clientes, setClientes] = useState<ClienteOption[]>([])
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<ProjetoFormData>({
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ProjetoFormData>({
     resolver: zodResolver(projetoSchema) as Resolver<ProjetoFormData>,
-    defaultValues: { status: 'backlog', prioridade: 'media', progresso: 0 },
+    defaultValues: { status: 'backlog', prioridade: 'media', progresso: 0, cliente_id: clienteInicial },
   })
+  const clienteId = watch('cliente_id')
 
   useEffect(() => {
     const supabase = createClient()
@@ -46,13 +48,14 @@ export default function NovoProjetoPage() {
       status: data.status,
       prioridade: data.prioridade,
       valor: data.valor ?? null,
+      ...(data.horas_estimadas ? { horas_estimadas: data.horas_estimadas } : {}),
       data_inicio: data.data_inicio ?? null,
       data_entrega: data.data_entrega ?? null,
       progresso: data.progresso,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
     if (!error) {
-      router.push('/projetos')
+      router.push(clienteInicial ? `/clientes/${clienteInicial}` : '/projetos')
     } else {
       console.error('Erro ao criar projeto:', error)
       setSubmitError(`${error.code ?? ''} ${error.message}`.trim())
@@ -64,7 +67,7 @@ export default function NovoProjetoPage() {
       <Header title="Novo Projeto" />
       <div className="p-6">
         <PageHeader title="Novo Projeto" description="Crie um novo projeto">
-          <Link href="/projetos">
+          <Link href={clienteInicial ? `/clientes/${clienteInicial}` : '/projetos'}>
             <Button variant="outline" size="sm" className="gap-2">
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
@@ -84,7 +87,7 @@ export default function NovoProjetoPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Cliente</Label>
-                    <Select onValueChange={(v) => setValue('cliente_id', v)}>
+                    <Select value={clienteId ?? ''} onValueChange={(v) => setValue('cliente_id', v)}>
                       <SelectTrigger><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
                       <SelectContent>
                         {clientes.map((c) => (
@@ -107,9 +110,15 @@ export default function NovoProjetoPage() {
                       <Input id="data_entrega" type="date" {...register('data_entrega')} />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="valor">Valor (R$)</Label>
-                    <Input id="valor" type="number" step="0.01" placeholder="0,00" {...register('valor', { valueAsNumber: true })} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="valor">Valor (R$)</Label>
+                      <Input id="valor" type="number" step="0.01" placeholder="0,00" {...register('valor', { valueAsNumber: true })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="horas_estimadas">Horas estimadas</Label>
+                      <Input id="horas_estimadas" type="number" step="0.5" placeholder="Ex: 80" {...register('horas_estimadas', { setValueAs: (v) => (v === '' || v == null ? undefined : Number(v)) })} />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,7 +1,7 @@
 'use client'
 
-import { Bell, Search } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Search } from 'lucide-react'
+import { NotificacoesMenu } from '@/components/layout/notificacoes-menu'
 import { useCommandPalette } from '@/components/layout/command-palette'
 
 interface HeaderProps {
@@ -31,10 +31,7 @@ export function Header({ title, description }: HeaderProps) {
           <span className="flex-1 text-left">Buscar...</span>
           <kbd className="text-[10px] px-1.5 py-0.5 rounded border border-white/[0.1] text-brand-lavanda/30">Ctrl K</kbd>
         </button>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-lima" />
-        </Button>
+        <NotificacoesMenu />
       </div>
     </header>
   )

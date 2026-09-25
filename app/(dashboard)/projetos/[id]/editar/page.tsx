@@ -53,6 +53,7 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
           status: projeto.status,
           prioridade: projeto.prioridade,
           valor: projeto.valor ?? undefined,
+          horas_estimadas: projeto.horas_estimadas ?? undefined,
           data_inicio: projeto.data_inicio ?? undefined,
           data_entrega: projeto.data_entrega ?? undefined,
           progresso: projeto.progresso,
@@ -75,6 +76,7 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
       status: data.status,
       prioridade: data.prioridade,
       valor: data.valor ?? null,
+      horas_estimadas: data.horas_estimadas ?? null,
       data_inicio: data.data_inicio ?? null,
       data_entrega: data.data_entrega ?? null,
       progresso: data.progresso,
@@ -137,9 +139,15 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
                       <Input id="data_entrega" type="date" {...register('data_entrega')} />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="valor">Valor (R$)</Label>
-                    <Input id="valor" type="number" step="0.01" placeholder="0,00" {...register('valor', { valueAsNumber: true })} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="valor">Valor (R$)</Label>
+                      <Input id="valor" type="number" step="0.01" placeholder="0,00" {...register('valor', { valueAsNumber: true })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="horas_estimadas">Horas estimadas</Label>
+                      <Input id="horas_estimadas" type="number" step="0.5" placeholder="Ex: 80" {...register('horas_estimadas', { setValueAs: (v) => (v === '' || v == null ? undefined : Number(v)) })} />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

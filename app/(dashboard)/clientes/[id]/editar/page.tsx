@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { segmentoOpcoes, origemOpcoes } from '@/lib/crm/opcoes'
 import type { Database } from '@/types/database.types'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
@@ -26,6 +27,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
   const router = useRouter()
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string }[]>([])
   const [loading, setLoading] = useState(true)
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<ClienteFormData>({
@@ -39,10 +41,12 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
     async function load() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
-      const [{ data: c }, { data: p }] = await Promise.all([
+      const [{ data: c }, { data: p }, { data: r }] = await Promise.all([
         sb.from('clientes').select('*').eq('id', id).single() as Promise<{ data: Cliente | null }>,
         sb.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true) as Promise<{ data: Produto[] | null }>,
+        sb.from('profiles').select('id, nome').order('nome') as Promise<{ data: { id: string; nome: string }[] | null }>,
       ])
+      setResponsaveis(r ?? [])
       if (c) {
         setCliente(c)
         reset({
@@ -58,6 +62,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
           cep: c.cep ?? '',
           segmento: c.segmento ?? '',
           origem: c.origem ?? '',
+          responsavel_id: c.responsavel_id ?? '',
           status: (c.status as ClienteFormData['status']) ?? 'ativo',
           tipo: (c.tipo as ClienteFormData['tipo']) ?? 'agencia',
           produto_id: c.produto_id ?? undefined,
@@ -86,6 +91,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
       cep: data.cep || null,
       segmento: data.segmento || null,
       origem: data.origem || null,
+      responsavel_id: data.responsavel_id || null,
       status: data.status,
       tipo: data.tipo ?? 'agencia',
       produto_id: data.produto_id || null,
@@ -250,12 +256,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                     >
                       <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="restaurante">Restaurante</SelectItem>
-                        <SelectItem value="moda">Moda</SelectItem>
-                        <SelectItem value="tech">Tech</SelectItem>
-                        <SelectItem value="saude">Saúde</SelectItem>
-                        <SelectItem value="educacao">Educação</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
+                        {segmentoOpcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -267,11 +268,18 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                     >
                       <SelectTrigger><SelectValue placeholder="Como nos conheceu?" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="indicacao">Indicação</SelectItem>
-                        <SelectItem value="instagram">Instagram</SelectItem>
-                        <SelectItem value="linkedin">LinkedIn</SelectItem>
-                        <SelectItem value="site">Site</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
+                        {origemOpcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Responsável</Label>
+                    <Select
+                      defaultValue={cliente.responsavel_id ?? undefined}
+                      onValueChange={(v) => setValue('responsavel_id', v)}>
+                      <SelectTrigger><SelectValue placeholder="Quem cuida deste cliente?" /></SelectTrigger>
+                      <SelectContent>
+                        {responsaveis.map((r) => <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

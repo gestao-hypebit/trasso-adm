@@ -1,10 +1,10 @@
-﻿'use client'
+'use client'
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { ArrowLeft, Download, Send, FileCheck, Edit, Trash2, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Download, Send, FileCheck, Edit, Trash2, Loader2, RefreshCw, Copy } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { PropostaPDF } from '@/components/propostas/proposta-pdf'
+import { ConverterContratoDialog } from '@/components/propostas/converter-contrato-dialog'
+import { EnviarPropostaDialog } from '@/components/propostas/enviar-proposta-dialog'
+import { duplicarProposta } from '@/lib/propostas/duplicar'
 
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then(m => m.PDFDownloadLink),
@@ -50,6 +53,19 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
   const [deleting, setDeleting] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [agenciaNome, setAgenciaNome] = useState('Trasso')
+  const [converterOpen, setConverterOpen] = useState(false)
+  const [enviarOpen, setEnviarOpen] = useState(false)
+  const [duplicando, setDuplicando] = useState(false)
+
+  async function handleDuplicar() {
+    setDuplicando(true)
+    try {
+      const novaId = await duplicarProposta(createClient(), id)
+      router.push(`/propostas/${novaId}/editar`)
+    } catch {
+      setDuplicando(false)
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true)
@@ -133,13 +149,13 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
               )}
             </PDFDownloadLink>
             {proposta.status === 'rascunho' && (
-              <Button variant="violeta" size="sm">
+              <Button variant="violeta" size="sm" onClick={() => setEnviarOpen(true)}>
                 <Send className="h-4 w-4" />
                 Enviar Proposta
               </Button>
             )}
             {proposta.status === 'aprovada' && (
-              <Button size="sm">
+              <Button size="sm" onClick={() => setConverterOpen(true)}>
                 <FileCheck className="h-4 w-4" />
                 Converter em Contrato
               </Button>
@@ -376,12 +392,16 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
                     </Button>
                   )}
                 </PDFDownloadLink>
-                <Button variant="outline" className="w-full justify-start text-sm" size="sm">
+                <Button variant="outline" className="w-full justify-start text-sm" size="sm" onClick={() => setEnviarOpen(true)}>
                   <Send className="h-3.5 w-3.5 mr-2" />
-                  Enviar por Email
+                  Enviar ao cliente
+                </Button>
+                <Button variant="outline" className="w-full justify-start text-sm" size="sm" onClick={handleDuplicar} disabled={duplicando}>
+                  {duplicando ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Copy className="h-3.5 w-3.5 mr-2" />}
+                  Duplicar
                 </Button>
                 {proposta.status === 'aprovada' && (
-                  <Button className="w-full justify-start text-sm" size="sm">
+                  <Button className="w-full justify-start text-sm" size="sm" onClick={() => setConverterOpen(true)}>
                     <FileCheck className="h-3.5 w-3.5 mr-2" />
                     Gerar Contrato
                   </Button>
@@ -396,6 +416,14 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </main>
+
+      <ConverterContratoDialog propostaId={id} open={converterOpen} onOpenChange={setConverterOpen} />
+      <EnviarPropostaDialog
+        proposta={proposta}
+        open={enviarOpen}
+        onOpenChange={setEnviarOpen}
+        onEnviada={(status, enviadaEm) => setProposta(prev => prev ? { ...prev, status, enviada_em: enviadaEm } : prev)}
+      />
 
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent>

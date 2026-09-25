@@ -16,12 +16,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { segmentoOpcoes, origemOpcoes } from '@/lib/crm/opcoes'
 
 type Produto = { id: string; nome: string; cor: string }
 
 export default function NovoClientePage() {
   const router = useRouter()
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string }[]>([])
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema) as Resolver<ClienteFormData>,
@@ -34,6 +36,7 @@ export default function NovoClientePage() {
     const supabase = createClient()
     supabase.from('produtos').select('id, nome, cor').eq('tipo', 'saas').eq('ativo', true)
       .then(({ data }) => setProdutos(data ?? []))
+    supabase.from('profiles').select('id, nome').order('nome').then(({ data }) => setResponsaveis(data ?? []))
   }, [])
 
   async function onSubmit(data: ClienteFormData) {
@@ -51,6 +54,7 @@ export default function NovoClientePage() {
       cep: data.cep ?? null,
       segmento: data.segmento ?? null,
       origem: data.origem ?? null,
+      responsavel_id: data.responsavel_id || null,
       status: data.status,
       tipo: data.tipo ?? 'agencia',
       produto_id: data.produto_id ?? null,
@@ -196,12 +200,7 @@ export default function NovoClientePage() {
                     <Select onValueChange={(v) => setValue('segmento', v)}>
                       <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="restaurante">Restaurante</SelectItem>
-                        <SelectItem value="moda">Moda</SelectItem>
-                        <SelectItem value="tech">Tech</SelectItem>
-                        <SelectItem value="saude">Saúde</SelectItem>
-                        <SelectItem value="educacao">Educação</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
+                        {segmentoOpcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -210,11 +209,16 @@ export default function NovoClientePage() {
                     <Select onValueChange={(v) => setValue('origem', v)}>
                       <SelectTrigger><SelectValue placeholder="Como nos conheceu?" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="indicacao">Indicação</SelectItem>
-                        <SelectItem value="instagram">Instagram</SelectItem>
-                        <SelectItem value="linkedin">LinkedIn</SelectItem>
-                        <SelectItem value="site">Site</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
+                        {origemOpcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Responsável</Label>
+                    <Select onValueChange={(v) => setValue('responsavel_id', v)}>
+                      <SelectTrigger><SelectValue placeholder="Quem cuida deste cliente?" /></SelectTrigger>
+                      <SelectContent>
+                        {responsaveis.map((r) => <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

@@ -1,8 +1,8 @@
-﻿'use client'
+'use client'
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Edit, Plus, CheckCircle2, Clock } from 'lucide-react'
+import { ArrowLeft, Edit, Plus, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,10 +10,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { RentabilidadeProjeto } from '@/components/projetos/rentabilidade-projeto'
+
+const TAREFA_VAZIA = { titulo: '', prioridade: 'media', data_vencimento: '', descricao: '' }
 
 type Projeto = {
   id: string; nome: string; descricao: string | null; tipo: string | null; status: string
   prioridade: string; progresso: number; valor: number | null; data_inicio: string | null; data_entrega: string | null
+  horas_estimadas: number | null
   clientes: { nome: string } | null
 }
 type Tarefa = {
@@ -32,12 +41,39 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
   const [projeto, setProjeto] = useState<Projeto | null>(null)
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
+  const [tarefaOpen, setTarefaOpen] = useState(false)
+  const [tarefaForm, setTarefaForm] = useState(TAREFA_VAZIA)
+  const [salvandoTarefa, setSalvandoTarefa] = useState(false)
+
+  async function criarTarefa() {
+    if (!tarefaForm.titulo.trim()) return
+    setSalvandoTarefa(true)
+    const { data, error } = await (createClient() as any)
+      .from('tarefas')
+      .insert({
+        projeto_id: id,
+        titulo: tarefaForm.titulo.trim(),
+        prioridade: tarefaForm.prioridade,
+        data_vencimento: tarefaForm.data_vencimento || null,
+        descricao: tarefaForm.descricao.trim() || null,
+        status: 'a_fazer',
+        ordem: tarefas.length,
+      })
+      .select('id, titulo, status, prioridade, data_vencimento')
+      .single()
+    setSalvandoTarefa(false)
+    if (!error && data) {
+      setTarefas((prev) => [...prev, data as Tarefa])
+      setTarefaForm(TAREFA_VAZIA)
+      setTarefaOpen(false)
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
     async function load() {
       const [{ data: p }, { data: t }] = await Promise.all([
-        supabase.from('projetos').select('id, nome, descricao, tipo, status, prioridade, progresso, valor, data_inicio, data_entrega, clientes(nome)').eq('id', id).single(),
+        supabase.from('projetos').select('*, clientes(nome)').eq('id', id).single(),
         supabase.from('tarefas').select('id, titulo, status, prioridade, data_vencimento').eq('projeto_id', id).order('ordem'),
       ])
       setProjeto(p as unknown as Projeto)
@@ -55,7 +91,6 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
     </div>
   )
 
-  const concluidas = tarefas.filter(t => t.status === 'concluida').length
 
   return (
     <div>
@@ -114,12 +149,12 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
         <Tabs defaultValue="tarefas">
           <TabsList className="mb-4">
             <TabsTrigger value="tarefas">Tarefas ({tarefas.length})</TabsTrigger>
-            <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
+            <TabsTrigger value="financeiro">Rentabilidade</TabsTrigger>
           </TabsList>
 
           <TabsContent value="tarefas">
             <div className="flex justify-end mb-3">
-              <Button size="sm" className="gap-2">
+              <Button size="sm" className="gap-2" onClick={() => setTarefaOpen(true)}>
                 <Plus className="h-4 w-4" /> Nova Tarefa
               </Button>
             </div>
@@ -162,23 +197,49 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
           </TabsContent>
 
           <TabsContent value="financeiro">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card><CardContent className="p-5 text-center">
-                <p className="text-xs text-brand-lavanda/50 uppercase tracking-wider">Valor Total</p>
-                <p className="text-2xl font-bold text-brand-lavanda mt-1">{formatCurrency(projeto.valor ?? 0)}</p>
-              </CardContent></Card>
-              <Card><CardContent className="p-5 text-center">
-                <p className="text-xs text-brand-lavanda/50 uppercase tracking-wider">Tarefas</p>
-                <p className="text-2xl font-bold text-brand-lima mt-1">{tarefas.length}</p>
-              </CardContent></Card>
-              <Card><CardContent className="p-5 text-center">
-                <p className="text-xs text-brand-lavanda/50 uppercase tracking-wider">Concluídas</p>
-                <p className="text-2xl font-bold text-brand-violeta mt-1">{concluidas}</p>
-              </CardContent></Card>
-            </div>
+            <RentabilidadeProjeto projetoId={id} valorProjeto={projeto.valor} horasEstimadas={projeto.horas_estimadas ?? null} />
           </TabsContent>
         </Tabs>
       </div>
+      <Dialog open={tarefaOpen} onOpenChange={setTarefaOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Nova tarefa</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <Label>Título *</Label>
+              <Input value={tarefaForm.titulo} onChange={(e) => setTarefaForm({ ...tarefaForm, titulo: e.target.value })} placeholder="Ex: Criar wireframes" autoFocus />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Prioridade</Label>
+                <Select value={tarefaForm.prioridade} onValueChange={(v) => setTarefaForm({ ...tarefaForm, prioridade: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vencimento</Label>
+                <Input type="date" value={tarefaForm.data_vencimento} onChange={(e) => setTarefaForm({ ...tarefaForm, data_vencimento: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrição</Label>
+              <Textarea rows={3} value={tarefaForm.descricao} onChange={(e) => setTarefaForm({ ...tarefaForm, descricao: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" onClick={() => setTarefaOpen(false)} disabled={salvandoTarefa}>Cancelar</Button>
+            <Button onClick={criarTarefa} disabled={salvandoTarefa || !tarefaForm.titulo.trim()}>
+              {salvandoTarefa ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar tarefa'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

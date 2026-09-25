@@ -1,7 +1,8 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus, Search, Copy, FileCheck, MoreHorizontal, FileText } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
@@ -14,6 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { duplicarProposta } from '@/lib/propostas/duplicar'
+import { ConverterContratoDialog } from '@/components/propostas/converter-contrato-dialog'
 
 type Proposta = {
   id: string
@@ -42,6 +45,19 @@ export default function PropostasPage() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [converterId, setConverterId] = useState<string | null>(null)
+  const [erroAcao, setErroAcao] = useState<string | null>(null)
+  const router = useRouter()
+
+  async function handleDuplicar(id: string) {
+    setErroAcao(null)
+    try {
+      const novaId = await duplicarProposta(createClient(), id)
+      router.push(`/propostas/${novaId}/editar`)
+    } catch (e) {
+      setErroAcao(`Não foi possível duplicar: ${(e as { message?: string })?.message ?? 'erro desconhecido'}`)
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -187,12 +203,12 @@ export default function PropostasPage() {
                               <DropdownMenuItem asChild>
                                 <Link href={`/propostas/${p.id}`}>Visualizar</Link>
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleDuplicar(p.id)}>
                                 <Copy className="h-3.5 w-3.5 mr-2" />
                                 Duplicar
                               </DropdownMenuItem>
                               {p.status === 'aprovada' && (
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setConverterId(p.id)}>
                                   <FileCheck className="h-3.5 w-3.5 mr-2" />
                                   Converter em Contrato
                                 </DropdownMenuItem>
@@ -208,7 +224,15 @@ export default function PropostasPage() {
             </div>
           </CardContent>
         </Card>
+        {erroAcao && <p className="mt-3 text-xs text-brand-rosa">{erroAcao}</p>}
       </main>
+      {converterId && (
+        <ConverterContratoDialog
+          propostaId={converterId}
+          open={!!converterId}
+          onOpenChange={(v) => { if (!v) setConverterId(null) }}
+        />
+      )}
     </div>
   )
 }

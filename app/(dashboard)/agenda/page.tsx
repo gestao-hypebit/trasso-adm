@@ -1,7 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Video, Phone, Package, Clock, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Video, Phone, Package, Clock, Pencil, Loader2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,22 +39,65 @@ const tipoConfig = {
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+const EVENTO_VAZIO = { titulo: '', tipo: 'reuniao', cliente_id: '', data_inicio: '', data_fim: '', link_meet: '', descricao: '' }
+
 export default function AgendaPage() {
   const [eventos, setEventos] = useState<Evento[]>([])
   const [mesAtual, setMesAtual] = useState(new Date())
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null)
+  const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([])
+  const [novoOpen, setNovoOpen] = useState(false)
+  const [form, setForm] = useState(EVENTO_VAZIO)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     async function load() {
-      const { data } = await supabase
-        .from('eventos')
-        .select('id, titulo, tipo, data_inicio, data_fim, link_meet, clientes(nome)')
-        .order('data_inicio', { ascending: true })
+      const [{ data }, { data: cls }] = await Promise.all([
+        supabase
+          .from('eventos')
+          .select('id, titulo, tipo, data_inicio, data_fim, link_meet, clientes(nome)')
+          .order('data_inicio', { ascending: true }),
+        supabase.from('clientes').select('id, nome').order('nome'),
+      ])
       setEventos((data as Evento[]) ?? [])
+      setClientes(cls ?? [])
     }
     load()
   }, [])
+
+  function abrirNovo(open: boolean) {
+    if (open) {
+      const base = diaSelecionado ?? new Date()
+      setForm({ ...EVENTO_VAZIO, data_inicio: `${format(base, 'yyyy-MM-dd')}T10:00` })
+      setErro(null)
+    }
+    setNovoOpen(open)
+  }
+
+  async function criarEvento() {
+    if (!form.titulo.trim() || !form.data_inicio) { setErro('Preencha título e início.'); return }
+    setSalvando(true)
+    setErro(null)
+    const { data, error } = await (createClient() as any)
+      .from('eventos')
+      .insert({
+        titulo: form.titulo.trim(),
+        tipo: form.tipo,
+        cliente_id: form.cliente_id && form.cliente_id !== 'none' ? form.cliente_id : null,
+        data_inicio: new Date(form.data_inicio).toISOString(),
+        data_fim: form.data_fim ? new Date(form.data_fim).toISOString() : null,
+        link_meet: form.link_meet.trim() || null,
+        descricao: form.descricao.trim() || null,
+      })
+      .select('id, titulo, tipo, data_inicio, data_fim, link_meet, clientes(nome)')
+      .single()
+    setSalvando(false)
+    if (error) { setErro(error.message); return }
+    setEventos(prev => [...prev, data as Evento].sort((a, b) => a.data_inicio.localeCompare(b.data_inicio)))
+    setNovoOpen(false)
+  }
 
   const diasDoMes = eachDayOfInterval({ start: startOfMonth(mesAtual), end: endOfMonth(mesAtual) })
   const primeiroDiaSemana = getDay(startOfMonth(mesAtual))
@@ -76,7 +119,7 @@ export default function AgendaPage() {
 
       <main className="flex-1 p-6">
         <PageHeader title="Agenda">
-          <Dialog>
+          <Dialog open={novoOpen} onOpenChange={abrirNovo}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4" />
@@ -90,12 +133,12 @@ export default function AgendaPage() {
               <div className="space-y-4 pt-2">
                 <div>
                   <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Título *</Label>
-                  <Input placeholder="Ex: Reunião de alinhamento" />
+                  <Input placeholder="Ex: Reunião de alinhamento" value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Tipo</Label>
-                    <Select>
+                    <Select value={form.tipo} onValueChange={v => setForm({ ...form, tipo: v })}>
                       <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(tipoConfig).map(([k, v]) => (
@@ -106,31 +149,40 @@ export default function AgendaPage() {
                   </div>
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Cliente</Label>
-                    <Input placeholder="Nome do cliente" />
+                    <Select value={form.cliente_id} onValueChange={v => setForm({ ...form, cliente_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Início *</Label>
-                    <Input type="datetime-local" />
+                    <Input type="datetime-local" value={form.data_inicio} onChange={e => setForm({ ...form, data_inicio: e.target.value })} />
                   </div>
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Fim</Label>
-                    <Input type="datetime-local" />
+                    <Input type="datetime-local" value={form.data_fim} onChange={e => setForm({ ...form, data_fim: e.target.value })} />
                   </div>
                 </div>
                 <div>
                   <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Link da reunião</Label>
-                  <Input placeholder="https://meet.google.com/..." />
+                  <Input placeholder="https://meet.google.com/..." value={form.link_meet} onChange={e => setForm({ ...form, link_meet: e.target.value })} />
                 </div>
                 <div>
                   <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Descrição</Label>
-                  <Textarea placeholder="Detalhes do evento..." rows={2} />
+                  <Textarea placeholder="Detalhes do evento..." rows={2} value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} />
                 </div>
+                {erro && <p className="text-xs text-brand-rosa">{erro}</p>}
               </div>
               <DialogFooter>
-                <Button variant="outline">Cancelar</Button>
-                <Button>Criar Evento</Button>
+                <Button variant="outline" onClick={() => setNovoOpen(false)} disabled={salvando}>Cancelar</Button>
+                <Button onClick={criarEvento} disabled={salvando}>
+                  {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar Evento'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

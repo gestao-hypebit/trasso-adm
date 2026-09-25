@@ -1,7 +1,8 @@
-﻿'use client'
+'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus, Search, FileSignature, Upload, MoreHorizontal } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
@@ -14,6 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { enviarContratoAssinado } from '@/lib/contratos/arquivo'
+import { ContratoFormDialog } from '@/components/contratos/contrato-form-dialog'
 
 type Contrato = {
   id: string
@@ -45,6 +48,29 @@ export default function ContratosPage() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [novoOpen, setNovoOpen] = useState(false)
+  const [uploadAlvo, setUploadAlvo] = useState<string | null>(null)
+  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
+
+  function escolherArquivo(contratoId: string) {
+    setUploadAlvo(contratoId)
+    fileRef.current?.click()
+  }
+
+  async function handleArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !uploadAlvo) return
+    try {
+      await enviarContratoAssinado(createClient(), uploadAlvo, file)
+      setMensagem({ tipo: 'ok', texto: 'PDF assinado enviado.' })
+    } catch (err) {
+      setMensagem({ tipo: 'erro', texto: `Falha no envio: ${(err as { message?: string })?.message ?? 'erro desconhecido'}` })
+    }
+    setUploadAlvo(null)
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -75,7 +101,7 @@ export default function ContratosPage() {
 
       <main className="flex-1 p-6">
         <PageHeader title="Contratos" description={`${contratos.filter(c => c.status === 'assinado').length} ativos • ${formatCurrency(totalAtivo)} em vigor`}>
-          <Button>
+          <Button onClick={() => setNovoOpen(true)}>
             <Plus className="h-4 w-4" />
             Novo Contrato
           </Button>
@@ -188,7 +214,7 @@ export default function ContratosPage() {
                               <DropdownMenuItem asChild>
                                 <Link href={`/contratos/${c.id}`}>Visualizar</Link>
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => escolherArquivo(c.id)}>
                                 <Upload className="h-3.5 w-3.5 mr-2" />
                                 Enviar PDF assinado
                               </DropdownMenuItem>
@@ -203,7 +229,12 @@ export default function ContratosPage() {
             </div>
           </CardContent>
         </Card>
+        {mensagem && (
+          <p className={cn('mt-3 text-xs', mensagem.tipo === 'ok' ? 'text-brand-lima' : 'text-brand-rosa')}>{mensagem.texto}</p>
+        )}
+        <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={handleArquivo} />
       </main>
+      <ContratoFormDialog open={novoOpen} onOpenChange={setNovoOpen} onSaved={(id) => router.push(`/contratos/${id}`)} />
     </div>
   )
 }

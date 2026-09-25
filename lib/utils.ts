@@ -43,3 +43,25 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 }
+
+// Monta link wa.me a partir de um telefone brasileiro em qualquer formato.
+export function whatsappUrl(phone: string | null | undefined, text?: string): string | null {
+  if (!phone) return null
+  let digits = phone.replace(/\D/g, '')
+  if (!digits) return null
+  if (digits.length === 10 || digits.length === 11) digits = `55${digits}`
+  return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ''}`
+}
+
+// Data local (YYYY-MM-DD) sem deslocamento de fuso.
+export function toISODateLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function addMonthsISO(date: string, months: number): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const target = new Date(y, m - 1 + months, 1)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(d, lastDay))
+  return toISODateLocal(target)
+}

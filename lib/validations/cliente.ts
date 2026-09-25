@@ -16,6 +16,7 @@ export const clienteSchema = z.object({
   status: z.enum(['ativo', 'inativo', 'lead', 'prospecto']).default('ativo'),
   tipo: z.enum(['agencia', 'saas', 'ambos']).default('agencia'),
   produto_id: z.string().uuid().optional(),
+  responsavel_id: z.string().uuid().optional().or(z.literal('')),
   tags: z.array(z.string()).optional(),
   observacoes: z.string().optional(),
 })
