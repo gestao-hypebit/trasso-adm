@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   FileSignature, CheckSquare, Calendar, BarChart2, Settings, LogOut,
-  StickyNote,
+  StickyNote, Inbox,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 const navItems = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/clientes',      icon: Users,           label: 'Clientes' },
+  { href: '/leads',         icon: Inbox,           label: 'Leads' },
   { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
   { href: '/financeiro',    icon: DollarSign,      label: 'Financeiro' },
   { href: '/propostas',     icon: FileText,        label: 'Propostas' },
@@ -36,16 +37,19 @@ export function Sidebar() {
   const [agenciaNome, setAgenciaNome] = useState('Trasso')
   const [userNome, setUserNome] = useState('')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
+  const [leadsNovos, setLeadsNovos] = useState(0)
 
   useEffect(() => {
     const supabase = createClient()
     const db = supabase as any
 
     async function load() {
-      const [configRes, userRes] = await Promise.all([
+      const [configRes, userRes, leadsRes] = await Promise.all([
         db.from('configuracoes_agencia').select('logo_url, nome').limit(1).maybeSingle() as Promise<{ data: { logo_url: string | null; nome: string } | null }>,
         supabase.auth.getUser(),
+        db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'novo') as Promise<{ count: number | null }>,
       ])
+      setLeadsNovos(leadsRes.count ?? 0)
 
       if (configRes.data) {
         if (configRes.data.logo_url) setLogoUrl(configRes.data.logo_url)
@@ -131,6 +135,9 @@ export function Sidebar() {
             >
               <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-lima' : 'text-brand-lavanda/30')} />
               <span className={cn('font-medium', isActive ? '' : 'font-normal')}>{label}</span>
+              {href === '/leads' && leadsNovos > 0 && (
+                <span className="ml-auto rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{leadsNovos}</span>
+              )}
             </Link>
           )
         })}

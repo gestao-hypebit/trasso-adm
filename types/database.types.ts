@@ -103,6 +103,16 @@ export interface Database {
         Insert: { id?: string; usuario_id?: string | null; titulo: string; mensagem?: string | null; tipo?: string | null; lida?: boolean; link?: string | null; created_at?: string }
         Update: { id?: string; usuario_id?: string | null; titulo?: string; mensagem?: string | null; tipo?: string | null; lida?: boolean; link?: string | null; created_at?: string }
       }
+      formularios: {
+        Row: { id: string; slug: string; nome: string; titulo: string | null; subtitulo: string | null; botao_texto: string; mensagem_sucesso: string; campos: Json; ativo: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; slug: string; nome: string; titulo?: string | null; subtitulo?: string | null; botao_texto?: string; mensagem_sucesso?: string; campos?: Json; ativo?: boolean; created_at?: string; updated_at?: string }
+        Update: { id?: string; slug?: string; nome?: string; titulo?: string | null; subtitulo?: string | null; botao_texto?: string; mensagem_sucesso?: string; campos?: Json; ativo?: boolean; created_at?: string; updated_at?: string }
+      }
+      leads: {
+        Row: { id: string; formulario_id: string | null; nome: string; email: string | null; telefone: string | null; empresa: string | null; respostas: Json; status: string; origem: string; pagina: string | null; utm: Json | null; cliente_id: string | null; observacoes: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; formulario_id?: string | null; nome: string; email?: string | null; telefone?: string | null; empresa?: string | null; respostas?: Json; status?: string; origem?: string; pagina?: string | null; utm?: Json | null; cliente_id?: string | null; observacoes?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; formulario_id?: string | null; nome?: string; email?: string | null; telefone?: string | null; empresa?: string | null; respostas?: Json; status?: string; origem?: string; pagina?: string | null; utm?: Json | null; cliente_id?: string | null; observacoes?: string | null; created_at?: string; updated_at?: string }
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
