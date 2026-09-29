@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!autorizado(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { slug } = await params
-  let body: { valores?: Record<string, unknown>; pagina?: string; utm?: Record<string, string> }
+  let body: { valores?: Record<string, unknown>; pagina?: string; origem?: string; utm?: Record<string, string> }
   try {
     body = await req.json()
   } catch {
@@ -68,7 +68,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         formulario_id: formulario.id,
         ...resultado.lead,
         respostas: resultado.respostas,
-        origem: 'site',
+        // Ex.: "landing-site" para os leads dos anúncios. Só slug simples.
+        origem: body.origem?.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 50) || 'site',
         pagina: body.pagina?.slice(0, 500) ?? null,
         utm: body.utm && Object.keys(body.utm).length > 0 ? body.utm : null,
       })
