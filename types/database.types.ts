@@ -54,9 +54,9 @@ export interface Database {
         Update: { id?: string; projeto_id?: string; usuario_id?: string | null; data?: string; horas?: number; descricao?: string | null; created_at?: string }
       }
       categorias_financeiras: {
-        Row: { id: string; nome: string; tipo: string; cor: string; icone: string | null; created_at: string }
-        Insert: { id?: string; nome: string; tipo: string; cor?: string; icone?: string | null; created_at?: string }
-        Update: { id?: string; nome?: string; tipo?: string; cor?: string; icone?: string | null; created_at?: string }
+        Row: { id: string; nome: string; tipo: string; cor: string; icone: string | null; recorrente: boolean; created_at: string }
+        Insert: { id?: string; nome: string; tipo: string; cor?: string; icone?: string | null; recorrente?: boolean; created_at?: string }
+        Update: { id?: string; nome?: string; tipo?: string; cor?: string; icone?: string | null; recorrente?: boolean; created_at?: string }
       }
       lancamentos: {
         Row: { id: string; tipo: string; descricao: string; valor: number; data: string; data_competencia: string | null; status: string; categoria_id: string | null; cliente_id: string | null; projeto_id: string | null; produto_id: string | null; forma_pagamento: string | null; recorrente: boolean; frequencia: string | null; comprovante_url: string | null; observacoes: string | null; created_at: string; updated_at: string }
