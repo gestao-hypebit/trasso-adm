@@ -184,7 +184,7 @@ export default function ComissoesPage() {
         </div>
       )}
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Financeiro" description="Comissões">
           <Button onClick={handleGerar} disabled={isGenerating}>
             <RefreshCw className={cn('h-4 w-4', isGenerating && 'animate-spin')} />

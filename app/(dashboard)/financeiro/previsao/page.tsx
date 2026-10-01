@@ -151,7 +151,7 @@ export default function PrevisaoPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description="Previsão de receita" />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Financeiro" description="Previsão de receita">
           <div className="flex rounded-lg border border-white/[0.1] p-0.5">
             {HORIZONTES.map((h) => (
@@ -309,6 +309,7 @@ export default function PrevisaoPage() {
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Propostas no pipeline</CardTitle></CardHeader>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody>
                   {[...propostas].sort((a, b) => b.valor_final - a.valor_final).map((p) => {
@@ -329,6 +330,7 @@ export default function PrevisaoPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -121,7 +121,7 @@ export default function MetasPage() {
   return (
     <div>
       <Header title="Metas" description="Aquisição de clientes e saúde da base" />
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
         <PageHeader title="Metas do mês" description="Registre cada cliente que entra ou sai — o resto é calculado sozinho.">
           <div className="flex items-center rounded-lg border border-white/[0.1] bg-white/[0.03]">
             <Button variant="ghost" size="icon" onClick={() => setMes(somarMeses(mes, -1))} title="Mês anterior">

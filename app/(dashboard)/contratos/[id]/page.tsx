@@ -97,7 +97,7 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
 
   if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
   if (!contrato) return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Link href="/contratos"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>
       <p className="mt-6 text-brand-lavanda/50">Contrato não encontrado.</p>
     </div>
@@ -109,7 +109,7 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
     <div className="flex flex-col min-h-screen">
       <Header title={contrato.numero} description={contrato.titulo} />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Link href="/contratos">
@@ -165,7 +165,7 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                   {contrato.clientes && (
                     <div>
                       <p className="text-xs text-brand-lavanda/40 uppercase tracking-wider mb-1">Contratante</p>

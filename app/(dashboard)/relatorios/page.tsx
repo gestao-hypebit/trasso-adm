@@ -176,12 +176,12 @@ export default function RelatoriosPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Relatórios" description="Análises e métricas da agência" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Relatórios">
           <Button variant="outline" size="sm"><Download className="h-4 w-4" /> Exportar CSV</Button>
         </PageHeader>
 
-        <div className="flex gap-1 border-b border-white/[0.06] mb-6">
+        <div className="flex gap-1 border-b border-white/[0.06] mb-6 overflow-x-auto">
           {tabItems.map(({ key, label, icon: Icon }) => (
             <button
               key={key}

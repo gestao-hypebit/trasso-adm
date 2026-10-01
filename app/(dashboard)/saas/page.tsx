@@ -101,7 +101,7 @@ export default function SaasPage() {
   return (
     <div>
       <Header title="Produtos SaaS" description="Gerencie seus produtos e assinaturas" />
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
         <PageHeader title="Produtos SaaS" description="Visão consolidada de todos os seus SaaS">
           <Button onClick={() => setNovoOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Novo Produto

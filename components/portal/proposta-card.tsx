@@ -53,6 +53,7 @@ export function PropostaCard({ token, proposta, logoUrl, agenciaNome }: {
         </div>
 
         {itens.length > 0 && (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm mb-4">
             <thead>
               <tr className="border-b border-white/[0.06]">
@@ -78,6 +79,7 @@ export function PropostaCard({ token, proposta, logoUrl, agenciaNome }: {
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         <div className="flex justify-end mb-4">

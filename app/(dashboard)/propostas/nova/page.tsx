@@ -146,14 +146,14 @@ export default function NovaPropostaPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Nova Proposta" description="Crie uma nova proposta comercial" />
 
-      <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
+      <main className="flex-1 p-4 md:p-6 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
           <Link href="/propostas">
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+          <h1 className="text-xl md:text-2xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
             Nova Proposta
           </h1>
         </div>
@@ -164,7 +164,7 @@ export default function NovaPropostaPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Informações Gerais</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Cliente *</Label>
                       <Select onValueChange={(v) => setValue('cliente_id', v)}>
@@ -223,7 +223,7 @@ export default function NovaPropostaPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-12 gap-2 text-xs text-brand-lavanda/40 px-1">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 text-xs text-brand-lavanda/40 px-1">
                       <span className="col-span-4">Descrição</span>
                       <span className="col-span-2">Recorrência</span>
                       <span className="col-span-2 text-center">Qtd</span>
@@ -237,11 +237,11 @@ export default function NovaPropostaPage() {
                       const rec = watch(`itens.${idx}.recorrencia`) ?? 'avulso'
                       const isRec = rec !== 'avulso'
                       return (
-                        <div key={field.id} className={`grid grid-cols-12 gap-2 items-center rounded-lg px-1 py-0.5 ${isRec ? 'bg-brand-violeta/5 border border-brand-violeta/20' : ''}`}>
-                          <div className="col-span-4">
+                        <div key={field.id} className={`grid grid-cols-6 sm:grid-cols-12 gap-2 items-center rounded-lg px-1 py-2 sm:py-0.5 border-b border-white/[0.06] sm:border-b-0 ${isRec ? 'bg-brand-violeta/5 border border-brand-violeta/20' : ''}`}>
+                          <div className="col-span-6 sm:col-span-4">
                             <Input {...register(`itens.${idx}.descricao`)} placeholder="Descrição do serviço..." className="h-9 text-sm" />
                           </div>
-                          <div className="col-span-2">
+                          <div className="col-span-3 sm:col-span-2">
                             <Select
                               defaultValue={rec}
                               onValueChange={(v) => setValue(`itens.${idx}.recorrencia`, v as 'avulso' | 'mensal' | 'trimestral' | 'anual')}
@@ -256,13 +256,13 @@ export default function NovaPropostaPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-2">
+                          <div className="col-span-3 sm:col-span-2">
                             <Input {...register(`itens.${idx}.quantidade`)} type="number" min="0.01" step="0.5" className="h-9 text-sm text-center" />
                           </div>
-                          <div className="col-span-2">
+                          <div className="col-span-3 sm:col-span-2">
                             <Input {...register(`itens.${idx}.valor_unitario`)} type="number" min="0" step="50" className="h-9 text-sm text-right" />
                           </div>
-                          <div className="col-span-1 text-right text-xs font-medium text-brand-lavanda">
+                          <div className="col-span-2 sm:col-span-1 text-right text-xs font-medium text-brand-lavanda">
                             {formatCurrency(qtd * vu)}
                             {isRec && <span className="block text-brand-violeta/60" style={{ fontSize: 9 }}>/{rec}</span>}
                           </div>
@@ -285,7 +285,7 @@ export default function NovaPropostaPage() {
                   <Separator className="my-4 bg-brand-violeta/20" />
 
                   <div className="flex justify-end">
-                    <div className="w-72 space-y-2">
+                    <div className="w-full sm:w-72 space-y-2">
                       {subtotalAvulso > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-brand-lavanda/60">Serviços avulsos</span>

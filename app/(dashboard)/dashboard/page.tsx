@@ -168,10 +168,10 @@ export default function DashboardPage() {
   return (
     <div>
       <Header title="Dashboard" description="Visão geral da Trasso" />
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
 
         {/* Seletor de mês */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {!allTime && (
             <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
               <button

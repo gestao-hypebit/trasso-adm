@@ -297,7 +297,7 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Configurações" />
 
         <div className="flex flex-col lg:flex-row gap-6">
@@ -473,6 +473,7 @@ export default function ConfiguracoesPage() {
                         </div>
                       )}
 
+                      <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-white/[0.06]">
@@ -516,6 +517,7 @@ export default function ConfiguracoesPage() {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -647,7 +649,7 @@ export default function ConfiguracoesPage() {
                       ].map((item) => (
                         <div key={item.label}>
                           <h4 className="text-sm font-semibold text-brand-lavanda mb-3">{item.label}</h4>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                               <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Prefixo</Label>
                               <Input
@@ -682,7 +684,7 @@ export default function ConfiguracoesPage() {
                         <p className="text-xs text-brand-lavanda/50 mb-3">
                           Quanto custa, em média, uma hora de trabalho (salários + encargos + ferramentas ÷ horas produtivas). Usado na rentabilidade dos projetos.
                         </p>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div>
                             <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">R$ por hora</Label>
                             <Input

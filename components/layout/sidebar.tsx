@@ -7,13 +7,14 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   FileSignature, CheckSquare, Calendar, BarChart2, Settings, LogOut,
-  StickyNote, Inbox, Target, ChevronDown,
+  StickyNote, Inbox, Target, ChevronDown, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { useMobileNav } from '@/components/layout/mobile-nav'
 
 type NavItem = {
   href: string
@@ -50,6 +51,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { aberto, fechar } = useMobileNav()
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [agenciaNome, setAgenciaNome] = useState('Trasso')
   const [userNome, setUserNome] = useState('')
@@ -119,7 +121,16 @@ export function Sidebar() {
     .toUpperCase() || 'U'
 
   return (
-    <aside className="flex h-screen w-60 flex-col bg-brand-noite border-r border-white/[0.06] fixed left-0 top-0 z-40">
+    <>
+    {/* Fundo escuro da gaveta no celular */}
+    <div
+      onClick={fechar}
+      className={cn('fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity md:hidden', aberto ? 'opacity-100' : 'pointer-events-none opacity-0')}
+    />
+    <aside className={cn(
+      'flex h-dvh w-64 md:w-60 flex-col bg-brand-noite border-r border-white/[0.06] fixed left-0 top-0 z-50 md:z-40 transition-transform duration-200',
+      aberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+    )}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-white/[0.06]">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-lima overflow-hidden shrink-0">
@@ -142,6 +153,14 @@ export function Sidebar() {
           </span>
           <p className="text-brand-lavanda/30 text-[10px] leading-none mt-0.5 tracking-wide">gestão</p>
         </div>
+        <button
+          type="button"
+          onClick={fechar}
+          aria-label="Fechar menu"
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-brand-lavanda/50 hover:bg-white/[0.06] hover:text-brand-lavanda md:hidden"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -174,7 +193,7 @@ export function Sidebar() {
                           key={child.href}
                           href={child.href}
                           className={cn(
-                            'block rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-100',
+                            'block rounded-md px-2.5 py-2 md:py-1.5 text-[13px] transition-all duration-100',
                             childActive
                               ? 'bg-white/[0.08] text-brand-lavanda font-medium'
                               : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
@@ -195,7 +214,7 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-100',
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 md:py-2 text-sm transition-all duration-100',
                 isActive
                   ? 'bg-white/[0.08] text-brand-lavanda'
                   : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
@@ -236,5 +255,6 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   )
 }

@@ -130,7 +130,7 @@ export default function FluxoCaixaPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description="Fluxo de caixa da agência" />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Fluxo de Caixa" description="Realizado até hoje e projeção pelos vencimentos em aberto">
           <Button variant="outline" size="sm" onClick={exportar} disabled={loading}><Download className="h-4 w-4" /> Exportar CSV</Button>
           <LancamentoForm onSuccess={load} />
@@ -176,7 +176,7 @@ export default function FluxoCaixaPage() {
                 </Select>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-xs text-brand-lavanda/50 pt-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-lavanda/50 pt-1">
               <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-brand-lima" /> Entradas</span>
               <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-brand-rosa" /> Saídas</span>
               <span className="flex items-center gap-1.5"><span className="h-0.5 w-3 bg-[#A78BFA]" /> Saldo</span>

@@ -97,6 +97,7 @@ export function IndicadorExtratoDialog({ indicador, comissoes, logoUrl, agenciaN
               {comissoesFiltradas.length === 0 ? (
                 <p className="text-xs text-brand-lavanda/40 text-center py-8">Nenhuma comissão nesse período.</p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <tbody>
                     {comissoesFiltradas.map((c) => {
@@ -114,6 +115,7 @@ export function IndicadorExtratoDialog({ indicador, comissoes, logoUrl, agenciaN
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
             <div className="flex items-center justify-between px-3 py-2.5 bg-white/[0.02] border-t border-white/[0.08] text-xs">

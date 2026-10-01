@@ -54,7 +54,7 @@ export function NotificacoesMenu() {
           {naoLidas.length > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-lima" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] sm:w-80 p-0">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
           <span className="text-sm font-semibold">Notificações</span>
           {naoLidas.length > 0 && (

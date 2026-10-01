@@ -251,7 +251,7 @@ export default function ClientesPage() {
   return (
     <div>
       <Header title="Clientes" description="Gerencie seus clientes e leads" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader
           title="Clientes"
           description={`${filtered.length} clientes encontrados${followUpsAtrasados > 0 ? ` • ${followUpsAtrasados} follow-up(s) atrasado(s)` : ''}`}

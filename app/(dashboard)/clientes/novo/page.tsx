@@ -67,7 +67,7 @@ export default function NovoClientePage() {
   return (
     <div>
       <Header title="Novo Cliente" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader title="Novo Cliente" description="Adicione um novo cliente ao CRM">
           <Link href="/clientes">
             <Button variant="outline" size="sm" className="gap-2">

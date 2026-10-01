@@ -222,7 +222,7 @@ export default function EditarFormularioPage({ params }: { params: Promise<{ id:
     return (
       <div className="flex flex-col min-h-screen">
         <Header title="Formulário" />
-        <main className="p-6 text-sm text-brand-lavanda/50">Formulário não encontrado. <Link href="/leads/formularios" className="text-brand-lima">Voltar</Link></main>
+        <main className="p-4 md:p-6 text-sm text-brand-lavanda/50">Formulário não encontrado. <Link href="/leads/formularios" className="text-brand-lima">Voltar</Link></main>
       </div>
     )
   }
@@ -231,7 +231,7 @@ export default function EditarFormularioPage({ params }: { params: Promise<{ id:
     return (
       <div className="flex flex-col min-h-screen">
         <Header title="Formulário" />
-        <main className="p-6 text-sm text-brand-lavanda/40">Carregando...</main>
+        <main className="p-4 md:p-6 text-sm text-brand-lavanda/40">Carregando...</main>
       </div>
     )
   }
@@ -242,7 +242,7 @@ export default function EditarFormularioPage({ params }: { params: Promise<{ id:
     <div className="flex flex-col min-h-screen">
       <Header title={form.nome} description="Construtor de formulário" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link href="/leads/formularios" className="inline-flex items-center gap-1.5 text-xs text-brand-lavanda/50 hover:text-brand-lavanda">
             <ArrowLeft className="h-3.5 w-3.5" /> Formulários

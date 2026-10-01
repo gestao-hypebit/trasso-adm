@@ -161,7 +161,7 @@ export default function FinanceiroPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description="Controle financeiro da agência" />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Financeiro" description={loading ? 'Carregando...' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}>
           <LancamentoForm onSuccess={load} />
         </PageHeader>
@@ -185,7 +185,7 @@ export default function FinanceiroPage() {
         )}
 
         {/* Seletor de mês */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           {!allTime && (
             <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
               <button
@@ -389,7 +389,7 @@ export default function FinanceiroPage() {
                 <Link href="/financeiro/receitas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">Ver todas →</Link>
               </div>
               {!loading && (
-                <div className="flex items-center gap-4 pt-1">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
                   <span className="text-xs text-brand-lavanda/50">Recebido: <span className="text-brand-lima font-semibold">{formatCurrency(receitasMes.filter(l => l.status === 'recebido').reduce((s, l) => s + l.valor, 0))}</span></span>
                   {receitasMes.filter(l => l.status === 'pendente').length > 0 && (
                     <span className="text-xs text-brand-lavanda/50">Pendente: <span className="text-yellow-400 font-semibold">{formatCurrency(receitasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0))}</span></span>
@@ -462,7 +462,7 @@ export default function FinanceiroPage() {
                 <Link href="/financeiro/despesas" className="text-xs text-brand-violeta hover:text-brand-lima transition-colors">Ver todas →</Link>
               </div>
               {!loading && (
-                <div className="flex items-center gap-4 pt-1">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
                   <span className="text-xs text-brand-lavanda/50">Pago: <span className="text-brand-rosa font-semibold">{formatCurrency(despesasMes.filter(l => l.status === 'pago').reduce((s, l) => s + l.valor, 0))}</span></span>
                   {despesasMes.filter(l => l.status === 'pendente').length > 0 && (
                     <span className="text-xs text-brand-lavanda/50">Pendente: <span className="text-yellow-400 font-semibold">{formatCurrency(despesasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0))}</span></span>

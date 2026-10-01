@@ -102,7 +102,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
 
   if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
   if (!proposta) return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Link href="/propostas"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>
       <p className="mt-6 text-brand-lavanda/50">Proposta não encontrada.</p>
     </div>
@@ -118,7 +118,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
     <div className="flex flex-col min-h-screen">
       <Header title={proposta.numero} description={proposta.titulo} />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Link href="/propostas">
@@ -211,6 +211,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
                   const subtotalRec = recorrentes.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
 
                   const ItemTable = ({ rows }: { rows: typeof itens }) => (
+                    <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-white/[0.06]">
@@ -231,6 +232,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   )
 
                   return (
@@ -244,6 +246,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
                             <span className="text-xs font-semibold text-brand-violeta uppercase tracking-wider">Serviços Recorrentes</span>
                             <span className="ml-auto text-xs text-brand-violeta/60">{formatCurrency(subtotalRec)}/mês</span>
                           </div>
+                          <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-white/[0.06]">
@@ -266,6 +269,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         </div>
                       )}
                     </div>

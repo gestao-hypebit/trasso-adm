@@ -127,7 +127,7 @@ export default function ProjetosPage() {
   return (
     <div>
       <Header title="Projetos" description="Gerencie seus projetos" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader title="Projetos" description={`${projetos.length} projetos`}>
           <div className="flex items-center gap-2">
             <Button variant={view === 'kanban' ? 'violeta' : 'ghost'} size="icon" onClick={() => setView('kanban')} title="Kanban">

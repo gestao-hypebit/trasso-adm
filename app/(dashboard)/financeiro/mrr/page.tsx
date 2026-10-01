@@ -157,7 +157,7 @@ export default function MrrPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description="Receita recorrente" />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="MRR" description="Receita mensal recorrente — assinaturas SaaS e contratos de serviço">
           <Button variant="outline" size="sm" onClick={exportar} disabled={loading}><Download className="h-4 w-4" /> Exportar CSV</Button>
           <Link href="/saas"><Button variant="outline" size="sm">Gerenciar assinantes</Button></Link>

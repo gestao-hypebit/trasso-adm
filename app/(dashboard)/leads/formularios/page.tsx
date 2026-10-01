@@ -55,7 +55,7 @@ export default function FormulariosPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Formulários" description="Formulários de captação do site" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <Link href="/leads" className="mb-4 inline-flex items-center gap-1.5 text-xs text-brand-lavanda/50 hover:text-brand-lavanda">
           <ArrowLeft className="h-3.5 w-3.5" /> Leads
         </Link>

@@ -102,7 +102,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
 
   if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
   if (!cliente) return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Link href="/clientes"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>
       <p className="mt-6 text-brand-lavanda/50">Cliente não encontrado.</p>
     </div>
@@ -111,7 +111,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
   return (
     <div>
       <Header title="Editar Cliente" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader title="Editar Cliente" description={cliente.nome}>
           <Link href={`/clientes/${id}`}>
             <Button variant="outline" size="sm" className="gap-2">

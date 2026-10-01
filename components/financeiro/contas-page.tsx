@@ -216,7 +216,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description={t.titulo} />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title={t.titulo} description={ehReceber ? 'Títulos a receber de clientes, vencimentos e inadimplência' : 'Obrigações da agência, vencimentos e pagamentos'}>
           <Button variant="outline" size="sm" onClick={exportar} disabled={!filtradas.length}>
             <Download className="h-4 w-4" /> Exportar CSV

@@ -178,7 +178,7 @@ export default function SaasDetailPage({ params }: { params: Promise<{ id: strin
 
   if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
   if (!produto) return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Link href="/saas"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>
       <p className="mt-6 text-brand-lavanda/50">Produto não encontrado.</p>
     </div>
@@ -187,7 +187,7 @@ export default function SaasDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div>
       <Header title={produto.nome} description="Gestão de assinantes" />
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
 
         {/* Breadcrumb + ações */}
         <div className="flex items-center justify-between">
@@ -378,6 +378,7 @@ export default function SaasDetailPage({ params }: { params: Promise<{ id: strin
                 </p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
@@ -474,6 +475,7 @@ export default function SaasDetailPage({ params }: { params: Promise<{ id: strin
                   )})}
                 </tbody>
               </table>
+              </div>
             )}
           </CardContent>
         </Card>

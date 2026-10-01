@@ -85,7 +85,7 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
 
   if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
   if (!projeto) return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Link href="/projetos"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>
       <p className="mt-6 text-brand-lavanda/50">Projeto não encontrado.</p>
     </div>
@@ -95,7 +95,7 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div>
       <Header title="Detalhe do Projeto" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="mb-4 flex justify-between">
           <Link href="/projetos">
             <Button variant="outline" size="sm" className="gap-2">

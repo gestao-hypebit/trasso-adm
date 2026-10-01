@@ -65,7 +65,7 @@ export default function NovoProjetoPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <Header title="Novo Projeto" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader title="Novo Projeto" description="Crie um novo projeto">
           <Link href={clienteInicial ? `/clientes/${clienteInicial}` : '/projetos'}>
             <Button variant="outline" size="sm" className="gap-2">

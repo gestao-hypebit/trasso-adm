@@ -117,7 +117,7 @@ export default function AgendaPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Agenda" description="Calendário de eventos e entregas" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Agenda">
           <Dialog open={novoOpen} onOpenChange={abrirNovo}>
             <DialogTrigger asChild>
@@ -158,7 +158,7 @@ export default function AgendaPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Início *</Label>
                     <Input type="datetime-local" value={form.data_inicio} onChange={e => setForm({ ...form, data_inicio: e.target.value })} />

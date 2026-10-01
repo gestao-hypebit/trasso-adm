@@ -99,7 +99,7 @@ export default function ContratosPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Contratos" description="Gestão de contratos" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Contratos" description={`${contratos.filter(c => c.status === 'assinado').length} ativos • ${formatCurrency(totalAtivo)} em vigor`}>
           <Button onClick={() => setNovoOpen(true)}>
             <Plus className="h-4 w-4" />

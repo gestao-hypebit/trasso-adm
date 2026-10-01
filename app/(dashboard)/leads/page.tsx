@@ -71,7 +71,7 @@ function LeadsConteudo() {
     <div className="flex flex-col min-h-screen">
       <Header title="Leads" description="Contatos recebidos pelo site" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader
           title="Leads"
           description={loading ? 'Carregando…' : `${novos} novo${novos === 1 ? '' : 's'} • ${leads.length} no total • ${taxa}% convertidos`}

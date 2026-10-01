@@ -103,7 +103,7 @@ export default function RentabilidadePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description="Rentabilidade por projeto" />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Financeiro" description="Rentabilidade por projeto">
           <div className="flex rounded-lg border border-white/[0.1] p-0.5">
             {([['todos', 'Todos'], ['ativos', 'Em andamento'], ['concluidos', 'Concluídos']] as const).map(([k, label]) => (

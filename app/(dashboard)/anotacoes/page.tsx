@@ -249,10 +249,10 @@ export default function AnotacoesPage() {
   }
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ height: '100vh' }}>
+    <div className="flex flex-col overflow-hidden" style={{ height: '100dvh' }}>
       <Header title="Anotações" description="Canvas de post-its" />
 
-      <div className="shrink-0 px-6 py-3 border-b border-white/[0.06] flex items-center justify-between bg-brand-noite/95 backdrop-blur-sm">
+      <div className="shrink-0 px-4 md:px-6 py-3 border-b border-white/[0.06] flex items-center justify-between bg-brand-noite/95 backdrop-blur-sm">
         <p className="text-brand-lavanda/40 text-sm">
           {loading ? '' : notas.length > 0
             ? `${notas.length} ${notas.length === 1 ? 'anotação' : 'anotações'}`

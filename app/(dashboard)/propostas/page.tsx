@@ -88,7 +88,7 @@ export default function PropostasPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Propostas" description="Pipeline comercial" />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Propostas" description={`${propostas.length} propostas • ${formatCurrency(totalEmAberto)} em aberto`}>
           <Link href="/propostas/nova">
             <Button>

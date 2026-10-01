@@ -94,7 +94,7 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
   return (
     <div>
       <Header title="Editar Projeto" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader title="Editar Projeto" description="Atualize as informações do projeto">
           <Link href={`/projetos/${id}`}>
             <Button variant="outline" size="sm" className="gap-2">
