@@ -222,7 +222,7 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
             </div>
 
             <div>
-              <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">{isRecorrente ? 'Data de início *' : 'Data *'}</Label>
+              <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">{isRecorrente ? '1º vencimento *' : 'Vencimento *'}</Label>
               <Input {...register('data')} type="date" />
               {errors.data && <p className="text-brand-rosa text-xs mt-1">{errors.data.message}</p>}
             </div>

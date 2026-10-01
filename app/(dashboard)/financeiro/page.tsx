@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, ChevronDown, Wallet, Trash2, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, ChevronLeft, ChevronRight, ChevronDown, Wallet, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -90,6 +90,12 @@ export default function FinanceiroPage() {
   const aReceber = receitasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0)
   const aPagar = despesasMes.filter(l => l.status === 'pendente').reduce((s, l) => s + l.valor, 0)
 
+  // Vencidos independem do mês selecionado: é o que está atrasado hoje.
+  const hojeStr = format(new Date(), 'yyyy-MM-dd')
+  const vencidos = lancamentos.filter(l => l.status === 'pendente' && l.data < hojeStr)
+  const vencidoReceber = vencidos.filter(l => l.tipo === 'receita')
+  const vencidoPagar = vencidos.filter(l => l.tipo === 'despesa')
+
   const saldoAtual = lancamentos.reduce((s, l) => {
     if (l.tipo === 'receita' && l.status === 'recebido') return s + l.valor
     if (l.tipo === 'despesa' && l.status === 'pago') return s - l.valor
@@ -161,6 +167,22 @@ export default function FinanceiroPage() {
         </PageHeader>
 
         <FinanceiroSubNav pathname={pathname} />
+
+        {!loading && vencidos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 rounded-xl border border-brand-rosa/20 bg-brand-rosa/[0.05] px-4 py-3 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-brand-rosa" />
+            {vencidoReceber.length > 0 && (
+              <Link href="/financeiro/receitas" className="text-brand-lavanda hover:text-brand-lima transition-colors">
+                <span className="font-semibold">{vencidoReceber.length}</span> a receber vencido(s) · <span className="font-semibold text-brand-rosa">{formatCurrency(vencidoReceber.reduce((s, l) => s + l.valor, 0))}</span>
+              </Link>
+            )}
+            {vencidoPagar.length > 0 && (
+              <Link href="/financeiro/despesas" className="text-brand-lavanda hover:text-brand-lima transition-colors">
+                <span className="font-semibold">{vencidoPagar.length}</span> a pagar vencido(s) · <span className="font-semibold text-brand-rosa">{formatCurrency(vencidoPagar.reduce((s, l) => s + l.valor, 0))}</span>
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Seletor de mês */}
         <div className="flex items-center gap-3 mb-4">

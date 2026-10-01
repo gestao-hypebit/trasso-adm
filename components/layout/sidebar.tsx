@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   FileSignature, CheckSquare, Calendar, BarChart2, Settings, LogOut,
-  StickyNote, Inbox, Target,
+  StickyNote, Inbox, Target, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -15,13 +15,29 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
-const navItems = [
+type NavItem = {
+  href: string
+  icon: typeof LayoutDashboard
+  label: string
+  children?: { href: string; label: string }[]
+}
+
+const navItems: NavItem[] = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/metas',         icon: Target,          label: 'Metas' },
   { href: '/clientes',      icon: Users,           label: 'Clientes' },
   { href: '/leads',         icon: Inbox,           label: 'Leads' },
   { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
-  { href: '/financeiro',    icon: DollarSign,      label: 'Financeiro' },
+  {
+    href: '/financeiro', icon: DollarSign, label: 'Financeiro',
+    children: [
+      { href: '/financeiro',               label: 'Visão Geral' },
+      { href: '/financeiro/receitas',      label: 'Contas a Receber' },
+      { href: '/financeiro/despesas',      label: 'Contas a Pagar' },
+      { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
+      { href: '/financeiro/mrr',            label: 'MRR' },
+    ],
+  },
   { href: '/propostas',     icon: FileText,        label: 'Propostas' },
   { href: '/contratos',     icon: FileSignature,   label: 'Contratos' },
   { href: '/tarefas',       icon: CheckSquare,     label: 'Tarefas' },
@@ -39,6 +55,15 @@ export function Sidebar() {
   const [userNome, setUserNome] = useState('')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [leadsNovos, setLeadsNovos] = useState(0)
+  const [financeiroAberto, setFinanceiroAberto] = useState(false)
+
+  const isPathActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
+  const financeiroItem = navItems.find(i => i.children)!
+  const emFinanceiro = financeiroItem.children!.some(c => isPathActive(c.href))
+
+  useEffect(() => {
+    if (emFinanceiro) setFinanceiroAberto(true)
+  }, [emFinanceiro])
 
   useEffect(() => {
     const supabase = createClient()
@@ -121,8 +146,50 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-        {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href || pathname.startsWith(href + '/')
+        {navItems.map(({ href, icon: Icon, label, children }) => {
+          if (children) {
+            return (
+              <div key={href}>
+                <button
+                  type="button"
+                  onClick={() => setFinanceiroAberto(v => !v)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-100',
+                    emFinanceiro
+                      ? 'text-brand-lavanda'
+                      : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
+                  )}
+                >
+                  <Icon className={cn('h-4 w-4 shrink-0', emFinanceiro ? 'text-brand-lima' : 'text-brand-lavanda/30')} />
+                  <span className={cn('font-medium', emFinanceiro ? '' : 'font-normal')}>{label}</span>
+                  <ChevronDown className={cn('ml-auto h-3.5 w-3.5 text-brand-lavanda/30 transition-transform', financeiroAberto && 'rotate-180')} />
+                </button>
+                {financeiroAberto && (
+                  <div className="ml-[22px] mt-0.5 mb-1 space-y-0.5 border-l border-white/[0.06] pl-3">
+                    {children.map(child => {
+                      // Visão Geral só fica ativa na rota exata, senão acenderia em todas as subpáginas
+                      const childActive = child.href === '/financeiro' ? pathname === child.href : isPathActive(child.href)
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={cn(
+                            'block rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-100',
+                            childActive
+                              ? 'bg-white/[0.08] text-brand-lavanda font-medium'
+                              : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
+                          )}
+                        >
+                          {child.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
+          const isActive = isPathActive(href)
           return (
             <Link
               key={href}

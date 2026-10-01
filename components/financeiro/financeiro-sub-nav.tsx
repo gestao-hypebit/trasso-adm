@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils'
 
 export const financeiroSubNav = [
   { href: '/financeiro', label: 'Visão Geral' },
-  { href: '/financeiro/receitas', label: 'Receitas' },
-  { href: '/financeiro/despesas', label: 'Despesas' },
+  { href: '/financeiro/receitas', label: 'Contas a Receber' },
+  { href: '/financeiro/despesas', label: 'Contas a Pagar' },
   { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
+  { href: '/financeiro/mrr', label: 'MRR' },
   { href: '/financeiro/previsao', label: 'Previsão' },
   { href: '/financeiro/rentabilidade', label: 'Rentabilidade' },
   { href: '/financeiro/comissoes', label: 'Comissões' },
@@ -15,7 +16,7 @@ export const financeiroSubNav = [
 
 export function FinanceiroSubNav({ pathname }: { pathname: string }) {
   return (
-    <div className="flex gap-1 border-b border-white/[0.06] mb-6">
+    <div className="flex gap-1 border-b border-white/[0.06] mb-6 overflow-x-auto">
       {financeiroSubNav.map(({ href, label }) => (
         <Link key={href} href={href} className={cn(
           'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap',
