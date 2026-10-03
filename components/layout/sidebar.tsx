@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   Settings, LogOut,
-  StickyNote, Inbox, Target, Star, ChevronDown, X,
+  StickyNote, Inbox, Target, Star, ChevronDown, X, Globe,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
     ],
   },
   { href: '/propostas',     icon: FileText,        label: 'Propostas' },
+  { href: '/sites',         icon: Globe,           label: 'Prévias de site' },
   { href: '/anotacoes',     icon: StickyNote,      label: 'Anotações' },
   { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
 ]
