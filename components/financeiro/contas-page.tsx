@@ -60,7 +60,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
-  const [aba, setAba] = useState<Aba>('aberto')
+  const [aba, setAba] = useState<Aba>('todas')
   const [periodo, setPeriodo] = useState<Periodo>(periodoInicial)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -284,7 +284,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
         </div>
 
         <div className="mb-4">
-          <SeletorMes valor={periodo} onChange={(p) => { setPeriodo(p); setSelecionados(new Set()) }} permitirFuturo />
+          <SeletorMes valor={periodo} onChange={(p) => { setPeriodo(p); setAba('todas'); setSelecionados(new Set()) }} permitirFuturo />
         </div>
 
         {/* Abas de situação */}
