@@ -162,8 +162,8 @@ export default function AsaasPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Asaas" description="Integração de cobranças" />
       <main className="flex-1 p-4 md:p-6 space-y-6">
-        <Link href="/catalogo" className="inline-flex items-center gap-1.5 text-xs text-brand-lavanda/50 hover:text-brand-lavanda">
-          <ArrowLeft className="h-3.5 w-3.5" /> Catálogo Place
+        <Link href="/financeiro/mrr?aba=catalogo" className="inline-flex items-center gap-1.5 text-xs text-brand-lavanda/50 hover:text-brand-lavanda">
+          <ArrowLeft className="h-3.5 w-3.5" /> MRR e assinaturas
         </Link>
         <PageHeader
           title="Integração com o Asaas"

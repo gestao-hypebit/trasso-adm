@@ -12,34 +12,11 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, whatsappUrl } from '@/lib/utils'
 import {
   cicloLabel, formaLabel, assinaturaStatus, cobrancaStatus,
-  type AssinaturaAsaas, type CobrancaAsaas,
+  type CobrancaAsaas,
 } from '@/lib/asaas/rotulos'
+import { nomeLinha, type Assinante, type LinhaRec } from '@/lib/recorrencia'
 
-export type Assinante = {
-  chave: string
-  clienteId: string | null
-  nome: string
-  empresa: string | null
-  whatsapp: string | null
-  mensalidade: number
-  desde: string | null
-  mesesPagos: number
-  pagoEsteMes: boolean
-  ativo: boolean
-  atraso: number
-  diasAtraso: number
-  status: string | null
-  asaasCustomerId: string | null
-  assinaturas: AssinaturaAsaas[]
-  // Quais dessas assinaturas são do Catálogo Place (o cliente pode ter outras da agência).
-  idsCatalogo: string[]
-  // De onde vêm a mensalidade e a situação: assinatura do Asaas ou lançamentos do financeiro.
-  fonte: 'asaas' | 'financeiro'
-  // Lançamentos do financeiro (usado quando o cliente não está no Asaas).
-  historico: { data: string; valor: number; status: string; descricao: string }[]
-  // Assinatura do Asaas sem cliente do sistema ligado a ela.
-  soNoAsaas: boolean
-}
+export type { Assinante }
 
 type Opcao = { id: string; nome: string }
 
@@ -50,9 +27,10 @@ const statusLancamento: Record<string, { label: string; variant: 'aprovada' | 'p
 }
 
 export function AssinantePainel({
-  assinante, onClose, asaasConfigurado, clientesSemAsaas, customersSemCliente, onAlterado,
+  assinante, linha, onClose, asaasConfigurado, clientesSemAsaas, customersSemCliente, onAlterado,
 }: {
   assinante: Assinante | null
+  linha: LinhaRec
   onClose: () => void
   asaasConfigurado: boolean
   clientesSemAsaas: Opcao[]
@@ -132,6 +110,7 @@ export function AssinantePainel({
   if (!assinante) return <Sheet open={false} />
 
   const a = assinante
+  const outraLinha = nomeLinha[linha === 'catalogo_place' ? 'agencia' : 'catalogo_place']
   const primeiroNome = a.nome.split(' ')[0]
   const abertas = (cobrancas ?? []).filter((c) => cobrancaStatus(c.status).aberta)
   const pagas = (cobrancas ?? []).filter((c) => ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(c.status))
@@ -140,7 +119,7 @@ export function AssinantePainel({
   function mensagemFatura(c: CobrancaAsaas) {
     const venc = formatDate(c.vencimento)
     const quando = c.status === 'OVERDUE' ? `que venceu em ${venc}` : `com vencimento em ${venc}`
-    return `Oi ${primeiroNome}! Tudo bem? Segue o link da fatura do Catálogo Place de ${formatCurrency(c.valor)}, ${quando}: ${c.faturaUrl}`
+    return `Oi ${primeiroNome}! Tudo bem? Segue o link da fatura${linha === 'catalogo_place' ? ' do Catálogo Place' : ''} de ${formatCurrency(c.valor)}, ${quando}: ${c.faturaUrl}`
   }
 
   return (
@@ -152,7 +131,7 @@ export function AssinantePainel({
             {a.nome}
           </SheetTitle>
           <SheetDescription className="text-xs text-brand-lavanda/40">
-            {a.empresa ?? (a.soNoAsaas ? 'Cliente só no Asaas' : 'Assinante do Catálogo Place')}
+            {a.empresa ?? (a.soNoAsaas ? 'Cliente só no Asaas' : `Assinante · ${nomeLinha[linha]}`)}
           </SheetDescription>
           <div className="mt-3 flex flex-wrap gap-2">
             {a.clienteId && (
@@ -202,8 +181,8 @@ export function AssinantePainel({
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <Badge variant={st.variant}>{st.label}</Badge>
-                          {!a.soNoAsaas && !a.idsCatalogo.includes(s.id) && (
-                            <Badge variant="outline" title="Não tem &quot;Catálogo&quot; na descrição: é considerada da agência e não entra no MRR do Catálogo.">Agência</Badge>
+                          {!a.soNoAsaas && !a.idsDaLinha.includes(s.id) && (
+                            <Badge variant="outline" title={`É de ${outraLinha} e não entra no MRR de ${nomeLinha[linha]}.`}>{outraLinha}</Badge>
                           )}
                         </div>
                       </div>
@@ -348,7 +327,7 @@ export function AssinantePainel({
               </p>
               {opcoesVinculo.length === 0 ? (
                 <p className="mt-3 text-xs text-brand-lavanda/40">
-                  {a.soNoAsaas ? 'Nenhum cliente do Catálogo Place livre para ligar. Cadastre o cliente primeiro.' : 'Nenhuma assinatura do Asaas sem cliente.'}
+                  {a.soNoAsaas ? 'Nenhum cliente livre para ligar. Cadastre o cliente primeiro.' : 'Nenhuma assinatura do Asaas sem cliente.'}
                 </p>
               ) : (
                 <div className="mt-3 flex gap-2">
