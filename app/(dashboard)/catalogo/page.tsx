@@ -57,7 +57,7 @@ const doCatalogo = (l: Assinante) => (l.soNoAsaas ? l.assinaturas : l.assinatura
 const assinaturaAtiva = (l: Assinante) => doCatalogo(l).find(ativa)
 
 // Próxima cobrança da assinatura ativa do Catálogo (nulo = sem assinatura ativa no Asaas).
-const proximaCobranca = (l: Assinante) => assinaturaAtiva(l)?.proximoVencimento ?? null
+const proximaCobranca = (l: Assinante) => assinaturaAtiva(l)?.proximaCobranca ?? null
 
 // Quem não tem o dado usado na ordenação vai para o fim da lista.
 function comparar(a: Assinante, b: Assinante, ordem: Ordem): number {
@@ -276,7 +276,7 @@ export default function CatalogoPage() {
       ['Cliente', 'Empresa', 'Mensalidade', 'Desde', 'Meses pagos', 'Pago este mês', 'Em atraso', 'Próxima cobrança (Asaas)'],
       visiveis.map((l) => {
         const s = assinaturaAtiva(l)
-        return [l.nome, l.empresa ?? '', l.mensalidade, mesLabel(l.desde), String(l.mesesPagos), l.pagoEsteMes ? 'Sim' : 'Não', l.atraso, s ? formatDate(s.proximoVencimento) : '']
+        return [l.nome, l.empresa ?? '', l.mensalidade, mesLabel(l.desde), String(l.mesesPagos), l.pagoEsteMes ? 'Sim' : 'Não', l.atraso, s ? formatDate(s.proximaCobranca) : '']
       }),
     )
   }
@@ -432,7 +432,10 @@ export default function CatalogoPage() {
                             <td className="px-4 py-3 whitespace-nowrap text-xs">
                               {sub ? (
                                 <>
-                                  <span className="text-brand-lavanda/80">{formatDate(sub.proximoVencimento)}</span>
+                                  <span className="text-brand-lavanda/80">{formatDate(sub.proximaCobranca)}</span>
+                                  {sub.vencidas > 0 && (
+                                    <span className="ml-1.5 text-[11px] text-brand-rosa">+ {sub.vencidas} vencida{sub.vencidas === 1 ? '' : 's'}</span>
+                                  )}
                                   <span className="block text-[11px] text-brand-lavanda/40">{formaLabel[sub.formaPagamento] ?? sub.formaPagamento}</span>
                                 </>
                               ) : asaasCarregando && l.asaasCustomerId ? (

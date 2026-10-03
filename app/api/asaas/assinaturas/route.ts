@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { asaasConfigurado, listarAssinaturas, listarClientesAsaas } from '@/lib/asaas/api'
+import { asaasConfigurado, listarAssinaturas, listarClientesAsaas, listarCobrancasPorStatus } from '@/lib/asaas/api'
 import { usuarioLogado } from '@/lib/asaas/auth'
 
 // Assinaturas do Asaas com o nome/contato do cliente de cada uma.
@@ -10,8 +10,22 @@ export async function GET() {
   if (!asaasConfigurado()) return NextResponse.json({ configurado: false, assinaturas: [] })
 
   try {
-    const [assinaturas, clientes] = await Promise.all([listarAssinaturas(), listarClientesAsaas()])
+    const [assinaturas, clientes, aguardando, vencidas] = await Promise.all([
+      listarAssinaturas(), listarClientesAsaas(), listarCobrancasPorStatus('PENDING'), listarCobrancasPorStatus('OVERDUE'),
+    ])
     const porId = new Map(clientes.map((c) => [c.id, c]))
+    // Fatura aguardando pagamento mais próxima de cada assinatura.
+    const proximaAberta = new Map<string, string>()
+    for (const p of aguardando) {
+      if (!p.subscription || p.deleted) continue
+      const atual = proximaAberta.get(p.subscription)
+      if (!atual || p.dueDate < atual) proximaAberta.set(p.subscription, p.dueDate)
+    }
+    const qtdVencidas = new Map<string, number>()
+    for (const p of vencidas) {
+      if (!p.subscription || p.deleted) continue
+      qtdVencidas.set(p.subscription, (qtdVencidas.get(p.subscription) ?? 0) + 1)
+    }
     return NextResponse.json({
       configurado: true,
       assinaturas: assinaturas
@@ -27,6 +41,8 @@ export async function GET() {
             valor: Number(a.value),
             ciclo: a.cycle,
             proximoVencimento: a.nextDueDate,
+            proximaCobranca: proximaAberta.get(a.id) ?? a.nextDueDate,
+            vencidas: qtdVencidas.get(a.id) ?? 0,
             formaPagamento: a.billingType,
             descricao: a.description,
             criadaEm: a.dateCreated,

@@ -105,6 +105,9 @@ async function listarTudo<T>(recurso: string, filtro = ''): Promise<T[]> {
 export const listarCobrancas = (desde: string) => listarTudo<AsaasPayment>('payments', `dueDate%5Bge%5D=${desde}`)
 
 export const listarAssinaturas = () => listarTudo<AsaasSubscription>('subscriptions')
+
+// Cobranças ainda não pagas de uma situação (PENDING = aguardando, OVERDUE = vencida).
+export const listarCobrancasPorStatus = (status: 'PENDING' | 'OVERDUE') => listarTudo<AsaasPayment>('payments', `status=${status}`)
 export const listarClientesAsaas = () => listarTudo<AsaasCustomer>('customers')
 
 // Faturas de um cliente (das assinaturas e avulsas), mais recentes primeiro.

@@ -8,7 +8,14 @@ export type AssinaturaAsaas = {
   customerTelefone: string | null
   valor: number
   ciclo: string
+  // nextDueDate do Asaas: vencimento da próxima fatura que ele AINDA VAI GERAR.
+  // Como a fatura é gerada com antecedência, pode já estar no mês seguinte.
   proximoVencimento: string
+  // Próxima cobrança de fato: a fatura aguardando pagamento mais próxima
+  // ou, se não houver, a próxima que será gerada.
+  proximaCobranca: string
+  // Faturas vencidas e não pagas desta assinatura.
+  vencidas: number
   formaPagamento: string
   descricao: string | null
   criadaEm: string

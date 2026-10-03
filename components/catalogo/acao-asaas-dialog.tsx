@@ -173,7 +173,7 @@ export function AcaoAsaasDialog({ acao, nome, onClose, onFeito }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="mb-1.5 block text-xs text-brand-lavanda/80">
-                {acao.tipo === 'recebida' ? 'Pago em' : acao.tipo === 'vencimento' ? 'Novo vencimento' : 'Próximo vencimento'}
+                {acao.tipo === 'recebida' ? 'Pago em' : acao.tipo === 'vencimento' ? 'Novo vencimento' : 'Vencimento da próxima fatura a gerar'}
               </Label>
               <Input type="date" value={data} min={acao.tipo === 'recebida' ? undefined : hoje} max={acao.tipo === 'recebida' ? hoje : undefined} onChange={(e) => setData(e.target.value)} />
             </div>

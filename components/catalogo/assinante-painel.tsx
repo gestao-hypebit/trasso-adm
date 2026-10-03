@@ -208,7 +208,7 @@ export function AssinantePainel({
                         </div>
                       </div>
                       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                        <Dado rotulo="Próximo vencimento" valor={s.status === 'ACTIVE' ? formatDate(s.proximoVencimento) : '—'} />
+                        <Dado rotulo="Próxima cobrança" valor={s.status === 'ACTIVE' ? formatDate(s.proximaCobranca) : '—'} />
                         <Dado rotulo="Forma" valor={formaLabel[s.formaPagamento] ?? s.formaPagamento} />
                         <Dado rotulo="Criada em" valor={formatDate(s.criadaEm)} />
                       </dl>
