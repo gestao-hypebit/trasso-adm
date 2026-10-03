@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
-  CheckSquare, Settings, LogOut,
+  Settings, LogOut,
   StickyNote, Inbox, Target, Star, ChevronDown, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -41,7 +41,6 @@ const navItems: NavItem[] = [
     ],
   },
   { href: '/propostas',     icon: FileText,        label: 'Propostas' },
-  { href: '/tarefas',       icon: CheckSquare,     label: 'Tarefas' },
   { href: '/anotacoes',     icon: StickyNote,      label: 'Anotações' },
   { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
 ]

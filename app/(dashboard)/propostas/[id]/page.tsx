@@ -50,6 +50,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
   const [proposta, setProposta] = useState<Proposta | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [erroDelete, setErroDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [agenciaNome, setAgenciaNome] = useState('Trasso')
@@ -69,9 +70,16 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
 
   async function handleDelete() {
     setDeleting(true)
-    const supabase = createClient()
-    await supabase.from('proposta_itens').delete().eq('proposta_id', id)
-    await (supabase as any).from('propostas').delete().eq('id', id)
+    setErroDelete(null)
+    // Função no banco: desfaz o vínculo com contratos antes de apagar.
+    const { error } = await (createClient() as any).rpc('excluir_proposta', { p_proposta_id: id })
+    if (error) {
+      setErroDelete(error.code === 'PGRST202'
+        ? 'A migration de exclusão ainda não foi aplicada no Supabase.'
+        : `Não foi possível excluir: ${error.message}`)
+      setDeleting(false)
+      return
+    }
     router.push('/propostas')
   }
 
@@ -436,8 +444,9 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
           </DialogHeader>
           <p className="text-sm text-brand-lavanda/70">
             Tem certeza que deseja excluir a proposta <span className="font-semibold text-brand-lavanda">{proposta?.numero}</span>?
-            Esta ação não pode ser desfeita.
+            Esta ação não pode ser desfeita. Se ela já virou contrato, o contrato continua existindo.
           </p>
+          {erroDelete && <p className="text-sm text-brand-rosa">{erroDelete}</p>}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
               Cancelar

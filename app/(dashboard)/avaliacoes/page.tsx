@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Star, Copy, Check, ThumbsUp, MessageSquareQuote, Clock } from 'lucide-react'
+import { Star, Copy, Check, ThumbsUp, MessageSquareQuote, Clock, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { KpiCard } from '@/components/dashboard/kpi-card'
@@ -72,6 +72,21 @@ export default function AvaliacoesPage() {
     const { error } = await (createClient() as any).from('avaliacoes').update({ destaque: !a.destaque }).eq('id', a.id)
     if (error) setAvaliacoes((prev) => prev.map((x) => (x.id === a.id ? a : x)))
   }
+
+  // Primeiro clique arma, segundo apaga (mesmo padrão do lead).
+  const [confirmarId, setConfirmarId] = useState<string | null>(null)
+  async function excluir(a: Avaliacao) {
+    if (confirmarId !== a.id) { setConfirmarId(a.id); return }
+    setConfirmarId(null)
+    const { error } = await (createClient() as any).from('avaliacoes').delete().eq('id', a.id)
+    if (error) setErro(`Não foi possível excluir: ${error.message}`)
+    else setAvaliacoes((prev) => prev.filter((x) => x.id !== a.id))
+  }
+  const BotaoExcluir = ({ a }: { a: Avaliacao }) => (
+    <Button size="sm" variant="ghost" onClick={() => excluir(a)} className="text-brand-lavanda/40 hover:text-brand-rosa" aria-label="Excluir avaliação">
+      <Trash2 className="h-3.5 w-3.5" />{confirmarId === a.id && ' Clique de novo'}
+    </Button>
+  )
 
   const respondidas = avaliacoes.filter((a) => a.status === 'respondida' && a.nota !== null)
   const pendentes = avaliacoes.filter((a) => a.status === 'pendente')
@@ -169,7 +184,10 @@ export default function AvaliacoesPage() {
                             <p className="mt-1 text-xs text-brand-lavanda/40">Deixou depoimento, mas não autorizou publicar.</p>
                           )}
                         </div>
-                        <span className="shrink-0 text-xs text-brand-lavanda/40">{formatDate(a.respondida_em)}</span>
+                        <div className="flex shrink-0 items-start gap-1">
+                          <span className="pt-2 text-xs text-brand-lavanda/40">{formatDate(a.respondida_em)}</span>
+                          <BotaoExcluir a={a} />
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -188,7 +206,10 @@ export default function AvaliacoesPage() {
                           <p className="text-sm text-brand-lavanda">{a.clientes?.nome}{a.projetos && <span className="text-brand-lavanda/50"> · {a.projetos.nome}</span>}</p>
                           <p className="text-xs text-brand-lavanda/40">Pedida em {formatDate(a.solicitada_em)} <Badge variant="pendente" className="ml-1">Pendente</Badge></p>
                         </div>
-                        <PortalLinkAcoes cliente={a.clientes} mensagem="Seu projeto foi concluído! Pode avaliar nosso trabalho? Leva 1 minuto:" />
+                        <div className="flex flex-wrap items-center gap-1">
+                          <PortalLinkAcoes cliente={a.clientes} mensagem="Seu projeto foi concluído! Pode avaliar nosso trabalho? Leva 1 minuto:" />
+                          <BotaoExcluir a={a} />
+                        </div>
                       </li>
                     ))}
                   </ul>

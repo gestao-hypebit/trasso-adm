@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { RentabilidadeProjeto } from '@/components/projetos/rentabilidade-projeto'
 import { OnboardingProjeto } from '@/components/projetos/onboarding-projeto'
 import { EntregasProjeto } from '@/components/projetos/entregas-projeto'
+import { ExcluirProjetoDialog } from '@/components/projetos/excluir-projeto-dialog'
 import type { ClientePortal } from '@/components/projetos/portal-link-acoes'
 
 const TAREFA_VAZIA = { titulo: '', prioridade: 'media', data_vencimento: '', descricao: '' }
@@ -107,11 +108,14 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
           </Link>
-          <Link href={`/projetos/${id}/editar`}>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Edit className="h-4 w-4" /> Editar
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <ExcluirProjetoDialog projetoId={id} nome={projeto.nome} />
+            <Link href={`/projetos/${id}/editar`}>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Edit className="h-4 w-4" /> Editar
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <Card className="mb-6">
