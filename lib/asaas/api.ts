@@ -18,12 +18,21 @@ export type AsaasPayment = {
   clientPaymentDate: string | null
   billingType: string
   invoiceUrl: string | null
+  bankSlipUrl?: string | null
+  invoiceNumber?: string | null
   description: string | null
   deleted?: boolean
 }
 
 export type AsaasSubscription = {
   id: string
+  customer: string
+  value: number
+  nextDueDate: string
+  cycle: string // MONTHLY | WEEKLY | BIWEEKLY | QUARTERLY | SEMIANNUALLY | YEARLY
+  billingType: string
+  description: string | null
+  dateCreated: string
   status: string // ACTIVE | INACTIVE | EXPIRED
   deleted?: boolean
 }
@@ -33,6 +42,8 @@ export type AsaasCustomer = {
   name: string
   email: string | null
   cpfCnpj: string | null
+  mobilePhone?: string | null
+  phone?: string | null
 }
 
 const baseUrl = () =>
@@ -58,15 +69,27 @@ export const buscarCobranca = (id: string) => asaasGet<AsaasPayment>(`/payments/
 export const buscarClienteAsaas = (id: string) => asaasGet<AsaasCustomer>(`/customers/${encodeURIComponent(id)}`)
 export const buscarAssinatura = (id: string) => asaasGet<AsaasSubscription>(`/subscriptions/${encodeURIComponent(id)}`)
 
-// Todas as cobranças com vencimento a partir de `desde` (YYYY-MM-DD).
-export async function listarCobrancas(desde: string): Promise<AsaasPayment[]> {
-  const todas: AsaasPayment[] = []
+// Percorre todas as páginas de uma listagem (`filtro` já vem codificado).
+async function listarTudo<T>(recurso: string, filtro = ''): Promise<T[]> {
+  const todas: T[] = []
   for (let offset = 0; ; offset += 100) {
-    const pagina = await asaasGet<{ data: AsaasPayment[]; hasMore: boolean }>(
-      `/payments?dueDate%5Bge%5D=${desde}&limit=100&offset=${offset}`,
+    const pagina = await asaasGet<{ data: T[]; hasMore: boolean }>(
+      `/${recurso}?${filtro ? `${filtro}&` : ''}limit=100&offset=${offset}`,
     )
     todas.push(...pagina.data)
     if (!pagina.hasMore || offset > 10_000) break
   }
   return todas
+}
+
+// Todas as cobranças com vencimento a partir de `desde` (YYYY-MM-DD).
+export const listarCobrancas = (desde: string) => listarTudo<AsaasPayment>('payments', `dueDate%5Bge%5D=${desde}`)
+
+export const listarAssinaturas = () => listarTudo<AsaasSubscription>('subscriptions')
+export const listarClientesAsaas = () => listarTudo<AsaasCustomer>('customers')
+
+// Faturas de um cliente (das assinaturas e avulsas), mais recentes primeiro.
+export async function cobrancasDoCliente(customerId: string): Promise<AsaasPayment[]> {
+  const todas = await listarTudo<AsaasPayment>('payments', `customer=${encodeURIComponent(customerId)}`)
+  return todas.sort((a, b) => b.dueDate.localeCompare(a.dueDate))
 }
