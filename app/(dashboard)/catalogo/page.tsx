@@ -192,6 +192,9 @@ export default function CatalogoPage() {
     return {
       mrr, linhas,
       totalAtraso: emAtraso.reduce((s, l) => s + l.atraso, 0),
+      // Assinaturas = quem tem mensalidade recente ou está devendo.
+      totalAssinaturas: doSistema.filter((l) => l.ativo || l.atraso > 0).length,
+      inadimplentes: emAtraso.length,
       contagem: {
         ativos: doSistema.filter((l) => l.ativo).length,
         aguardando: doSistema.filter((l) => l.ativo && !l.pagoEsteMes).length,
@@ -223,9 +226,9 @@ export default function CatalogoPage() {
     .sort((a, b) => comparar(a, b, ordem) || a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const abas: { key: Aba; label: string }[] = [
-    { key: 'ativos', label: 'Pagando' },
+    { key: 'ativos', label: 'Ativas' },
     { key: 'aguardando', label: 'Aguardando este mês' },
-    { key: 'atraso', label: 'Em atraso' },
+    { key: 'atraso', label: 'Inadimplentes' },
     { key: 'sem_mensalidade', label: 'Sem mensalidade' },
     ...(calc.contagem.so_asaas > 0 ? [{ key: 'so_asaas' as Aba, label: 'Só no Asaas' }] : []),
     { key: 'todos', label: 'Todos' },
@@ -277,10 +280,29 @@ export default function CatalogoPage() {
           <div className="space-y-5">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <KpiCard title="MRR" value={formatCurrency(calc.mrr.mrr)} icon={Repeat} iconColor="text-brand-lima" />
-              <KpiCard title="Assinantes pagando" value={String(calc.contagem.ativos)} icon={Users} />
+              <KpiCard
+                title="Assinaturas"
+                value={String(calc.totalAssinaturas)}
+                icon={Users}
+                sub={<>
+                  <span className="text-brand-lima/80">{calc.totalAssinaturas - calc.inadimplentes} em dia</span>
+                  {' · '}
+                  <span className={calc.inadimplentes > 0 ? 'text-brand-rosa' : undefined}>{calc.inadimplentes} inadimplente{calc.inadimplentes === 1 ? '' : 's'}</span>
+                </>}
+              />
               <KpiCard title="Novos este mês" value={String(mov.novos)} icon={UserPlus} />
               <KpiCard title="Cancelaram mês passado" value={String(passado.churn)} icon={UserMinus} iconColor={passado.churn > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/40'} />
-              <KpiCard title="Em atraso" value={formatCurrency(calc.totalAtraso)} icon={AlertTriangle} iconColor={calc.totalAtraso > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/40'} />
+              <button type="button" onClick={() => setAba('atraso')} className="text-left" title="Ver inadimplentes">
+                <KpiCard
+                  title="Inadimplência"
+                  value={formatCurrency(calc.totalAtraso)}
+                  icon={AlertTriangle}
+                  iconColor={calc.totalAtraso > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/40'}
+                  sub={calc.inadimplentes > 0
+                    ? <span className="text-brand-rosa/80">{calc.inadimplentes} cliente{calc.inadimplentes === 1 ? '' : 's'} em atraso · ver lista</span>
+                    : 'Ninguém em atraso'}
+                />
+              </button>
             </div>
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -405,7 +427,7 @@ export default function CatalogoPage() {
             </Card>
 
             <p className="text-[11px] text-brand-lavanda/40">
-              Clique num assinante para ver a assinatura e as faturas do Asaas. Pagando = tem mensalidade lançada neste mês ou no anterior.
+              Clique num assinante para ver a assinatura e as faturas do Asaas. Ativas = tem mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga.
               &quot;Sem mensalidade&quot; = cliente do Catálogo sem mensalidade recente: pode ter cancelado ou faltar lançar.
               {calc.semCliente > 0 && ` ${calc.semCliente} assinante(s) aparecem só pela descrição do lançamento, sem cliente cadastrado; nos próximos lançamentos, escolha o cliente.`}
             </p>
