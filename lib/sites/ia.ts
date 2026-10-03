@@ -56,19 +56,53 @@ export function gerarConteudo(b: Briefing): Promise<Conteudo> {
 }
 
 // Etapa 2: o site em HTML. Devolve o stream para a tela acompanhar a geração.
-export function gerarHtml(b: Briefing, conteudo: Conteudo) {
+// Com `parcial`, a geração anterior foi interrompida (tempo máximo da função):
+// a IA recebe o que já escreveu e continua do ponto exato, sem recomeçar.
+export function gerarHtml(b: Briefing, conteudo: Conteudo, parcial?: string | null) {
+  const pedido = `Crie a prévia do site.
+
+Briefing:
+${descreverBriefing(b, { visual: true })}
+
+Textos aprovados (JSON):
+${JSON.stringify(conteudo, null, 2)}
+
+Ano atual: ${new Date().getFullYear()}`
+  const continuacao = parcial
+    ? `
+
+Você já começou este HTML e a escrita foi interrompida. Abaixo está tudo o que já foi escrito, entre as marcas INICIO e FIM (as marcas não fazem parte do HTML).
+
+INICIO
+${parcial}
+FIM
+
+Continue exatamente a partir do último caractere antes de FIM, mantendo o mesmo design. Escreva só o que falta até </html>: não repita nada do que já está escrito, não recomece o documento e não use cercas de markdown.`
+    : ''
   return client.beta.messages.stream({
     model: MODELO,
     max_tokens: 64000,
     ...FALLBACK,
     thinking: { type: 'adaptive' },
-    output_config: { effort: 'high' },
+    output_config: { effort: 'medium' },
     system: sistema(SISTEMA_HTML),
-    messages: [{
-      role: 'user',
-      content: `Crie a prévia do site.\n\nBriefing:\n${descreverBriefing(b, { visual: true })}\n\nTextos aprovados (JSON):\n${JSON.stringify(conteudo, null, 2)}\n\nAno atual: ${new Date().getFullYear()}`,
-    }],
+    messages: [{ role: 'user', content: pedido + continuacao }],
   })
+}
+
+// Junta a continuação ao que já existia, descartando o trecho que a IA
+// eventualmente repetiu no começo da continuação.
+export function juntarContinuacao(base: string, continuacao: string) {
+  const resto = continuacao.replace(/^\s*```(?:html)?[^\S\n]*\n?/i, '')
+  for (let k = Math.min(2000, base.length, resto.length); k >= 20; k--) {
+    if (base.endsWith(resto.slice(0, k))) return base + resto.slice(k)
+  }
+  return base + resto
+}
+
+export function verificarResposta(msg: Anthropic.Beta.BetaMessage) {
+  verificarParada(msg)
+  return textoDe(msg)
 }
 
 // Tira cercas de markdown e qualquer texto fora do documento.
@@ -77,12 +111,6 @@ export function limparHtml(texto: string) {
   const fim = texto.toLowerCase().lastIndexOf('</html>')
   if (inicio === -1 || fim === -1) throw new IaErro('A IA não devolveu um HTML completo. Tente gerar de novo.')
   return texto.slice(inicio, fim + '</html>'.length)
-}
-
-export async function finalizarHtml(stream: ReturnType<typeof gerarHtml>) {
-  const msg = await stream.finalMessage()
-  verificarParada(msg)
-  return limparHtml(textoDe(msg))
 }
 
 function aplicarEdicoes(html: string, edicoes: Edicao['edicoes']) {

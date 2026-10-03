@@ -20,10 +20,13 @@ import { cn, formatDate, whatsappUrl } from '@/lib/utils'
 
 type Previa = {
   id: string; nome: string; slug: string; briefing: Briefing; conteudo: Conteudo | null; status: string; erro: string | null
-  html: string | null; versao_atual: number; publicada: boolean; visualizacoes: number; ultima_visualizacao: string | null
+  html: string | null; html_parcial: string | null; updated_at: string; versao_atual: number; publicada: boolean; visualizacoes: number; ultima_visualizacao: string | null
   clientes: { nome: string; telefone: string | null; whatsapp: string | null } | null
   leads: { nome: string; telefone: string | null } | null
 }
+const PARADO_MS = 30000 // sem progresso salvo por esse tempo = a geração caiu
+const MAX_RODADAS = 6
+
 type Versao = { numero: number; instrucao: string | null; created_at: string }
 type Aba = 'textos' | 'ajustes' | 'versoes'
 
@@ -75,12 +78,19 @@ export function PreviaWorkspace({ id, autoGerar }: { id: string; autoGerar: bool
 
   useEffect(() => { carregar() }, [carregar])
 
-  // Geração que continuou no servidor (tela recarregada no meio): acompanha até terminar.
+  // Geração que continuou no servidor (tela recarregada no meio): acompanha até
+  // terminar. Se o servidor parar de salvar progresso, a geração caiu.
+  const [interrompida, setInterrompida] = useState(false)
+  const sinal = useRef({ valor: '', desde: 0 })
   useEffect(() => {
-    if (previa?.status !== 'gerando' || ocupado) return
-    const t = setInterval(carregar, 5000)
+    if (previa?.status !== 'gerando' || ocupado) { setInterrompida(false); return }
+    if (previa.updated_at !== sinal.current.valor) sinal.current = { valor: previa.updated_at, desde: Date.now() }
+    const t = setInterval(() => {
+      if (Date.now() - sinal.current.desde > PARADO_MS) setInterrompida(true)
+      else carregar()
+    }, 5000)
     return () => clearInterval(t)
-  }, [previa?.status, ocupado, carregar])
+  }, [previa?.status, previa?.updated_at, ocupado, carregar])
 
   const gerarTextos = useCallback(async () => {
     setOcupado('conteudo'); setErro(null); setAviso(null)
@@ -113,20 +123,23 @@ export function PreviaWorkspace({ id, autoGerar }: { id: string; autoGerar: bool
     return true
   }
 
-  async function gerarSite() {
-    setErro(null); setAviso(null); setVerVersao(null)
-    if (sujo && !(await salvarTextos())) return
-    setOcupado('gerar'); setParcial(''); setTamanho(0)
+  // Uma rodada de geração: lê o HTML chegando e mostra a prévia parcial.
+  // Se a função do servidor cair no meio, a conexão fecha e a rodada só termina.
+  async function rodarGeracao(continuar: boolean) {
+    const res = await fetch(`/api/sites/${id}/gerar`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ continuar }),
+    })
+    if (!res.ok || !res.body) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error ?? `Erro ${res.status}`)
+    }
+    const leitor = res.body.getReader()
+    const decoder = new TextDecoder()
+    let texto = ''
+    let ultimaPintura = 0
     try {
-      const res = await fetch(`/api/sites/${id}/gerar`, { method: 'POST' })
-      if (!res.ok || !res.body) {
-        const json = await res.json().catch(() => ({}))
-        throw new Error(json.error ?? `Erro ${res.status}`)
-      }
-      const leitor = res.body.getReader()
-      const decoder = new TextDecoder()
-      let texto = ''
-      let ultimaPintura = 0
       for (;;) {
         const { done, value } = await leitor.read()
         if (done) break
@@ -135,8 +148,43 @@ export function PreviaWorkspace({ id, autoGerar }: { id: string; autoGerar: bool
         // Redesenha a prévia parcial no máximo a cada 1,5 s (evita piscar).
         if (Date.now() - ultimaPintura > 1500) { setParcial(texto); ultimaPintura = Date.now() }
       }
-      const marcaErro = texto.match(/<!--ERRO:([\s\S]*?)-->\s*$/)
-      if (marcaErro) throw new Error(marcaErro[1])
+    } catch {
+      // Conexão caiu (tempo máximo da função): quem decide o próximo passo é o banco.
+    }
+    setParcial(texto)
+    const marcaErro = texto.match(/<!--ERRO:([\s\S]*?)-->\s*$/)
+    if (marcaErro) throw new Error(marcaErro[1])
+  }
+
+  // Depois da rodada, olha o banco: terminou, deu erro ou parou no meio?
+  // "Parou" = o servidor ficou PARADO_MS sem salvar progresso.
+  async function esperarResultado(): Promise<'pronto' | 'parou'> {
+    const db = createClient() as any
+    let ultimoSinal = ''
+    let desde = Date.now()
+    for (;;) {
+      const { data } = await db.from('site_previas').select('status, erro, html_parcial, updated_at').eq('id', id).maybeSingle()
+      if (!data) throw new Error('Prévia não encontrada.')
+      if (data.status === 'pronto' && !data.html_parcial) return 'pronto'
+      if (data.status === 'erro' || (data.erro && data.status !== 'gerando')) throw new Error(data.erro ?? 'Falha ao gerar o site.')
+      if (data.updated_at !== ultimoSinal) { ultimoSinal = data.updated_at; desde = Date.now() }
+      if (Date.now() - desde > PARADO_MS) return 'parou'
+      await new Promise((ok) => setTimeout(ok, 4000))
+    }
+  }
+
+  async function gerarSite(continuar = false) {
+    setErro(null); setAviso(null); setVerVersao(null)
+    if (!continuar && sujo && !(await salvarTextos())) return
+    setOcupado('gerar'); setParcial(''); setTamanho(0)
+    try {
+      let concluido = false
+      for (let rodada = 0; rodada < MAX_RODADAS && !concluido; rodada++) {
+        await rodarGeracao(continuar || rodada > 0)
+        if ((await esperarResultado()) === 'pronto') concluido = true
+        else setAviso('A geração passou do tempo máximo do servidor. Continuando de onde parou…')
+      }
+      if (!concluido) throw new Error('A geração não terminou depois de várias tentativas. Tente de novo.')
       setAviso('Site gerado! Copie o link e mande para o cliente, ou peça ajustes.')
       setAba('ajustes')
     } catch (e) {
@@ -285,7 +333,7 @@ export function PreviaWorkspace({ id, autoGerar }: { id: string; autoGerar: bool
                 <>
                   <ConteudoEditor valor={conteudo} onChange={(c) => { setConteudo(c); setSujo(true) }} />
                   <div className="sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t border-white/[0.06] bg-brand-noite/95 px-4 py-3 backdrop-blur">
-                    <Button onClick={gerarSite} disabled={!!ocupado} className="flex-1">
+                    <Button onClick={() => gerarSite()} disabled={!!ocupado} className="flex-1">
                       {ocupado === 'gerar' ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando site…</> : <><Sparkles className="h-4 w-4" /> {previa.html ? 'Gerar site de novo' : 'Gerar site'}</>}
                     </Button>
                     {sujo && <Button variant="outline" onClick={salvarTextos} disabled={!!ocupado}>Salvar textos</Button>}
@@ -431,7 +479,15 @@ export function PreviaWorkspace({ id, autoGerar }: { id: string; autoGerar: bool
                 />
               ) : (
                 <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-2 bg-brand-noite text-center text-sm text-brand-lavanda/40">
-                  {ocupado === 'gerar' || previa.status === 'gerando'
+                  {interrompida ? (
+                    <>
+                      <p className="text-brand-lavanda/70">A geração foi interrompida no meio.</p>
+                      <div className="mt-2 flex gap-2">
+                        {previa.html_parcial && <Button size="sm" onClick={() => gerarSite(true)}><Sparkles className="h-3.5 w-3.5" /> Continuar de onde parou</Button>}
+                        <Button size="sm" variant={previa.html_parcial ? 'outline' : 'default'} onClick={() => gerarSite(false)}><RotateCcw className="h-3.5 w-3.5" /> Gerar do zero</Button>
+                      </div>
+                    </>
+                  ) : ocupado === 'gerar' || previa.status === 'gerando'
                     ? <><Loader2 className="h-5 w-5 animate-spin text-brand-lima" /> A IA está montando o site (1 a 3 minutos)…</>
                     : 'A prévia aparece aqui depois de gerar o site.'}
                 </div>

@@ -13,6 +13,7 @@ export type PreviaRow = {
   conteudo: Conteudo | null
   status: string
   html: string | null
+  html_parcial: string | null
   versao_atual: number
 }
 
@@ -23,7 +24,7 @@ export async function abrirPrevia(id: string): Promise<{ erro: NextResponse } | 
   const supabase = createServiceClient() as any
   const { data, error } = await supabase
     .from('site_previas')
-    .select('id, nome, slug, briefing, conteudo, status, html, versao_atual')
+    .select('id, nome, slug, briefing, conteudo, status, html, html_parcial, versao_atual')
     .eq('id', id)
     .maybeSingle()
   if (error) return { erro: NextResponse.json({ error: error.message }, { status: 500 }) }
