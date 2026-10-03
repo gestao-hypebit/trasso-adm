@@ -22,7 +22,7 @@ type Cliente = {
   id: string; nome: string; empresa: string | null; whatsapp: string | null; telefone: string | null
   status: string; created_at: string; tipo: string; asaas_customer_id?: string | null
 }
-type Lanc = LancamentoMrr & { categoria_id: string | null }
+type Lanc = LancamentoMrr & { categoria_id: string | null; asaas_payment_id?: string | null }
 
 type Aba = 'ativos' | 'aguardando' | 'atraso' | 'sem_mensalidade' | 'so_asaas' | 'todos'
 type Ordem = 'vencimento' | 'nome' | 'nome_desc' | 'mensalidade_desc' | 'mensalidade' | 'atraso' | 'antigos' | 'recentes'
@@ -46,11 +46,14 @@ const mesLabel = (mesKey: string | null) => {
 
 const ativa = (s: AssinaturaAsaas) => s.status === 'ACTIVE'
 
-// No Asaas também há assinaturas da agência (software, social…). Cliente do tipo
-// "saas" só tem Catálogo; cliente "ambos" pode ter as duas, então lá só conta a
-// assinatura que diz "Catálogo" na descrição.
+// No Asaas também há assinaturas da agência (software, social…). Uma assinatura é
+// do Catálogo quando:
+//   - o cliente é do tipo "saas" (só tem Catálogo); ou
+//   - alguma fatura dela está ligada a um lançamento do Catálogo no financeiro; ou
+//   - a descrição dela fala em "Catálogo".
 const CATALOGO_RE = /cat[aá]logo/i
-const ehDoCatalogo = (s: AssinaturaAsaas, tipoCliente: string) => tipoCliente === 'saas' || CATALOGO_RE.test(s.descricao ?? '')
+const ehDoCatalogo = (s: AssinaturaAsaas, tipoCliente: string, faturasCatalogo: Set<string>) =>
+  tipoCliente === 'saas' || s.cobrancasRecentes.some((id) => faturasCatalogo.has(id)) || CATALOGO_RE.test(s.descricao ?? '')
 
 // Assinaturas que contam para o Catálogo (para quem só está no Asaas, todas).
 const doCatalogo = (l: Assinante) => (l.soNoAsaas ? l.assinaturas : l.assinaturas.filter((s) => l.idsCatalogo.includes(s.id)))
@@ -99,7 +102,7 @@ export default function CatalogoPage() {
     const [resClientes, { data: l, error }, { data: cats }, { data: ligados }] = await Promise.all([
       supabase.from('clientes').select(`${camposCliente}, asaas_customer_id`).in('tipo', ['saas', 'ambos']).order('nome'),
       supabase.from('lancamentos')
-        .select('valor, data, status, descricao, cliente_id, categoria_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
+        .select('valor, data, status, descricao, cliente_id, categoria_id, asaas_payment_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
         .eq('tipo', 'receita')
         .eq('frente', 'catalogo_place'),
       supabase.from('categorias_financeiras').select('id').eq('tipo', 'receita').eq('recorrente', true),
@@ -112,6 +115,13 @@ export default function CatalogoPage() {
       c = r.data
     }
     if (error) setErro('Não foi possível carregar as mensalidades. A migration de frentes (20261007000000_frentes.sql) já foi aplicada no Supabase?')
+    // Cliente com mensalidade do Catálogo também entra, mesmo cadastrado com outro tipo.
+    const jaListados = new Set((c ?? []).map((x: Cliente) => x.id))
+    const faltando = [...new Set((l ?? []).map((x: Lanc) => x.cliente_id).filter((id: string | null): id is string => !!id && !jaListados.has(id)))]
+    if (faltando.length) {
+      const r = await supabase.from('clientes').select(resClientes.error ? camposCliente : `${camposCliente}, asaas_customer_id`).in('id', faltando)
+      c = [...(c ?? []), ...(r.data ?? [])].sort((a: Cliente, b: Cliente) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }
     setClientes(c ?? [])
     setLancamentos(l ?? [])
     setRecorrentes((cats ?? []).map((x: { id: string }) => x.id))
@@ -139,12 +149,14 @@ export default function CatalogoPage() {
     const mensalidades = lancamentos.filter((l) => l.categoria_id && recorrentes.includes(l.categoria_id))
     const mrr = calcularMrr(mensalidades, hoje)
     const assinaturas = asaas?.assinaturas ?? []
+    const faturasCatalogo = new Set(lancamentos.map((l) => l.asaas_payment_id).filter((id): id is string => !!id))
+    const doCat = (s: AssinaturaAsaas, tipo: string) => ehDoCatalogo(s, tipo, faturasCatalogo)
     // Assinaturas do cliente: as do Catálogo primeiro, ativas antes das canceladas.
     const assinaturasDo = (c: Cliente) => {
       if (!c.asaas_customer_id) return { todas: [] as AssinaturaAsaas[], catalogo: [] as AssinaturaAsaas[] }
-      const peso = (s: AssinaturaAsaas) => Number(ehDoCatalogo(s, c.tipo)) * 2 + Number(ativa(s))
+      const peso = (s: AssinaturaAsaas) => Number(doCat(s, c.tipo)) * 2 + Number(ativa(s))
       const todas = assinaturas.filter((s) => s.customerId === c.asaas_customer_id).sort((a, b) => peso(b) - peso(a))
-      return { todas, catalogo: todas.filter((s) => ehDoCatalogo(s, c.tipo)) }
+      return { todas, catalogo: todas.filter((s) => doCat(s, c.tipo)) }
     }
     const asaasCarregado = !!asaas?.configurado && !erroAsaas && asaas.assinaturas.length > 0
 
@@ -208,7 +220,7 @@ export default function CatalogoPage() {
         mensalidade: subs.filter(ativa).reduce((t, s) => t + valorMensal(s), 0), desde: null, mesesPagos: 0,
         pagoEsteMes: false, ativo: subs.some(ativa), atraso: 0, diasAtraso: 0, status: null,
         asaasCustomerId: customerId, assinaturas: subs.sort((a, b) => Number(ativa(b)) - Number(ativa(a))),
-        idsCatalogo: subs.filter((s) => CATALOGO_RE.test(s.descricao ?? '')).map((s) => s.id), fonte: 'asaas',
+        idsCatalogo: subs.filter((s) => doCat(s, '')).map((s) => s.id), fonte: 'asaas',
         historico: [], soNoAsaas: true,
       })
     }
@@ -216,16 +228,19 @@ export default function CatalogoPage() {
     const doSistema = linhas.filter((l) => !l.soNoAsaas)
     const emAtraso = doSistema.filter((l) => l.atraso > 0)
     const ativas = doSistema.filter((l) => l.ativo)
-    // Assinaturas de clientes "ambos" sem "Catálogo" na descrição: ficam fora do MRR.
+    // Assinaturas ativas de clientes que também são da agência e não foram reconhecidas como do Catálogo.
     const foraDoCatalogo = clientes
-      .filter((c) => c.tipo === 'ambos')
-      .flatMap((c) => assinaturasDo(c).todas.filter((s) => ativa(s) && !ehDoCatalogo(s, c.tipo))).length
+      .filter((c) => c.tipo !== 'saas')
+      .flatMap((c) => assinaturasDo(c).todas.filter((s) => ativa(s) && !doCat(s, c.tipo))).length
+    // Clientes com mensalidade do Catálogo cadastrados com outro tipo (ex.: só "Agência").
+    const tipoErrado = clientes.filter((c) => c.tipo !== 'saas' && c.tipo !== 'ambos')
     return {
       mrr, linhas,
       mrrCatalogo: ativas.reduce((t, l) => t + l.mensalidade, 0),
       viaAsaas: ativas.filter((l) => l.fonte === 'asaas').length,
       viaFinanceiro: ativas.filter((l) => l.fonte === 'financeiro').length,
       foraDoCatalogo,
+      tipoErrado,
       asaasCarregado,
       totalAtraso: emAtraso.reduce((s, l) => s + l.atraso, 0),
       // Assinaturas = quem tem mensalidade recente ou está devendo.
@@ -308,6 +323,17 @@ export default function CatalogoPage() {
           <p className="mb-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-xs text-brand-lavanda/50">
             O Asaas não está configurado no servidor: a lista usa só os lançamentos do financeiro. Veja em <Link href="/catalogo/asaas" className="text-brand-lima hover:underline">Integração Asaas</Link>.
           </p>
+        )}
+
+        {!loading && calc.tipoErrado.length > 0 && (
+          <div className="mb-4 rounded-xl border border-yellow-400/20 bg-yellow-400/[0.05] px-4 py-2.5 text-sm text-brand-lavanda/80">
+            <AlertTriangle className="mr-1.5 inline h-4 w-4 text-yellow-400" />
+            {calc.tipoErrado.length === 1 ? 'Este cliente tem' : 'Estes clientes têm'} mensalidade do Catálogo, mas {calc.tipoErrado.length === 1 ? 'está cadastrado' : 'estão cadastrados'} só como Agência:{' '}
+            {calc.tipoErrado.map((c, i) => (
+              <span key={c.id}>{i > 0 && ', '}<Link href={`/clientes/${c.id}`} className="font-medium text-brand-lavanda hover:text-brand-lima">{c.nome.trim()}</Link></span>
+            ))}
+            . Mude o tipo para &quot;Agência + Catálogo&quot; no cadastro.
+          </div>
         )}
 
         {loading ? (
@@ -480,7 +506,7 @@ export default function CatalogoPage() {
             <p className="text-[11px] text-brand-lavanda/40">
               Clique num assinante para ver a assinatura e as faturas do Asaas.
               MRR bruto = soma das assinaturas do Catálogo ativas no Asaas (valor cobrado, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro. MRR líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas.
-              {calc.foraDoCatalogo > 0 && ` ${calc.foraDoCatalogo} assinatura(s) de clientes "Agência + Catálogo" sem "Catálogo" na descrição ficaram de fora (são consideradas da agência).`} Ativas = tem mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga.
+              {calc.foraDoCatalogo > 0 && ` ${calc.foraDoCatalogo} assinatura(s) de clientes que também são da agência foram consideradas da agência e ficaram fora do MRR (nenhuma fatura delas está ligada a um lançamento do Catálogo).`} Ativas = tem mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga.
               &quot;Sem mensalidade&quot; = cliente do Catálogo sem mensalidade recente: pode ter cancelado ou faltar lançar.
               {calc.semCliente > 0 && ` ${calc.semCliente} assinante(s) aparecem só pela descrição do lançamento, sem cliente cadastrado; nos próximos lançamentos, escolha o cliente.`}
             </p>

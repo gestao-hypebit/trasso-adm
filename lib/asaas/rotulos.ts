@@ -16,6 +16,9 @@ export type AssinaturaAsaas = {
   proximaCobranca: string
   // Faturas vencidas e não pagas desta assinatura.
   vencidas: number
+  // Ids das faturas recentes (últimos ~2 meses e em aberto): servem para saber,
+  // pelos lançamentos ligados a elas, de que linha de receita é a assinatura.
+  cobrancasRecentes: string[]
   formaPagamento: string
   descricao: string | null
   criadaEm: string
