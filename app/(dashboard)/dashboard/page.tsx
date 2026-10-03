@@ -13,6 +13,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
+import { useFrente, filtrarLancamentos, tiposDeCliente } from '@/components/layout/frente'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -77,14 +78,21 @@ export default function DashboardPage() {
   const mesLabel = allTime ? 'Desde o início' : format(mesSel, 'MMMM yyyy', { locale: ptBR })
   const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
+  const { frente, pronto } = useFrente()
+
   useEffect(() => {
+    if (!pronto) return
     const supabase = createClient() as any
+    const tipos = tiposDeCliente(frente)
+    // Projetos e propostas são da agência: na visão Catálogo Place ficam de fora.
+    const soAgencia = <T,>(q: T) => (frente === 'catalogo_place' ? Promise.resolve({ data: [] }) : q)
     async function load() {
+      setLoading(true)
       const [{ data: l }, { data: p }, { data: prop }, { data: cl }, { data: interacoes }, { data: propAprovadas }, { data: contratosAssinados }, { data: tarefasConcluidas }] = await Promise.all([
-        supabase.from('lancamentos').select('tipo, valor, data, status, descricao, categorias_financeiras(nome)').order('data', { ascending: true }),
-        supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false }),
-        supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao']),
-        supabase.from('clientes').select('id, created_at'),
+        filtrarLancamentos(supabase.from('lancamentos').select('tipo, valor, data, status, descricao, categorias_financeiras(nome)'), frente).order('data', { ascending: true }),
+        soAgencia(supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false })),
+        soAgencia(supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao'])),
+        tipos ? supabase.from('clientes').select('id, created_at').in('tipo', tipos) : supabase.from('clientes').select('id, created_at'),
         supabase.from('interacoes').select('id, titulo, data, clientes(id, nome)').order('data', { ascending: false }).limit(8),
         supabase.from('propostas').select('id, numero, titulo, aprovada_em, clientes(nome)').not('aprovada_em', 'is', null).order('aprovada_em', { ascending: false }).limit(8),
         supabase.from('contratos').select('id, numero, titulo, assinado_em, clientes(nome)').not('assinado_em', 'is', null).order('assinado_em', { ascending: false }).limit(8),
@@ -118,7 +126,7 @@ export default function DashboardPage() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [frente, pronto])
 
   // KPIs do mês selecionado
   const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)

@@ -219,8 +219,8 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="agencia">Agência</SelectItem>
-                        <SelectItem value="saas">SaaS</SelectItem>
-                        <SelectItem value="ambos">Agência + SaaS</SelectItem>
+                        <SelectItem value="saas">Catálogo Place</SelectItem>
+                        <SelectItem value="ambos">Agência + Catálogo Place</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

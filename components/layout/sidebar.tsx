@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   Settings, LogOut,
-  StickyNote, Inbox, Target, Star, ChevronDown, X,
+  StickyNote, Inbox, Target, Star, Store, ChevronDown, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -15,21 +15,25 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { useMobileNav } from '@/components/layout/mobile-nav'
+import { useFrente, frenteOpcoes, type Frente } from '@/components/layout/frente'
 
 type NavItem = {
   href: string
   icon: typeof LayoutDashboard
   label: string
   children?: { href: string; label: string }[]
+  // Frentes em que o item aparece. Sem a chave, aparece em todas.
+  frentes?: Frente[]
 }
 
 const navItems: NavItem[] = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/metas',         icon: Target,          label: 'Metas' },
   { href: '/clientes',      icon: Users,           label: 'Clientes' },
-  { href: '/leads',         icon: Inbox,           label: 'Leads' },
-  { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
-  { href: '/avaliacoes',    icon: Star,            label: 'Avaliações' },
+  { href: '/catalogo',      icon: Store,           label: 'Catálogo Place', frentes: ['catalogo_place', 'todas'] },
+  { href: '/leads',         icon: Inbox,           label: 'Leads',          frentes: ['agencia', 'todas'] },
+  { href: '/projetos',      icon: FolderOpen,      label: 'Projetos',       frentes: ['agencia', 'todas'] },
+  { href: '/avaliacoes',    icon: Star,            label: 'Avaliações',     frentes: ['agencia', 'todas'] },
   {
     href: '/financeiro', icon: DollarSign, label: 'Financeiro',
     children: [
@@ -40,7 +44,7 @@ const navItems: NavItem[] = [
       { href: '/financeiro/mrr',            label: 'MRR' },
     ],
   },
-  { href: '/propostas',     icon: FileText,        label: 'Propostas' },
+  { href: '/propostas',     icon: FileText,        label: 'Propostas',      frentes: ['agencia', 'todas'] },
   { href: '/anotacoes',     icon: StickyNote,      label: 'Anotações' },
   { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
 ]
@@ -49,6 +53,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { aberto, fechar } = useMobileNav()
+  const { frente, setFrente } = useFrente()
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [agenciaNome, setAgenciaNome] = useState('Trasso')
   const [userNome, setUserNome] = useState('')
@@ -160,9 +165,28 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Frente de negócio */}
+      <div className="px-3 pt-3">
+        <div className="grid grid-cols-3 gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5">
+          {frenteOpcoes.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setFrente(f.value)}
+              className={cn(
+                'rounded-md px-1 py-1.5 text-[11px] font-medium leading-tight transition-colors',
+                frente === f.value ? 'bg-brand-lima text-brand-noite' : 'text-brand-lavanda/50 hover:text-brand-lavanda'
+              )}
+            >
+              {f.value === 'catalogo_place' ? 'Catálogo' : f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-        {navItems.map(({ href, icon: Icon, label, children }) => {
+        {navItems.filter((i) => !i.frentes || i.frentes.includes(frente)).map(({ href, icon: Icon, label, children }) => {
           if (children) {
             return (
               <div key={href}>

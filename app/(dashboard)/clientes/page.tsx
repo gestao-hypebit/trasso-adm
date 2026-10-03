@@ -21,6 +21,7 @@ import { getInitials, formatDate, formatCurrency, formatRelative, whatsappUrl, t
 import { labelOrigem, labelSegmento } from '@/lib/crm/opcoes'
 import { toCSV, downloadCSV } from '@/lib/csv'
 import { createClient } from '@/lib/supabase/client'
+import { useFrente } from '@/components/layout/frente'
 import type { Database } from '@/types/database.types'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
@@ -36,7 +37,7 @@ const statusLabel: Record<string, string> = {
   ativo: 'Ativo', inativo: 'Inativo', lead: 'Lead', prospecto: 'Prospecto',
 }
 const grupoLabel: Record<string, string> = {
-  todos: 'Todos', agencia: 'Agência', saas: 'SaaS',
+  todos: 'Todos', agencia: 'Agência', saas: 'Catálogo Place', ambos: 'Agência + Catálogo',
 }
 const ordenacaoLabel: Record<Ordenacao, string> = {
   recentes: 'Mais recentes', nome: 'Nome (A–Z)', faturado: 'Maior faturamento',
@@ -57,7 +58,9 @@ export default function ClientesPage() {
   const [recarregar, setRecarregar] = useState(0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
-  const [grupoFilter, setGrupoFilter] = useState('todos')
+  // O grupo vem da frente escolhida no menu (Agência / Catálogo Place / Tudo).
+  const { frente } = useFrente()
+  const grupoFilter = frente === 'agencia' ? 'agencia' : frente === 'catalogo_place' ? 'saas' : 'todos'
   const [produtoFilter, setProdutoFilter] = useState('')
   const [responsavelFilter, setResponsavelFilter] = useState('todos')
   const [origemFilter, setOrigemFilter] = useState('todos')
@@ -172,7 +175,7 @@ export default function ClientesPage() {
   const followUpsAtrasados = Object.values(proximoContatoPorCliente).filter((d) => d.slice(0, 10) < hoje).length
 
   function limparFiltros() {
-    setSearch(''); setStatusFilter('todos'); setGrupoFilter('todos'); setProdutoFilter('')
+    setSearch(''); setStatusFilter('todos'); setProdutoFilter('')
     setResponsavelFilter('todos'); setOrigemFilter('todos'); setSegmentoFilter('todos')
   }
 
@@ -308,17 +311,6 @@ export default function ClientesPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {(['todos', 'agencia', 'saas'] as const).map((g) => (
-              <Button
-                key={g}
-                variant={grupoFilter === g ? 'violeta' : 'outline'}
-                size="sm"
-                onClick={() => { setGrupoFilter(g); setProdutoFilter('') }}
-              >
-                {grupoLabel[g]}
-              </Button>
-            ))}
-            <span className="mx-1 w-px bg-white/[0.08]" />
             {['todos', 'ativo', 'lead', 'prospecto', 'inativo'].map((s) => (
               <Button
                 key={s}
@@ -378,7 +370,7 @@ export default function ClientesPage() {
                 {segmentosDisponiveis.map((s) => <SelectItem key={s} value={s}>{labelSegmento(s)}</SelectItem>)}
               </SelectContent>
             </Select>
-            {(filtrosExtrasAtivos || search || statusFilter !== 'todos' || grupoFilter !== 'todos') && (
+            {(filtrosExtrasAtivos || search || statusFilter !== 'todos') && (
               <Button variant="ghost" size="sm" onClick={limparFiltros} className="gap-1 text-xs">
                 <X className="h-3.5 w-3.5" /> Limpar filtros
               </Button>
@@ -507,7 +499,7 @@ export default function ClientesPage() {
                       )}
                       {!produto && cliente.tipo !== 'agencia' && (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-brand-lavanda/50">
-                          {cliente.tipo === 'saas' ? 'SaaS' : 'Agência + SaaS'}
+                          {grupoLabel[cliente.tipo] ?? cliente.tipo}
                         </span>
                       )}
                       {(cliente.tags ?? []).map((tag) => (

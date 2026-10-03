@@ -15,12 +15,13 @@ import { Input } from '@/components/ui/input'
 import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, toISODateLocal, addMonthsISO, cn } from '@/lib/utils'
+import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
+import { useFrente, filtrarLancamentos } from '@/components/layout/frente'
 
 // Paleta validada (CVD + contraste) contra a superfície escura #141318.
 const COR = { confirmado: '#76A000', saas: '#8B5CF6', pipeline: '#2E9FD0', despesas: '#E0457B' }
 
-type Lanc = { tipo: string; valor: number; data: string; produto_id: string | null }
-type Assinante = { mrr: number; status: string; produto_id: string; produtos: { nome: string } | null }
+type Lanc = { tipo: string; valor: number; data: string; categoria_id: string | null }
 type Proposta = { id: string; numero: string; titulo: string; status: string; valor_final: number; validade: string | null; clientes: { nome: string } | null }
 type Mes = { key: string; label: string; confirmado: number; saas: number; pipeline: number; total: number; despesas: number; saldo: number }
 
@@ -31,7 +32,7 @@ function TooltipPrevisao({ active, payload }: { active?: boolean; payload?: { pa
   const m = payload[0].payload
   const linhas = [
     { cor: COR.confirmado, label: 'A receber (confirmado)', valor: m.confirmado },
-    { cor: COR.saas, label: 'MRR SaaS', valor: m.saas },
+    { cor: COR.saas, label: 'Mensalidades (MRR)', valor: m.saas },
     { cor: COR.pipeline, label: 'Pipeline ponderado', valor: m.pipeline },
     { cor: COR.despesas, label: 'Despesas previstas', valor: m.despesas },
   ]
@@ -56,27 +57,42 @@ export default function PrevisaoPage() {
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
   const [lancamentos, setLancamentos] = useState<Lanc[]>([])
-  const [assinantes, setAssinantes] = useState<Assinante[]>([])
+  const [mensalidades, setMensalidades] = useState<LancamentoMrr[]>([])
+  const [categoriasRecorrentes, setCategoriasRecorrentes] = useState<string[]>([])
+  const { frente, pronto } = useFrente()
+  const comPipeline = frente !== 'catalogo_place'
   const [propostas, setPropostas] = useState<Proposta[]>([])
   const [horizonte, setHorizonte] = useState(6)
   const [probEnviada, setProbEnviada] = useState(30)
   const [probNegociacao, setProbNegociacao] = useState(60)
 
   useEffect(() => {
+    if (!pronto) return
     const supabase = createClient() as any
     async function load() {
-      const [{ data: l }, { data: a }, { data: p }] = await Promise.all([
-        supabase.from('lancamentos').select('tipo, valor, data, produto_id').eq('status', 'pendente'),
-        supabase.from('saas_clientes').select('mrr, status, produto_id, produtos(nome)').in('status', ['ativo', 'trial']),
-        supabase.from('propostas').select('id, numero, titulo, status, valor_final, validade, clientes(nome)').in('status', ['enviada', 'em_negociacao']),
+      setLoading(true)
+      const { data: cats } = await supabase.from('categorias_financeiras').select('id').eq('tipo', 'receita').eq('recorrente', true)
+      const recorrentes: string[] = (cats ?? []).map((c: { id: string }) => c.id)
+      const [{ data: l }, { data: m }, { data: p }] = await Promise.all([
+        filtrarLancamentos(supabase.from('lancamentos').select('tipo, valor, data, categoria_id').eq('status', 'pendente'), frente),
+        recorrentes.length
+          ? filtrarLancamentos(supabase.from('lancamentos')
+              .select('valor, data, status, descricao, cliente_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
+              .eq('tipo', 'receita').in('categoria_id', recorrentes), frente)
+          : { data: [] },
+        // Propostas são só da agência.
+        frente === 'catalogo_place'
+          ? { data: [] }
+          : supabase.from('propostas').select('id, numero, titulo, status, valor_final, validade, clientes(nome)').in('status', ['enviada', 'em_negociacao']),
       ])
+      setCategoriasRecorrentes(recorrentes)
       setLancamentos(l ?? [])
-      setAssinantes(a ?? [])
+      setMensalidades(m ?? [])
       setPropostas(p ?? [])
       setLoading(false)
     }
     load()
-  }, [])
+  }, [frente, pronto])
 
   const hoje = toISODateLocal(new Date())
   const mesAtual = hoje.slice(0, 7)
@@ -95,14 +111,13 @@ export default function PrevisaoPage() {
       if (l.tipo === 'receita' && l.data < hoje) { atrasado += valor; continue }
       const m = porKey[l.data.slice(0, 7)]
       if (!m || l.data < hoje) continue
-      // Receitas com produto SaaS já estão representadas pelo MRR dos assinantes.
-      if (l.tipo === 'receita' && !l.produto_id) m.confirmado += valor
+      // Mensalidades já estão representadas pelo MRR.
+      if (l.tipo === 'receita' && !(l.categoria_id && categoriasRecorrentes.includes(l.categoria_id))) m.confirmado += valor
       if (l.tipo === 'despesa') m.despesas += valor
     }
 
-    const ativos = assinantes.filter((a) => a.status === 'ativo')
-    const mrr = ativos.reduce((s, a) => s + Number(a.mrr), 0)
-    const mrrTrial = assinantes.filter((a) => a.status === 'trial').reduce((s, a) => s + Number(a.mrr), 0)
+    const recorrente = calcularMrr(mensalidades, hoje)
+    const mrr = recorrente.mrr
     for (const m of meses) m.saas = mrr
 
     const prob = (status: string) => (status === 'em_negociacao' ? probNegociacao : probEnviada) / 100
@@ -119,31 +134,27 @@ export default function PrevisaoPage() {
     }
 
     const soma = (k: keyof Mes) => meses.reduce((s, m) => s + (m[k] as number), 0)
-    const mrrPorProduto: Record<string, number> = {}
-    for (const a of ativos) {
-      const nome = a.produtos?.nome ?? 'SaaS'
-      mrrPorProduto[nome] = (mrrPorProduto[nome] ?? 0) + Number(a.mrr)
-    }
+    const mrrPorCategoria = Object.fromEntries(recorrente.porCategoria.map(([nome, v]) => [nome, v.valor]))
     return {
-      meses, atrasado, mrr, mrrTrial, qtdAtivos: ativos.length, qtdTrial: assinantes.length - ativos.length, mrrPorProduto,
+      meses, atrasado, mrr, qtdAtivos: recorrente.ativos.length, mrrPorCategoria,
       totalConfirmado: soma('confirmado'), totalSaas: soma('saas'), totalPipeline: soma('pipeline'),
       total: soma('total'), totalDespesas: soma('despesas'), saldo: soma('saldo'),
     }
-  }, [lancamentos, assinantes, propostas, horizonte, probEnviada, probNegociacao, hoje, mesAtual])
+  }, [lancamentos, mensalidades, categoriasRecorrentes, propostas, horizonte, probEnviada, probNegociacao, hoje, mesAtual])
 
   const pctSaas = calc.total > 0 ? (calc.totalSaas / calc.total) * 100 : 0
   const pctAgencia = calc.total > 0 ? ((calc.totalConfirmado + calc.totalPipeline) / calc.total) * 100 : 0
 
   const kpis = [
     { label: `Receita prevista (${horizonte} meses)`, valor: calc.total, sub: `${formatCurrency(calc.total / horizonte)}/mês em média`, cor: 'text-brand-lavanda' },
-    { label: 'MRR SaaS', valor: calc.mrr, sub: `${calc.qtdAtivos} assinante(s) ativo(s)${calc.qtdTrial ? ` · ${calc.qtdTrial} em trial` : ''}`, cor: 'text-brand-lavanda' },
+    { label: 'Mensalidades (MRR)', valor: calc.mrr, sub: `${calc.qtdAtivos} cliente(s) pagando mensalidade`, cor: 'text-brand-lavanda' },
     { label: 'Pipeline ponderado', valor: calc.totalPipeline, sub: `${propostas.length} proposta(s) em aberto`, cor: 'text-brand-lavanda' },
     { label: 'Saldo previsto', valor: calc.saldo, sub: `após ${formatCurrency(calc.totalDespesas)} em despesas`, cor: calc.saldo >= 0 ? 'text-brand-lima' : 'text-brand-rosa' },
   ]
 
   const legenda = [
     { cor: COR.confirmado, label: 'A receber (confirmado)' },
-    { cor: COR.saas, label: 'MRR SaaS' },
+    { cor: COR.saas, label: 'Mensalidades (MRR)' },
     { cor: COR.pipeline, label: 'Pipeline ponderado' },
     { cor: COR.despesas, label: 'Despesas previstas', linha: true },
   ]
@@ -233,7 +244,7 @@ export default function PrevisaoPage() {
                     <tr className="border-b border-white/[0.06]">
                       <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-3">Mês</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Confirmado</th>
-                      <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">SaaS</th>
+                      <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Mensalidades</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Pipeline</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Despesas</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Saldo</th>
@@ -265,18 +276,15 @@ export default function PrevisaoPage() {
                   <div style={{ width: `${pctSaas}%`, background: COR.saas }} />
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-brand-lavanda/70">Agência (projetos + pipeline) <b className="text-brand-lavanda">{pctAgencia.toFixed(0)}%</b></span>
-                  <span className="text-brand-lavanda/70">SaaS <b className="text-brand-lavanda">{pctSaas.toFixed(0)}%</b></span>
+                  <span className="text-brand-lavanda/70">Avulsas{comPipeline ? ' + pipeline' : ''} <b className="text-brand-lavanda">{pctAgencia.toFixed(0)}%</b></span>
+                  <span className="text-brand-lavanda/70">Mensalidades <b className="text-brand-lavanda">{pctSaas.toFixed(0)}%</b></span>
                 </div>
-                {Object.entries(calc.mrrPorProduto).map(([nome, v]) => (
+                {Object.entries(calc.mrrPorCategoria).map(([nome, v]) => (
                   <div key={nome} className="flex justify-between text-xs">
                     <span className="text-brand-lavanda/50">{nome}</span>
                     <span className="text-brand-lavanda">{formatCurrency(v)}/mês</span>
                   </div>
                 ))}
-                {calc.mrrTrial > 0 && (
-                  <p className="text-[11px] text-brand-lavanda/40">+ {formatCurrency(calc.mrrTrial)}/mês em trials ainda não contados.</p>
-                )}
               </CardContent>
             </Card>
 
@@ -298,7 +306,7 @@ export default function PrevisaoPage() {
                 ))}
                 <p className="flex gap-1.5 text-[11px] text-brand-lavanda/40">
                   <Info className="h-3.5 w-3.5 shrink-0" />
-                  O pipeline entra no mês da validade da proposta. Receitas pendentes com produto SaaS ficam fora do &quot;confirmado&quot; para não somar duas vezes com o MRR.
+                  O pipeline entra no mês da validade da proposta. Mensalidades pendentes ficam fora do &quot;confirmado&quot; para não somar duas vezes com o MRR.
                 </p>
               </CardContent>
             </Card>

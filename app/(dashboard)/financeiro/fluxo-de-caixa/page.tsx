@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import { Download, TrendingUp, TrendingDown, Landmark, LineChart, AlertTriangle } from 'lucide-react'
 import { Header } from '@/components/layout/header'
@@ -15,6 +15,7 @@ import { formatCurrency, cn, addMonthsISO } from '@/lib/utils'
 import { hojeISO, baixarCSV } from '@/lib/financeiro'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
+import { useFrente, filtrarLancamentos } from '@/components/layout/frente'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -51,16 +52,19 @@ export default function FluxoCaixaPage() {
   const [mesesPassados, setMesesPassados] = useState(6)
   const [mesesFuturos, setMesesFuturos] = useState(6)
 
-  async function load() {
-    const { data } = await createClient()
-      .from('lancamentos')
-      .select('tipo, valor, data, status')
-      .neq('status', 'cancelado')
+  const { frente, pronto } = useFrente()
+
+  const load = useCallback(async () => {
+    if (!pronto) return
+    const { data } = await filtrarLancamentos(
+      (createClient() as any).from('lancamentos').select('tipo, valor, data, status').neq('status', 'cancelado'),
+      frente,
+    )
     setLancs((data as Lanc[]) ?? [])
     setLoading(false)
-  }
+  }, [frente, pronto])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const hoje = hojeISO()
   const mesAtual = hoje.slice(0, 7)
@@ -129,7 +133,7 @@ export default function FluxoCaixaPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header title="Financeiro" description="Fluxo de caixa da agência" />
+      <Header title="Financeiro" description="Fluxo de caixa" />
       <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Fluxo de Caixa" description="Realizado até hoje e projeção pelos vencimentos em aberto">
           <Button variant="outline" size="sm" onClick={exportar} disabled={loading}><Download className="h-4 w-4" /> Exportar CSV</Button>

@@ -29,7 +29,7 @@ type Contrato = { id: string; numero: string; titulo: string; status: string; va
 
 type EventoTimeline = { data: string; titulo: string; detalhe?: string; icon: React.FC<{ className?: string }>; cor: string; href?: string }
 
-const tipoLabel: Record<string, string> = { agencia: 'Agência', saas: 'SaaS', ambos: 'Agência + SaaS' }
+const tipoLabel: Record<string, string> = { agencia: 'Agência', saas: 'Catálogo Place', ambos: 'Agência + Catálogo' }
 
 const tipoIcons: Record<string, React.FC<{ className?: string }>> = {
   reuniao: Video, whatsapp: MessageCircle, ligacao: PhoneCall, email: Mail, nota: StickyNote, outro: FileText,

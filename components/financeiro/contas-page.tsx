@@ -18,10 +18,12 @@ import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { formatCurrency, formatDate, cn, whatsappUrl, addMonthsISO } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO, diasEntre, situacaoDe, aging, baixarCSV, type Situacao } from '@/lib/financeiro'
+import { useFrente, filtrarLancamentos, frenteLancamentoOpcoes, type FrenteLancamento } from '@/components/layout/frente'
 
 type Lancamento = {
   id: string; descricao: string; valor: number; data: string; status: string
   forma_pagamento: string | null; recorrente: boolean; frequencia: string | null
+  frente: FrenteLancamento
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string; whatsapp: string | null; telefone: string | null } | null
 }
@@ -82,16 +84,27 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [baixando, setBaixando] = useState(false)
   const hoje = hojeISO()
+  const { frente, pronto } = useFrente()
 
   const load = useCallback(async () => {
-    const { data } = await createClient()
-      .from('lancamentos')
-      .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
-      .eq('tipo', tipo)
-      .order('data', { ascending: true })
+    if (!pronto) return
+    const { data } = await filtrarLancamentos(
+      (createClient() as any)
+        .from('lancamentos')
+        .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
+        .eq('tipo', tipo),
+      frente,
+    ).order('data', { ascending: true })
     setLancamentos((data as Lancamento[]) ?? [])
     setLoading(false)
-  }, [tipo])
+  }, [tipo, frente, pronto])
+
+  async function mudarFrente(id: string, nova: FrenteLancamento) {
+    const anterior = lancamentos.find(l => l.id === id)?.frente
+    setLancamentos(prev => prev.map(l => l.id === id ? { ...l, frente: nova } : l))
+    const { error } = await (createClient() as any).from('lancamentos').update({ frente: nova }).eq('id', id)
+    if (error && anterior) setLancamentos(prev => prev.map(l => l.id === id ? { ...l, frente: anterior } : l))
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -356,7 +369,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Vencimento</th>
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Descrição</th>
                     {ehReceber && <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Cliente</th>}
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Categoria</th>
+                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Categoria · frente</th>
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Forma</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Valor</th>
                     <th className="text-center text-xs text-brand-lavanda/50 font-medium px-3 py-3">Situação</th>
@@ -390,7 +403,18 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                           </div>
                         </td>
                         {ehReceber && <td className="px-3 py-3 text-brand-lavanda/70 whitespace-nowrap">{l.clientes?.nome ?? '—'}</td>}
-                        <td className="px-3 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">{l.categorias_financeiras?.nome ?? '—'}</td>
+                        <td className="px-3 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">
+                          {l.categorias_financeiras?.nome ?? '—'}
+                          <select
+                            value={l.frente}
+                            onChange={(e) => mudarFrente(l.id, e.target.value as FrenteLancamento)}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Frente"
+                            className="mt-0.5 block bg-transparent text-[11px] text-brand-lavanda/40 hover:text-brand-lavanda outline-none cursor-pointer"
+                          >
+                            {frenteLancamentoOpcoes.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
+                          </select>
+                        </td>
                         <td className="px-3 py-3 text-xs text-brand-lavanda/50 whitespace-nowrap">{formaLabel[l.forma_pagamento ?? ''] ?? '—'}</td>
                         <td className={cn('px-3 py-3 text-right font-semibold whitespace-nowrap', l.status === 'cancelado' ? 'text-brand-lavanda/30 line-through' : t.cor)}>
                           {formatCurrency(l.valor)}

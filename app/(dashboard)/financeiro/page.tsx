@@ -14,12 +14,14 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
+import { useFrente, filtrarLancamentos, frenteOpcoes, type FrenteLancamento } from '@/components/layout/frente'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 type Lancamento = {
   id: string; tipo: string; descricao: string; valor: number; data: string; status: string
   forma_pagamento: string | null
+  frente: FrenteLancamento
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string } | null
 }
@@ -40,6 +42,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function FinanceiroPage() {
   const pathname = usePathname()
+  const { frente, pronto } = useFrente()
+  const nomeFrente = frenteOpcoes.find(f => f.value === frente)!.label
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -56,14 +60,15 @@ export default function FinanceiroPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('lancamentos')
-      .select('id, tipo, descricao, valor, data, status, forma_pagamento, categorias_financeiras(nome), clientes(nome)')
-      .order('data', { ascending: false })
+    if (!pronto) return
+    const supabase = createClient() as any
+    const { data } = await filtrarLancamentos(
+      supabase.from('lancamentos').select('id, tipo, descricao, valor, data, status, forma_pagamento, frente, categorias_financeiras(nome), clientes(nome)'),
+      frente,
+    ).order('data', { ascending: false })
     setLancamentos((data as Lancamento[]) ?? [])
     setLoading(false)
-  }, [])
+  }, [frente, pronto])
 
   useEffect(() => { load() }, [load])
 
@@ -155,12 +160,20 @@ export default function FinanceiroPage() {
       })(),
       icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10',
     },
-    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: 'Receitas recebidas − Despesas pagas', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
+    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: frente === 'todas' ? 'Receitas recebidas − Despesas pagas' : 'Inclui os custos gerais', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
   ]
+
+  // Resultado de cada frente no período (só na visão "Tudo").
+  const porFrente = (['agencia', 'catalogo_place', 'geral'] as const).map(f => {
+    const itens = doMes.filter(l => l.frente === f)
+    const receitas = itens.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
+    const despesas = itens.filter(l => l.tipo === 'despesa' && l.status === 'pago').reduce((s, l) => s + l.valor, 0)
+    return { frente: f, label: f === 'geral' ? 'Custos gerais' : frenteOpcoes.find(o => o.value === f)!.label, receitas, despesas, resultado: receitas - despesas }
+  })
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header title="Financeiro" description="Controle financeiro da agência" />
+      <Header title="Financeiro" description={frente === 'todas' ? 'Agência e Catálogo Place' : nomeFrente} />
       <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Financeiro" description={loading ? 'Carregando...' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}>
           <LancamentoForm onSuccess={load} />
@@ -270,11 +283,13 @@ export default function FinanceiroPage() {
         {/* Saldo em Conta */}
         <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
+            <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">{frente === 'todas' ? 'Saldo em Conta' : `Resultado acumulado · ${nomeFrente}`}</p>
             <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
               {loading ? '...' : formatCurrency(saldoAtual)}
             </p>
-            <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
+            <p className="text-xs text-brand-lavanda/30 mt-1">
+              {frente === 'todas' ? 'Total recebido − Total pago · histórico completo' : 'Recebido − pago desta frente, incluindo custos gerais · histórico completo'}
+            </p>
           </div>
           <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
         </div>
@@ -297,6 +312,45 @@ export default function FinanceiroPage() {
             </Card>
           ))}
         </div>
+
+        {frente === 'todas' && !loading && (
+          <Card className="mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Resultado por frente — {allTime ? 'desde o início' : mesLabel}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/[0.06]">
+                      <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-2.5">Frente</th>
+                      <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-2.5">Recebido</th>
+                      <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-2.5">Pago</th>
+                      <th className="text-right text-xs text-brand-lavanda/50 font-medium px-6 py-2.5">Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {porFrente.map(f => (
+                      <tr key={f.frente} className="border-b border-white/[0.04]">
+                        <td className="px-6 py-2.5 text-brand-lavanda">{f.label}</td>
+                        <td className="px-4 py-2.5 text-right text-brand-lavanda/70">{formatCurrency(f.receitas)}</td>
+                        <td className="px-4 py-2.5 text-right text-brand-lavanda/70">−{formatCurrency(f.despesas)}</td>
+                        <td className={cn('px-6 py-2.5 text-right font-semibold', f.resultado >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>{formatCurrency(f.resultado)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-white/[0.02] font-semibold">
+                      <td className="px-6 py-2.5 text-brand-lavanda">Total</td>
+                      <td className="px-4 py-2.5 text-right text-brand-lavanda">{formatCurrency(totalReceitas)}</td>
+                      <td className="px-4 py-2.5 text-right text-brand-lavanda">−{formatCurrency(totalDespesas)}</td>
+                      <td className={cn('px-6 py-2.5 text-right', totalReceitas - totalDespesas >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>{formatCurrency(totalReceitas - totalDespesas)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="px-6 py-3 text-[11px] text-brand-lavanda/40">Custos gerais são os compartilhados entre as frentes (contabilidade, impostos…). Dá para mudar a frente de cada lançamento em Contas a Receber e Contas a Pagar.</p>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <Card className="lg:col-span-2">

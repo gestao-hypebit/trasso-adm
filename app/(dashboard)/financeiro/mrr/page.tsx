@@ -17,6 +17,7 @@ import { hojeISO, baixarCSV } from '@/lib/financeiro'
 import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
+import { useFrente, filtrarLancamentos } from '@/components/layout/frente'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -43,6 +44,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function MrrPage() {
   const pathname = usePathname()
+  const { frente, pronto } = useFrente()
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [lancamentos, setLancamentos] = useState<LancamentoMrr[]>([])
   const [semMigration, setSemMigration] = useState(false)
@@ -52,6 +54,7 @@ export default function MrrPage() {
   const hoje = hojeISO()
 
   const load = useCallback(async () => {
+    if (!pronto) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = createClient() as any
     let cats: Categoria[]
@@ -69,16 +72,16 @@ export default function MrrPage() {
 
     const ids = cats.filter(c => c.recorrente).map(c => c.id)
     if (ids.length) {
-      const { data } = await db.from('lancamentos')
+      const { data } = await filtrarLancamentos(db.from('lancamentos')
         .select('valor, data, status, descricao, cliente_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
         .eq('tipo', 'receita')
-        .in('categoria_id', ids)
+        .in('categoria_id', ids), frente)
       setLancamentos(data ?? [])
     } else {
       setLancamentos([])
     }
     setLoading(false)
-  }, [])
+  }, [frente, pronto])
 
   useEffect(() => { load() }, [load])
 
