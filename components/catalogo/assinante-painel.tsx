@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Copy, Check, MessageCircle, Loader2, Link2, FileText, UserRound } from 'lucide-react'
+import { ExternalLink, Copy, Check, MessageCircle, Loader2, Link2, FileText, UserRound, MoreHorizontal, Pencil, X } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { AcaoAsaasDialog, type AcaoAsaas } from '@/components/catalogo/acao-asaas-dialog'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, whatsappUrl } from '@/lib/utils'
 import {
@@ -44,14 +46,15 @@ const statusLancamento: Record<string, { label: string; variant: 'aprovada' | 'p
 }
 
 export function AssinantePainel({
-  assinante, onClose, asaasConfigurado, clientesSemAsaas, customersSemCliente, onVinculado,
+  assinante, onClose, asaasConfigurado, clientesSemAsaas, customersSemCliente, onAlterado,
 }: {
   assinante: Assinante | null
   onClose: () => void
   asaasConfigurado: boolean
   clientesSemAsaas: Opcao[]
   customersSemCliente: Opcao[]
-  onVinculado: () => void
+  // Algo mudou (vínculo ou alteração no Asaas): a tela recarrega os dados.
+  onAlterado: () => void
 }) {
   const [cobrancas, setCobrancas] = useState<CobrancaAsaas[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -59,8 +62,18 @@ export function AssinantePainel({
   const [vinculo, setVinculo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erroVinculo, setErroVinculo] = useState<string | null>(null)
+  const [acao, setAcao] = useState<AcaoAsaas | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [recarga, setRecarga] = useState(0)
 
   const customerId = assinante?.asaasCustomerId ?? null
+  const chave = assinante?.chave ?? null
+
+  // Trocou de assinante: some o aviso e qualquer ação aberta.
+  useEffect(() => {
+    setAviso(null)
+    setAcao(null)
+  }, [chave])
 
   useEffect(() => {
     setCobrancas(null)
@@ -78,7 +91,7 @@ export function AssinantePainel({
       .then((c) => { if (!cancelado) setCobrancas(c) })
       .catch((e) => { if (!cancelado) setErro(e.message) })
     return () => { cancelado = true }
-  }, [customerId, asaasConfigurado])
+  }, [customerId, asaasConfigurado, recarga])
 
   async function copiar(id: string, texto: string) {
     try {
@@ -101,8 +114,15 @@ export function AssinantePainel({
       setErroVinculo(error.code === '23505' ? 'Esse cliente do Asaas já está ligado a outro cliente.' : error.message)
       return
     }
-    onVinculado()
+    onAlterado()
     onClose()
+  }
+
+  function aposAcao(mensagem: string) {
+    setAcao(null)
+    setAviso(mensagem)
+    setRecarga((n) => n + 1)
+    onAlterado()
   }
 
   if (!assinante) return <Sheet open={false} />
@@ -145,6 +165,13 @@ export function AssinantePainel({
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          {aviso && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-brand-lima/20 bg-brand-lima/[0.06] px-3 py-2 text-xs text-brand-lima">
+              {aviso}
+              <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
+
           {/* Resumo */}
           <div className="grid grid-cols-2 gap-3">
             <Resumo titulo="Mensalidade" valor={a.mensalidade ? formatCurrency(a.mensalidade) : '—'} />
@@ -176,6 +203,16 @@ export function AssinantePainel({
                         <Dado rotulo="Forma" valor={formaLabel[s.formaPagamento] ?? s.formaPagamento} />
                         <Dado rotulo="Criada em" valor={formatDate(s.criadaEm)} />
                       </dl>
+                      {s.status === 'ACTIVE' && asaasConfigurado && (
+                        <div className="mt-3 flex gap-2 border-t border-white/[0.04] pt-3">
+                          <Button size="sm" variant="outline" onClick={() => setAcao({ tipo: 'editar_assinatura', assinatura: s })}>
+                            <Pencil className="h-3.5 w-3.5" /> Alterar
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-brand-rosa/80 hover:text-brand-rosa" onClick={() => setAcao({ tipo: 'cancelar_assinatura', assinatura: s })}>
+                            Cancelar assinatura
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -239,6 +276,21 @@ export function AssinantePainel({
                           )}
                           {c.faturaUrl && (
                             <IconeAcao href={c.faturaUrl} titulo="Abrir fatura"><ExternalLink className="h-3.5 w-3.5" /></IconeAcao>
+                          )}
+                          {st.aberta && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button type="button" title="Mais ações" className="flex h-7 w-7 items-center justify-center rounded-md text-brand-lavanda/40 transition-colors hover:bg-white/[0.06] hover:text-brand-lavanda">
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => setAcao({ tipo: 'vencimento', cobranca: c })}>Mudar vencimento (2ª via)</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setAcao({ tipo: 'recebida', cobranca: c })}>Marcar como paga</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => setAcao({ tipo: 'cancelar_fatura', cobranca: c })} className="text-brand-rosa">Cancelar fatura</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                       </li>
@@ -309,6 +361,7 @@ export function AssinantePainel({
           )}
         </div>
       </SheetContent>
+      <AcaoAsaasDialog acao={acao} nome={a.nome} onClose={() => setAcao(null)} onFeito={aposAcao} />
     </Sheet>
   )
 }

@@ -285,3 +285,19 @@ export async function inicioIntegracao(supabase: any): Promise<string | null> {
   const { data } = await supabase.from('configuracoes_agencia').select('asaas_inicio').limit(1).maybeSingle()
   return data?.asaas_inicio ?? null
 }
+
+// Depois de alterar algo no Asaas pelo painel, já atualiza os lançamentos
+// (sem esperar o webhook). Integração desligada → não faz nada. Falhas só
+// são registradas: o webhook ou o "Sincronizar" corrigem depois.
+export async function refletirNoSistema(supabase: any, cobrancas: AsaasPayment[], opcoes: { excluida?: boolean } = {}) {
+  const inicio = await inicioIntegracao(supabase)
+  if (!inicio) return
+  const ctx: Contexto = { supabase, inicio }
+  for (const c of cobrancas) {
+    try {
+      await processarCobranca(ctx, c, opcoes)
+    } catch (e) {
+      console.error('[asaas] refletir no sistema', c.id, e)
+    }
+  }
+}

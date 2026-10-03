@@ -378,7 +378,7 @@ export default function CatalogoPage() {
         asaasConfigurado={asaasLigado}
         clientesSemAsaas={calc.clientesSemAsaas}
         customersSemCliente={calc.customersSemCliente}
-        onVinculado={() => { carregar(); carregarAsaas() }}
+        onAlterado={() => { carregar(); carregarAsaas() }}
       />
     </div>
   )
