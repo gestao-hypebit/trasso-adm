@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AssinantePainel, type Assinante } from '@/components/catalogo/assinante-painel'
 import { createClient } from '@/lib/supabase/client'
 import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
@@ -24,6 +25,18 @@ type Cliente = {
 type Lanc = LancamentoMrr & { categoria_id: string | null }
 
 type Aba = 'ativos' | 'aguardando' | 'atraso' | 'sem_mensalidade' | 'so_asaas' | 'todos'
+type Ordem = 'vencimento' | 'nome' | 'nome_desc' | 'mensalidade_desc' | 'mensalidade' | 'atraso' | 'antigos' | 'recentes'
+
+const ordens: { value: Ordem; label: string }[] = [
+  { value: 'vencimento', label: 'Próximo vencimento' },
+  { value: 'nome', label: 'Nome (A–Z)' },
+  { value: 'nome_desc', label: 'Nome (Z–A)' },
+  { value: 'mensalidade_desc', label: 'Maior mensalidade' },
+  { value: 'mensalidade', label: 'Menor mensalidade' },
+  { value: 'atraso', label: 'Maior atraso' },
+  { value: 'antigos', label: 'Assinantes mais antigos' },
+  { value: 'recentes', label: 'Assinantes mais recentes' },
+]
 
 const mesLabel = (mesKey: string | null) => {
   if (!mesKey) return '—'
@@ -32,6 +45,25 @@ const mesLabel = (mesKey: string | null) => {
 }
 
 const ativa = (s: AssinaturaAsaas) => s.status === 'ACTIVE'
+
+// Próxima cobrança da assinatura ativa (nulo = sem assinatura ativa no Asaas).
+const proximaCobranca = (l: Assinante) => l.assinaturas.find(ativa)?.proximoVencimento ?? null
+
+// Quem não tem o dado usado na ordenação vai para o fim da lista.
+function comparar(a: Assinante, b: Assinante, ordem: Ordem): number {
+  const vaziosNoFim = (x: string | null, y: string | null, sentido: 1 | -1) =>
+    x && y ? x.localeCompare(y) * sentido : x ? -1 : y ? 1 : 0
+  switch (ordem) {
+    case 'vencimento': return vaziosNoFim(proximaCobranca(a), proximaCobranca(b), 1)
+    case 'nome': return a.nome.localeCompare(b.nome, 'pt-BR')
+    case 'nome_desc': return b.nome.localeCompare(a.nome, 'pt-BR')
+    case 'mensalidade_desc': return b.mensalidade - a.mensalidade
+    case 'mensalidade': return (a.mensalidade || Infinity) - (b.mensalidade || Infinity) || 0
+    case 'atraso': return b.atraso - a.atraso || b.diasAtraso - a.diasAtraso
+    case 'antigos': return vaziosNoFim(a.desde, b.desde, 1)
+    case 'recentes': return vaziosNoFim(a.desde, b.desde, -1)
+  }
+}
 
 export default function CatalogoPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -47,6 +79,7 @@ export default function CatalogoPage() {
 
   const [busca, setBusca] = useState('')
   const [aba, setAba] = useState<Aba>('ativos')
+  const [ordem, setOrdem] = useState<Ordem>('vencimento')
   const [aberto, setAberto] = useState<string | null>(null)
   const hoje = hojeISO()
 
@@ -187,7 +220,7 @@ export default function CatalogoPage() {
       return !l.ativo && l.status !== 'inativo'
     })
     .filter((l) => !termo || [l.nome, l.empresa].some((v) => v?.toLowerCase().includes(termo)))
-    .sort((a, b) => (aba === 'atraso' ? b.atraso - a.atraso : b.mensalidade - a.mensalidade || a.nome.localeCompare(b.nome)))
+    .sort((a, b) => comparar(a, b, ordem) || a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const abas: { key: Aba; label: string }[] = [
     { key: 'ativos', label: 'Pagando' },
@@ -266,9 +299,17 @@ export default function CatalogoPage() {
                   </button>
                 ))}
               </div>
-              <div className="relative lg:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
-                <Input className="pl-9" placeholder="Buscar assinante..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+              <div className="flex gap-2">
+                <div className="relative flex-1 lg:w-64 lg:flex-none">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
+                  <Input className="pl-9" placeholder="Buscar assinante..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+                </div>
+                <Select value={ordem} onValueChange={(v) => setOrdem(v as Ordem)}>
+                  <SelectTrigger className="w-auto min-w-48" aria-label="Ordenar por"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ordens.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
