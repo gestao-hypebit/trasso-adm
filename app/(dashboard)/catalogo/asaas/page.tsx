@@ -15,7 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, toISODateLocal } from '@/lib/utils'
 
 type Status = { chave: boolean; webhookToken: boolean; ambiente: string }
-type Resultado = { acao: string; paymentId: string; vencimento: string; valorAsaas: number; status: string; cliente?: string; valorSistema?: number; detalhe?: string }
+type Resultado = { acao: string; paymentId: string; vencimento: string; valorAsaas: number; valorLiquido: number; status: string; cliente?: string; valorSistema?: number; detalhe?: string }
 type Sync = { inicio: string; total: number; resumo: Record<string, number>; resultados: Resultado[]; erros: { paymentId: string; erro: string }[] }
 type Pendencia = {
   payment_id: string
@@ -251,8 +251,9 @@ export default function AsaasPage() {
                       <tr className="border-b border-white/[0.06]">
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-2">Cliente</th>
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-2">Vencimento</th>
-                        <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-2">No Asaas</th>
-                        <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-2">No sistema</th>
+                        <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-2">Bruto</th>
+                        <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-2">Líquido</th>
+                        <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-2">Salvo no sistema</th>
                         <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-2">O que acontece</th>
                       </tr>
                     </thead>
@@ -261,8 +262,9 @@ export default function AsaasPage() {
                         <tr key={r.paymentId} className="border-b border-white/[0.04]">
                           <td className="px-4 py-2 text-brand-lavanda">{r.cliente ?? '—'}</td>
                           <td className="px-3 py-2 text-xs text-brand-lavanda/60">{formatDate(r.vencimento)}</td>
-                          <td className="px-3 py-2 text-right text-brand-lavanda/80">{formatCurrency(r.valorAsaas)}</td>
-                          <td className={cn('px-3 py-2 text-right', r.valorSistema != null && Math.abs(r.valorSistema - r.valorAsaas) > 0.009 ? 'text-yellow-400' : 'text-brand-lavanda/60')}>
+                          <td className="px-3 py-2 text-right text-brand-lavanda/50">{formatCurrency(r.valorAsaas)}</td>
+                          <td className="px-3 py-2 text-right text-brand-lavanda/80">{formatCurrency(r.valorLiquido)}</td>
+                          <td className={cn('px-3 py-2 text-right font-medium', r.valorSistema != null && Math.abs(r.valorSistema - r.valorLiquido) > 0.009 ? 'text-yellow-400' : 'text-brand-lavanda')}>
                             {r.valorSistema != null ? formatCurrency(r.valorSistema) : '—'}
                           </td>
                           <td className="px-4 py-2">
@@ -274,7 +276,7 @@ export default function AsaasPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[11px] text-brand-lavanda/40">Valor em amarelo: diferente do Asaas (taxa/desconto). O lançamento manual mantém o seu valor; só o status passa a vir do Asaas.</p>
+                <p className="text-[11px] text-brand-lavanda/40">Lançamentos novos são salvos pelo líquido (o que cai na conta). Em amarelo: lançamento manual com valor diferente do líquido — ele mantém o seu valor; só o status passa a vir do Asaas. Antes do pagamento o líquido é a estimativa do Asaas; quando o pagamento cai, é atualizado com o valor final.</p>
               </div>
             )}
           </CardContent>

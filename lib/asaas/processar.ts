@@ -12,7 +12,8 @@ import { buscarAssinatura, buscarClienteAsaas, type AsaasPayment } from '@/lib/a
 //    - um só → liga a ele (valor manual é mantido)
 //    - nenhum → cria o lançamento
 //    - vários → vira pendência para decidir na tela
-// 5. Lançamento criado pela integração e pago → lança a taxa do Asaas como despesa.
+// Lançamentos criados pela integração são salvos pelo valor LÍQUIDO (o que cai
+// na conta, já sem a taxa do Asaas). Lançamento manual ligado mantém o seu valor.
 
 export type Acao = 'ignorado' | 'atualizado' | 'ligado' | 'criado' | 'pendencia'
 
@@ -21,6 +22,7 @@ export type Resultado = {
   paymentId: string
   vencimento: string
   valorAsaas: number
+  valorLiquido: number
   status: string
   cliente?: string
   valorSistema?: number
@@ -70,6 +72,10 @@ export function statusDoLancamento(statusAsaas: string): 'recebido' | 'pendente'
 function manterRecebido(l: { asaas_criado: boolean; status: string }, novo: 'recebido' | 'pendente' | 'cancelado') {
   return !l.asaas_criado && l.status === 'recebido' && novo === 'pendente' ? 'recebido' : novo
 }
+
+// Valor que cai na conta. Antes do pagamento o Asaas já informa a estimativa;
+// quando o pagamento cai, o webhook atualiza com o valor final.
+const liquido = (p: AsaasPayment) => Number(Number(p.netValue ?? p.value).toFixed(2))
 
 const formaPagamento: Record<string, string> = { PIX: 'pix', BOLETO: 'boleto', CREDIT_CARD: 'cartao_credito', DEBIT_CARD: 'cartao_debito' }
 
@@ -144,33 +150,12 @@ async function resolverPendencia(ctx: Contexto, paymentId: string) {
   await ctx.supabase.from('asaas_pendencias').update({ resolvida: true, updated_at: new Date().toISOString() }).eq('payment_id', paymentId).eq('resolvida', false)
 }
 
-// Taxa do Asaas como despesa, só para lançamentos criados pela integração.
-async function lancarTaxa(ctx: Contexto, p: AsaasPayment, cliente: { id: string } | null) {
-  const taxa = Number(p.value) - Number(p.netValue ?? p.value)
-  if (ctx.simular || statusDoLancamento(p.status) !== 'recebido' || !(taxa > 0.009)) return
-  const chave = `taxa:${p.id}`
-  const { data: existe } = await ctx.supabase.from('lancamentos').select('id').eq('asaas_payment_id', chave).maybeSingle()
-  if (existe) return
-  await ctx.supabase.from('lancamentos').insert({
-    tipo: 'despesa',
-    descricao: `Taxa Asaas — ${p.description || p.id}`,
-    valor: Number(taxa.toFixed(2)),
-    data: p.paymentDate ?? p.clientPaymentDate ?? p.dueDate,
-    status: 'pago',
-    categoria_id: await categoriaId(ctx, 'Taxas Asaas', 'despesa'),
-    cliente_id: cliente?.id ?? null,
-    recorrente: false,
-    asaas_payment_id: chave,
-    asaas_criado: true,
-  })
-}
-
 export async function processarCobranca(
   ctx: Contexto,
   p: AsaasPayment,
   opcoes: { excluida?: boolean; lancamentoEscolhido?: string } = {},
 ): Promise<Resultado> {
-  const base = { paymentId: p.id, vencimento: p.dueDate, valorAsaas: Number(p.value), status: p.status }
+  const base = { paymentId: p.id, vencimento: p.dueDate, valorAsaas: Number(p.value), valorLiquido: liquido(p), status: p.status }
   const excluida = opcoes.excluida || p.deleted
   const status = statusDoLancamento(p.status)
   const camposAsaas = { asaas_status: excluida ? 'DELETED' : p.status, asaas_invoice_url: p.invoiceUrl }
@@ -198,11 +183,10 @@ export async function processarCobranca(
       ...camposAsaas,
       status: manterRecebido(ligado, status),
       forma_pagamento: ligado.forma_pagamento ?? formaPagamento[p.billingType] ?? null,
-      ...(ligado.asaas_criado ? { valor: Number(p.value), data: p.dueDate } : {}),
+      ...(ligado.asaas_criado ? { valor: liquido(p), data: p.dueDate } : {}),
       updated_at: new Date().toISOString(),
     }).eq('id', ligado.id)
     if (error) throw error
-    if (ligado.asaas_criado) await lancarTaxa(ctx, p, ligado.cliente_id ? { id: ligado.cliente_id } : null)
     return resultado
   }
 
@@ -270,7 +254,7 @@ export async function processarCobranca(
   }
 
   // Nenhum: cria
-  const resultado = { ...base, acao: 'criado' as const, cliente: cliente.nome }
+  const resultado = { ...base, acao: 'criado' as const, cliente: cliente.nome, valorSistema: liquido(p) }
   if (ctx.simular) return resultado
   const categoria = cliente.tipo === 'saas'
     ? await categoriaId(ctx, 'Catálogo Place', 'receita')
@@ -278,7 +262,7 @@ export async function processarCobranca(
   const { error } = await ctx.supabase.from('lancamentos').insert({
     tipo: 'receita',
     descricao: p.description || `${cliente.tipo === 'saas' ? 'Catálogo Place' : 'Cobrança'} — ${cliente.nome}`,
-    valor: Number(p.value),
+    valor: liquido(p),
     data: p.dueDate,
     status,
     categoria_id: categoria,
@@ -292,7 +276,6 @@ export async function processarCobranca(
   // Outro aviso criou ao mesmo tempo (índice único): trata como já ligado.
   if (error?.code === '23505') return processarCobranca(ctx, p, opcoes)
   if (error) throw error
-  await lancarTaxa(ctx, p, cliente)
   await resolverPendencia(ctx, p.id)
   return resultado
 }
