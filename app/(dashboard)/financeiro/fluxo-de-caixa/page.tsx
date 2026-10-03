@@ -230,8 +230,6 @@ export default function FluxoCaixaPage() {
                 </thead>
                 <tbody>
                   {calc.meses.map((m) => {
-                    const ent = m.entradas + m.entradasPrev
-                    const sai = m.saidas + m.saidasPrev
                     return (
                       <tr key={m.mesKey} className={cn('border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors', m.fase === 'atual' && 'bg-white/[0.02]')}>
                         <td className="px-6 py-3">
@@ -242,14 +240,15 @@ export default function FluxoCaixaPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <span className={cn('font-medium', m.fase === 'projetado' ? 'text-brand-lima/60' : 'text-brand-lima')}>+{formatCurrency(ent)}</span>
-                          {m.fase === 'atual' && m.entradasPrev > 0 && (
+                          {/* Só o que já foi recebido; o previsto fica na linha de baixo. */}
+                          <span className={cn('font-medium', m.fase === 'projetado' ? 'text-brand-lima/60' : 'text-brand-lima')}>+{formatCurrency(m.entradas)}</span>
+                          {m.entradasPrev > 0 && (
                             <p className="text-[10px] text-brand-lavanda/40">{formatCurrency(m.entradasPrev)} a receber</p>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <span className={cn('font-medium', m.fase === 'projetado' ? 'text-brand-rosa/60' : 'text-brand-rosa')}>-{formatCurrency(sai)}</span>
-                          {m.fase === 'atual' && m.saidasPrev > 0 && (
+                          <span className={cn('font-medium', m.fase === 'projetado' ? 'text-brand-rosa/60' : 'text-brand-rosa')}>-{formatCurrency(m.saidas)}</span>
+                          {m.saidasPrev > 0 && (
                             <p className="text-[10px] text-brand-lavanda/40">{formatCurrency(m.saidasPrev)} a pagar</p>
                           )}
                         </td>
