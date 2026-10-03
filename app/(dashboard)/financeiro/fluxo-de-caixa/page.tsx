@@ -225,7 +225,7 @@ export default function FluxoCaixaPage() {
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Entradas</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Saídas</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Resultado</th>
-                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Saldo final</th>
+                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Saldo final (com previstos)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -252,9 +252,21 @@ export default function FluxoCaixaPage() {
                             <p className="text-[10px] text-brand-lavanda/40">{formatCurrency(m.saidasPrev)} a pagar</p>
                           )}
                         </td>
-                        <td className={cn('px-4 py-3 text-right font-semibold whitespace-nowrap', m.resultado >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>
-                          {m.resultado >= 0 ? '+' : ''}{formatCurrency(m.resultado)}
-                        </td>
+                        {(() => {
+                          // Resultado realizado (recebido − pago); o previsto fica embaixo.
+                          const realizado = m.entradas - m.saidas
+                          const previsto = m.entradasPrev - m.saidasPrev
+                          return (
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <span className={cn('font-semibold', realizado >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>
+                                {realizado >= 0 ? '+' : ''}{formatCurrency(realizado)}
+                              </span>
+                              {(m.entradasPrev > 0 || m.saidasPrev > 0) && (
+                                <p className="text-[10px] text-brand-lavanda/40">{previsto >= 0 ? '+' : ''}{formatCurrency(previsto)} previsto</p>
+                              )}
+                            </td>
+                          )
+                        })()}
                         <td className={cn('px-4 py-3 text-right font-bold whitespace-nowrap', m.saldo >= 0 ? 'text-brand-lavanda' : 'text-brand-rosa')}>
                           {formatCurrency(m.saldo)}
                         </td>
