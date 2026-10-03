@@ -50,7 +50,7 @@ export const leadStatusConfig = {
   novo:        { label: 'Novo',                 variant: 'lead' as const },
   em_contato:  { label: 'Em contato',           variant: 'pendente' as const },
   qualificado: { label: 'Reunião / qualificado', variant: 'default' as const },
-  proposta:    { label: 'Proposta enviada',     variant: 'outline' as const },
+  proposta:    { label: 'Proposta',             variant: 'outline' as const },
   convertido:  { label: 'Fechado',              variant: 'aprovada' as const },
   descartado:  { label: 'Perdido',              variant: 'inativo' as const },
 }

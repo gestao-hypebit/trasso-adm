@@ -142,7 +142,7 @@ export default function NovaPropostaPage() {
       return
     }
 
-    router.push('/propostas')
+    router.push(`/propostas/${proposta.id}`)
   }
 
   return (

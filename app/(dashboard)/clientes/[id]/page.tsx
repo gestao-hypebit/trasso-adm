@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { NovaInteracaoDialog, type Interacao } from '@/components/clientes/nova-interacao-dialog'
+import { ExcluirClienteDialog } from '@/components/clientes/excluir-cliente-dialog'
 import { labelOrigem, labelSegmento } from '@/lib/crm/opcoes'
 import { formatDate, formatCurrency, formatRelative, getInitials, cn, whatsappUrl, toISODateLocal } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -204,11 +205,18 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
           </Link>
-          <Link href={`/clientes/${id}/editar`}>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Edit className="h-4 w-4" /> Editar
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <ExcluirClienteDialog
+              clienteId={id}
+              nome={cliente.nome}
+              contagem={{ projetos: projetos.length, propostas: propostas.length, contratos: contratos.length, lancamentos: lancamentos.length }}
+            />
+            <Link href={`/clientes/${id}/editar`}>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Edit className="h-4 w-4" /> Editar
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <Card className="mb-6">
@@ -467,7 +475,7 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-3">
               {propostas.length === 0 ? (
                 <EmptyState texto="Nenhuma proposta para este cliente.">
-                  <Link href="/propostas/nova"><Button size="sm" variant="outline"><Plus className="h-4 w-4" /> Nova proposta</Button></Link>
+                  <Link href={`/propostas/nova?cliente=${id}`}><Button size="sm" variant="outline"><Plus className="h-4 w-4" /> Nova proposta</Button></Link>
                 </EmptyState>
               ) : propostas.map((p) => {
                 const sc = propostaStatus[p.status]
