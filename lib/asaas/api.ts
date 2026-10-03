@@ -22,6 +22,12 @@ export type AsaasPayment = {
   deleted?: boolean
 }
 
+export type AsaasSubscription = {
+  id: string
+  status: string // ACTIVE | INACTIVE | EXPIRED
+  deleted?: boolean
+}
+
 export type AsaasCustomer = {
   id: string
   name: string
@@ -50,6 +56,7 @@ async function asaasGet<T>(path: string): Promise<T> {
 
 export const buscarCobranca = (id: string) => asaasGet<AsaasPayment>(`/payments/${encodeURIComponent(id)}`)
 export const buscarClienteAsaas = (id: string) => asaasGet<AsaasCustomer>(`/customers/${encodeURIComponent(id)}`)
+export const buscarAssinatura = (id: string) => asaasGet<AsaasSubscription>(`/subscriptions/${encodeURIComponent(id)}`)
 
 // Todas as cobranças com vencimento a partir de `desde` (YYYY-MM-DD).
 export async function listarCobrancas(desde: string): Promise<AsaasPayment[]> {

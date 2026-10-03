@@ -1,5 +1,5 @@
 import 'server-only'
-import { buscarClienteAsaas, type AsaasPayment } from '@/lib/asaas/api'
+import { buscarAssinatura, buscarClienteAsaas, type AsaasPayment } from '@/lib/asaas/api'
 
 // Transforma uma cobrança do Asaas em lançamento, sem nunca duplicar:
 //
@@ -38,9 +38,26 @@ export type Contexto = {
   // Na prévia nada é gravado: guarda em memória os lançamentos já "ligados"
   // para a próxima cobrança do mesmo cliente/mês não contar o mesmo de novo.
   usadosNaPrevia?: Set<string>
+  // Situação de cada assinatura já consultada nesta execução.
+  assinaturas?: Map<string, boolean>
+  // Por que o cliente não foi achado (para a pendência/prévia).
+  motivoCliente?: string
 }
 
 const so = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '')
+const normalizarNome = (v: string | null | undefined) =>
+  (v ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+
+// Assinatura cancelada/expirada no Asaas? (consulta uma vez por execução)
+async function assinaturaAtiva(ctx: Contexto, id: string) {
+  ctx.assinaturas ??= new Map()
+  if (!ctx.assinaturas.has(id)) {
+    // Se a consulta falhar, considera ativa: melhor processar do que sumir com uma cobrança.
+    const a = await buscarAssinatura(id).catch(() => null)
+    ctx.assinaturas.set(id, !a || (!a.deleted && a.status === 'ACTIVE'))
+  }
+  return ctx.assinaturas.get(id)!
+}
 
 export function statusDoLancamento(statusAsaas: string): 'recebido' | 'pendente' | 'cancelado' {
   if (['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(statusAsaas)) return 'recebido'
@@ -85,11 +102,28 @@ async function acharCliente(ctx: Contexto, customerId: string): Promise<ClienteR
 
   const doAsaas = await buscarClienteAsaas(customerId)
   const doc = so(doAsaas.cpfCnpj)
-  const email = doAsaas.email?.trim().toLowerCase()
-  const achado =
-    (doc && clientes.find((c) => so(c.cpf_cnpj) === doc)) ||
-    (email && clientes.find((c) => c.email?.trim().toLowerCase() === email)) ||
-    null
+  const email = doAsaas.email?.trim().toLowerCase() || ''
+  const nome = normalizarNome(doAsaas.name)
+
+  // Cliente já ligado a outro cadastro do Asaas não entra na disputa:
+  // assim duas lojas com o mesmo CPF não caem no mesmo cliente.
+  const livres = clientes.filter((c) => !c.asaas_customer_id || c.asaas_customer_id === customerId)
+  const porEmail = email ? livres.filter((c) => c.email?.trim().toLowerCase() === email) : []
+  const porDoc = doc ? livres.filter((c) => so(c.cpf_cnpj) === doc) : []
+  const ambos = porEmail.filter((c) => porDoc.includes(c))
+
+  // Ordem: e-mail + CPF/CNPJ → só e-mail → só CPF/CNPJ (se for um cliente só) → CPF/CNPJ + nome.
+  let achado: ClienteRow | null = null
+  if (ambos.length === 1) achado = ambos[0]
+  else if (porEmail.length === 1) achado = porEmail[0]
+  else if (porDoc.length === 1) achado = porDoc[0]
+  else if (porDoc.length > 1) {
+    const mesmoNome = porDoc.filter((c) => normalizarNome(c.nome) === nome)
+    if (mesmoNome.length === 1) achado = mesmoNome[0]
+    else ctx.motivoCliente = `${porDoc.length} clientes com o mesmo CPF/CNPJ e o e-mail do Asaas (${doAsaas.email || 'vazio'}) não bate com nenhum`
+  }
+  if (!achado && !ctx.motivoCliente) ctx.motivoCliente = `"${doAsaas.name}" não encontrado pelo e-mail nem pelo CPF/CNPJ`
+
   if (achado && !achado.asaas_customer_id) {
     if (!ctx.simular) await ctx.supabase.from('clientes').update({ asaas_customer_id: customerId }).eq('id', achado.id)
     achado.asaas_customer_id = customerId
@@ -175,14 +209,22 @@ export async function processarCobranca(
   // 2. Fora do período da integração (ou excluída sem nada ligado)
   if (p.dueDate < ctx.inicio || excluida) return { ...base, acao: 'ignorado', detalhe: excluida ? 'Cobrança excluída' : 'Vencimento antes do início da integração' }
 
-  // 3. Cliente
-  const cliente = await acharCliente(ctx, p.customer)
-  if (!cliente) {
-    await registrarPendencia(ctx, p, 'cliente_nao_encontrado', {})
-    return { ...base, acao: 'pendencia', detalhe: 'Cliente do Asaas não encontrado pelo CPF/CNPJ nem e-mail' }
+  // 3. Assinatura cancelada: cobrança que ficou em aberto não entra (não é receita esperada).
+  //    Se foi paga mesmo assim, entra normalmente.
+  if (p.subscription && status !== 'recebido' && !(await assinaturaAtiva(ctx, p.subscription))) {
+    return { ...base, acao: 'ignorado', detalhe: 'Assinatura cancelada no Asaas' }
   }
 
-  // 4. Lançamento manual do mesmo mês
+  // 4. Cliente
+  ctx.motivoCliente = undefined
+  const cliente = await acharCliente(ctx, p.customer)
+  if (!cliente) {
+    const detalhe = ctx.motivoCliente ?? 'Cliente do Asaas não encontrado'
+    await registrarPendencia(ctx, p, 'cliente_nao_encontrado', { observacao: detalhe })
+    return { ...base, acao: 'pendencia', detalhe }
+  }
+
+  // 5. Lançamento manual do mesmo mês
   let candidatos: { id: string; valor: number; descricao: string; data: string; status: string }[]
   if (opcoes.lancamentoEscolhido) {
     const { data } = await ctx.supabase.from('lancamentos').select('id, valor, descricao, data, status').eq('id', opcoes.lancamentoEscolhido).is('asaas_payment_id', null)

@@ -23,6 +23,7 @@ type Pendencia = {
   detalhes: {
     cobranca?: { value: number; dueDate: string; description: string | null; customer: string }
     cliente_nome?: string
+    observacao?: string
     candidatos?: { id: string; valor: number; descricao: string; data: string; status: string }[]
   }
   created_at: string
@@ -38,7 +39,7 @@ const acaoLabel: Record<string, { label: string; variant: 'aprovada' | 'default'
 }
 
 const motivoLabel = {
-  cliente_nao_encontrado: 'Cliente do Asaas não encontrado pelo CPF/CNPJ nem pelo e-mail',
+  cliente_nao_encontrado: 'Não deu para saber qual cliente do sistema é este cliente do Asaas',
   varios_lancamentos: 'Há mais de um lançamento desse cliente no mesmo mês',
   cobranca_excluida: 'A cobrança foi excluída no Asaas, mas estava ligada a um lançamento manual (o lançamento continua lá)',
 }
@@ -296,6 +297,7 @@ export default function AsaasPage() {
                     <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400 mt-0.5" />
                     <div>
                       <p className="text-sm text-brand-lavanda">{motivoLabel[p.motivo]}</p>
+                      {p.detalhes.observacao && <p className="text-xs text-yellow-400/80">{p.detalhes.observacao}</p>}
                       <p className="text-xs text-brand-lavanda/50">
                         {p.detalhes.cliente_nome ? `${p.detalhes.cliente_nome} · ` : ''}
                         {c ? `${formatCurrency(c.value)} · vence ${formatDate(c.dueDate)}${c.description ? ` · ${c.description}` : ''}` : p.payment_id}
