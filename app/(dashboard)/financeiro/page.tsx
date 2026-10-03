@@ -280,19 +280,19 @@ export default function FinanceiroPage() {
           )}
         </div>
 
-        {/* Saldo em Conta */}
-        <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
-          <div>
-            <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">{frente === 'todas' ? 'Saldo em Conta' : `Resultado acumulado · ${nomeFrente}`}</p>
-            <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-              {loading ? '...' : formatCurrency(saldoAtual)}
-            </p>
-            <p className="text-xs text-brand-lavanda/30 mt-1">
-              {frente === 'todas' ? 'Total recebido − Total pago · histórico completo' : 'Recebido − pago desta frente, sem os custos gerais · histórico completo'}
-            </p>
+        {/* Saldo em Conta: só faz sentido com todas as frentes (é o dinheiro da conta). */}
+        {frente === 'todas' && (
+          <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
+            <div>
+              <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
+              <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                {loading ? '...' : formatCurrency(saldoAtual)}
+              </p>
+              <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
+            </div>
+            <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
           </div>
-          <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
-        </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {kpis.map((kpi) => (
