@@ -323,8 +323,8 @@ export default function CatalogoPage() {
                 sub={asaasCarregando
                   ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> buscando no Asaas…</span>
                   : calc.asaasCarregado
-                    ? <span title={`${calc.viaAsaas} pelo Asaas, ${calc.viaFinanceiro} pelos lançamentos (fora do Asaas). No financeiro, que soma valores líquidos, o MRR lançado é ${formatCurrency(calc.mrr.mrr)}.`}>
-                        Pelo Asaas · financeiro {formatCurrency(calc.mrr.mrr)}
+                    ? <span title={`Bruto: valor cobrado nas assinaturas ativas do Asaas (${calc.viaAsaas} pelo Asaas, ${calc.viaFinanceiro} pelo financeiro). Líquido: o que cai na conta, já sem as taxas do Asaas (mensalidades lançadas no financeiro).`}>
+                        Bruto · líquido <span className="text-brand-lavanda/70">{formatCurrency(calc.mrr.mrr)}</span> após taxas
                       </span>
                     : 'Pelos lançamentos do financeiro'}
               />
@@ -476,7 +476,7 @@ export default function CatalogoPage() {
 
             <p className="text-[11px] text-brand-lavanda/40">
               Clique num assinante para ver a assinatura e as faturas do Asaas.
-              MRR = soma das assinaturas do Catálogo ativas no Asaas (valor cheio, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro.
+              MRR bruto = soma das assinaturas do Catálogo ativas no Asaas (valor cobrado, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro. MRR líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas.
               {calc.foraDoCatalogo > 0 && ` ${calc.foraDoCatalogo} assinatura(s) de clientes "Agência + Catálogo" sem "Catálogo" na descrição ficaram de fora (são consideradas da agência).`} Ativas = tem mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga.
               &quot;Sem mensalidade&quot; = cliente do Catálogo sem mensalidade recente: pode ter cancelado ou faltar lançar.
               {calc.semCliente > 0 && ` ${calc.semCliente} assinante(s) aparecem só pela descrição do lançamento, sem cliente cadastrado; nos próximos lançamentos, escolha o cliente.`}
