@@ -31,6 +31,10 @@ export type Assinante = {
   status: string | null
   asaasCustomerId: string | null
   assinaturas: AssinaturaAsaas[]
+  // Quais dessas assinaturas são do Catálogo Place (o cliente pode ter outras da agência).
+  idsCatalogo: string[]
+  // De onde vêm a mensalidade e a situação: assinatura do Asaas ou lançamentos do financeiro.
+  fonte: 'asaas' | 'financeiro'
   // Lançamentos do financeiro (usado quando o cliente não está no Asaas).
   historico: { data: string; valor: number; status: string; descricao: string }[]
   // Assinatura do Asaas sem cliente do sistema ligado a ela.
@@ -174,7 +178,7 @@ export function AssinantePainel({
 
           {/* Resumo */}
           <div className="grid grid-cols-2 gap-3">
-            <Resumo titulo="Mensalidade" valor={a.mensalidade ? formatCurrency(a.mensalidade) : '—'} />
+            <Resumo titulo="Mensalidade" valor={a.mensalidade ? formatCurrency(a.mensalidade) : '—'} nota={a.fonte === 'asaas' ? 'pela assinatura do Asaas' : 'pelo financeiro'} />
             <Resumo titulo="Em atraso" valor={a.atraso ? formatCurrency(a.atraso) : '—'} destaque={a.atraso > 0} sub={a.atraso ? `há ${a.diasAtraso} dias` : undefined} />
             <Resumo titulo="Assinante desde" valor={a.desde ? `${a.desde.slice(5, 7)}/${a.desde.slice(0, 4)}` : '—'} />
             <Resumo titulo="Meses pagos" valor={a.mesesPagos ? String(a.mesesPagos) : '—'} />
@@ -196,7 +200,12 @@ export function AssinantePainel({
                           </p>
                           {s.descricao && <p className="mt-0.5 text-xs text-brand-lavanda/50">{s.descricao}</p>}
                         </div>
-                        <Badge variant={st.variant}>{st.label}</Badge>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <Badge variant={st.variant}>{st.label}</Badge>
+                          {!a.soNoAsaas && !a.idsCatalogo.includes(s.id) && (
+                            <Badge variant="outline" title="Não tem &quot;Catálogo&quot; na descrição: é considerada da agência e não entra no MRR do Catálogo.">Agência</Badge>
+                          )}
+                        </div>
                       </div>
                       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
                         <Dado rotulo="Próximo vencimento" valor={s.status === 'ACTIVE' ? formatDate(s.proximoVencimento) : '—'} />
@@ -366,12 +375,13 @@ export function AssinantePainel({
   )
 }
 
-function Resumo({ titulo, valor, sub, destaque }: { titulo: string; valor: string; sub?: string; destaque?: boolean }) {
+function Resumo({ titulo, valor, sub, nota, destaque }: { titulo: string; valor: string; sub?: string; nota?: string; destaque?: boolean }) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
       <p className="text-[11px] text-brand-lavanda/40">{titulo}</p>
       <p className={cn('text-base font-semibold', destaque ? 'text-brand-rosa' : 'text-brand-lavanda')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>{valor}</p>
       {sub && <p className="text-[11px] text-brand-rosa/70">{sub}</p>}
+      {nota && <p className="text-[11px] text-brand-lavanda/30">{nota}</p>}
     </div>
   )
 }
