@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Repeat, Users, UserPlus, UserMinus, AlertTriangle, Search, MessageCircle, Download } from 'lucide-react'
+import { Repeat, Users, UserPlus, UserMinus, AlertTriangle, Search, MessageCircle, Download, PlugZap } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { KpiCard } from '@/components/dashboard/kpi-card'
@@ -162,6 +162,7 @@ export default function CatalogoPage() {
           title="Catálogo Place"
           description="Assinantes são os clientes do tipo Catálogo Place. As mensalidades vêm dos lançamentos do financeiro."
         >
+          <Button variant="outline" size="sm" asChild><Link href="/catalogo/asaas"><PlugZap className="h-4 w-4" /> Asaas</Link></Button>
           <Button variant="outline" size="sm" onClick={exportar} disabled={!visiveis.length}><Download className="h-4 w-4" /> Exportar CSV</Button>
         </PageHeader>
 

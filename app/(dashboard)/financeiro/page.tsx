@@ -160,7 +160,7 @@ export default function FinanceiroPage() {
       })(),
       icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10',
     },
-    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: frente === 'todas' ? 'Receitas recebidas − Despesas pagas' : 'Inclui os custos gerais', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
+    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: frente === 'todas' ? 'Receitas recebidas − Despesas pagas' : 'Sem os custos gerais (veja em Tudo)', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
   ]
 
   // Resultado de cada frente no período (só na visão "Tudo").
@@ -288,7 +288,7 @@ export default function FinanceiroPage() {
               {loading ? '...' : formatCurrency(saldoAtual)}
             </p>
             <p className="text-xs text-brand-lavanda/30 mt-1">
-              {frente === 'todas' ? 'Total recebido − Total pago · histórico completo' : 'Recebido − pago desta frente, incluindo custos gerais · histórico completo'}
+              {frente === 'todas' ? 'Total recebido − Total pago · histórico completo' : 'Recebido − pago desta frente, sem os custos gerais · histórico completo'}
             </p>
           </div>
           <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />

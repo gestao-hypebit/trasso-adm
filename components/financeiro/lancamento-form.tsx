@@ -90,6 +90,7 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
   const { frente } = useFrente()
   // "auto" deixa o banco decidir pela categoria/cliente.
   const [frenteSel, setFrenteSel] = useState<string>('auto')
+  const [asaasAtivo, setAsaasAtivo] = useState(false)
 
   useEffect(() => {
     if (open) setFrenteSel(frente === 'todas' ? 'auto' : frente)
@@ -109,7 +110,9 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
       supabase.from('clientes').select('id, nome').order('nome'),
       supabase.from('categorias_financeiras').select('id, nome').eq('tipo', tipo).order('nome'),
       supabase.from('projetos').select('id, nome, cliente_id').neq('status', 'cancelado').order('created_at', { ascending: false }),
-    ]).then(([c, cat, proj]) => {
+      (supabase as any).from('configuracoes_agencia').select('asaas_inicio').limit(1).maybeSingle(),
+    ]).then(([c, cat, proj, cfg]) => {
+      setAsaasAtivo(!!cfg.data?.asaas_inicio)
       setClientes(c.data ?? [])
       setCategorias(cat.data ?? [])
       setProjetos((proj.data ?? []) as ProjetoOption[])
@@ -245,6 +248,9 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
                 </SelectContent>
               </Select>
               {errors.categoria && <p className="text-brand-rosa text-xs mt-1">{errors.categoria.message}</p>}
+              {asaasAtivo && tipo === 'receita' && /cat[aá]logo/i.test(watch('categoria') ?? '') && (
+                <p className="text-yellow-400 text-xs mt-1">As mensalidades do Catálogo já entram sozinhas pelo Asaas. Lançar aqui pode duplicar.</p>
+              )}
             </div>
 
             <div>

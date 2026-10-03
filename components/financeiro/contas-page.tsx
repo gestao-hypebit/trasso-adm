@@ -12,12 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LancamentoForm } from '@/components/financeiro/lancamento-form'
 import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { formatCurrency, formatDate, cn, whatsappUrl, addMonthsISO } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO, diasEntre, situacaoDe, aging, baixarCSV, type Situacao } from '@/lib/financeiro'
+import { SeletorMes, periodoInicial, intervaloPeriodo, rotuloPeriodo, type Periodo } from '@/components/financeiro/seletor-mes'
 import { useFrente, filtrarLancamentos, frenteLancamentoOpcoes, type FrenteLancamento } from '@/components/layout/frente'
 
 type Lancamento = {
@@ -29,28 +29,10 @@ type Lancamento = {
 }
 
 type Aba = 'aberto' | 'vencidas' | 'semana' | 'liquidadas' | 'canceladas' | 'todas'
-type Periodo = 'todos' | 'mes_passado' | 'este_mes' | 'proximo_mes' | 'ano'
 
 const formaLabel: Record<string, string> = {
   pix: 'PIX', transferencia: 'Transferência', boleto: 'Boleto',
   cartao_credito: 'Cartão crédito', cartao_debito: 'Cartão débito', dinheiro: 'Dinheiro',
-}
-
-function intervaloDoPeriodo(p: Periodo, hoje: string): [string, string] {
-  const inicioMes = hoje.slice(0, 8) + '01'
-  const fimDe = (ini: string) => {
-    const prox = addMonthsISO(ini, 1)
-    const [y, m] = prox.split('-').map(Number)
-    const ultimo = new Date(y, m - 1, 0).getDate()
-    return ini.slice(0, 8) + String(ultimo).padStart(2, '0')
-  }
-  switch (p) {
-    case 'mes_passado': { const ini = addMonthsISO(inicioMes, -1); return [ini, fimDe(ini)] }
-    case 'este_mes': return [inicioMes, fimDe(inicioMes)]
-    case 'proximo_mes': { const ini = addMonthsISO(inicioMes, 1); return [ini, fimDe(ini)] }
-    case 'ano': return [hoje.slice(0, 4) + '-01-01', hoje.slice(0, 4) + '-12-31']
-    default: return ['0000-01-01', '9999-12-31']
-  }
 }
 
 function SituacaoBadge({ situacao, data, hoje, liquidadoLabel }: { situacao: Situacao; data: string; hoje: string; liquidadoLabel: string }) {
@@ -79,7 +61,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [aba, setAba] = useState<Aba>('aberto')
-  const [periodo, setPeriodo] = useState<Periodo>('todos')
+  const [periodo, setPeriodo] = useState<Periodo>(periodoInicial)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [baixando, setBaixando] = useState(false)
@@ -94,6 +76,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
         .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
         .eq('tipo', tipo),
       frente,
+      { incluirGeral: true },
     ).order('data', { ascending: true })
     setLancamentos((data as Lancamento[]) ?? [])
     setLoading(false)
@@ -129,8 +112,9 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const abertos = useMemo(() => lancamentos.filter(l => l.status === 'pendente'), [lancamentos])
   const vencidos = abertos.filter(l => l.data < hoje)
   const em7 = abertos.filter(l => l.data >= hoje && diasEntre(hoje, l.data) <= 7)
-  const mesAtual = hoje.slice(0, 7)
-  const liquidadoMes = lancamentos.filter(l => l.status === statusLiquidado && l.data.startsWith(mesAtual))
+  const [ini, fim] = intervaloPeriodo(periodo)
+  const noPeriodo = lancamentos.filter(l => l.data >= ini && l.data <= fim)
+  const liquidadoMes = noPeriodo.filter(l => l.status === statusLiquidado)
   const soma = (arr: Lancamento[]) => arr.reduce((s, l) => s + l.valor, 0)
   const faixas = aging(abertos, hoje)
   const maxFaixa = Math.max(...faixas.map(f => f.valor), 1)
@@ -144,17 +128,17 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     }, {} as Record<string, number>)
   ).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
-  const [ini, fim] = intervaloDoPeriodo(periodo, hoje)
+  // As abas contam só o período escolhido; os cartões do topo mostram a situação de hoje.
   const contagem: Record<Aba, number> = {
-    aberto: abertos.length,
-    vencidas: vencidos.length,
-    semana: em7.length,
-    liquidadas: lancamentos.filter(l => l.status === statusLiquidado).length,
-    canceladas: lancamentos.filter(l => l.status === 'cancelado').length,
-    todas: lancamentos.length,
+    aberto: noPeriodo.filter(l => l.status === 'pendente').length,
+    vencidas: noPeriodo.filter(l => l.status === 'pendente' && l.data < hoje).length,
+    semana: noPeriodo.filter(l => l.status === 'pendente' && l.data >= hoje && diasEntre(hoje, l.data) <= 7).length,
+    liquidadas: liquidadoMes.length,
+    canceladas: noPeriodo.filter(l => l.status === 'cancelado').length,
+    todas: noPeriodo.length,
   }
 
-  const filtradas = lancamentos
+  const filtradas = noPeriodo
     .filter((l) => {
       switch (aba) {
         case 'aberto': return l.status === 'pendente'
@@ -165,7 +149,6 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
         default: return true
       }
     })
-    .filter(l => l.data >= ini && l.data <= fim)
     .filter((l) => {
       const q = busca.toLowerCase()
       return !q || l.descricao.toLowerCase().includes(q)
@@ -212,7 +195,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     { label: 'Vencido', valor: soma(vencidos), sub: `${vencidos.length} título(s) em atraso`, icon: AlertTriangle, cor: 'text-brand-rosa', bg: 'bg-brand-rosa/10', aba: 'vencidas' as Aba },
     { label: 'Vence em 7 dias', valor: soma(em7), sub: `${em7.length} título(s)`, icon: CalendarClock, cor: 'text-yellow-400', bg: 'bg-yellow-400/10', aba: 'semana' as Aba },
     { label: 'Total em aberto', valor: soma(abertos), sub: `${abertos.length} título(s)`, icon: Wallet, cor: 'text-brand-lavanda', bg: 'bg-brand-violeta/10', aba: 'aberto' as Aba },
-    { label: `${t.liquidado} no mês`, valor: soma(liquidadoMes), sub: `${liquidadoMes.length} baixa(s)`, icon: CheckCircle2, cor: t.cor, bg: ehReceber ? 'bg-brand-lima/10' : 'bg-brand-rosa/10', aba: 'liquidadas' as Aba },
+    { label: `${t.liquidado} · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(liquidadoMes), sub: `${liquidadoMes.length} baixa(s)`, icon: CheckCircle2, cor: t.cor, bg: ehReceber ? 'bg-brand-lima/10' : 'bg-brand-rosa/10', aba: 'liquidadas' as Aba },
   ]
 
   const abas: { key: Aba; label: string }[] = [
@@ -241,7 +224,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
         {/* KPIs — clicar filtra a tabela */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {kpis.map((k) => (
-            <button key={k.label} type="button" onClick={() => setAba(k.aba)} className="text-left">
+            <button key={k.label} type="button" onClick={() => { setAba(k.aba); if (k.aba !== 'liquidadas') setPeriodo(p => ({ ...p, tudo: true })) }} className="text-left">
               <Card className={cn('transition-colors hover:border-white/[0.14]', aba === k.aba && 'border-white/[0.18]')}>
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', k.bg)}>
@@ -300,6 +283,10 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
           </Card>
         </div>
 
+        <div className="mb-4">
+          <SeletorMes valor={periodo} onChange={(p) => { setPeriodo(p); setSelecionados(new Set()) }} permitirFuturo />
+        </div>
+
         {/* Abas de situação */}
         <div className="flex gap-1 mb-4 overflow-x-auto">
           {abas.map((a) => (
@@ -325,16 +312,6 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
             <Input className="pl-9" placeholder={ehReceber ? 'Buscar por descrição, cliente ou categoria...' : 'Buscar por descrição ou categoria...'} value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
-          <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
-            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Qualquer vencimento</SelectItem>
-              <SelectItem value="mes_passado">Mês passado</SelectItem>
-              <SelectItem value="este_mes">Este mês</SelectItem>
-              <SelectItem value="proximo_mes">Próximo mês</SelectItem>
-              <SelectItem value="ano">Este ano</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {selecionados.size > 0 && (

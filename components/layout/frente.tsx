@@ -22,16 +22,21 @@ export const frenteLancamentoOpcoes: { value: FrenteLancamento; label: string }[
 export const labelFrenteLancamento = (v: string | null | undefined) =>
   frenteLancamentoOpcoes.find((o) => o.value === v)?.label.replace(' (compartilhado)', '') ?? '—'
 
-// Lançamentos que aparecem em cada frente. Custos gerais aparecem nas duas,
-// para nenhuma conta a pagar sumir da tela.
-export function frentesDosLancamentos(frente: Frente): FrenteLancamento[] | null {
+// Lançamentos de cada frente. Custos gerais (compartilhados) não entram no
+// resultado de nenhuma frente — só no "Tudo". Em contas a pagar/receber eles
+// aparecem também (incluirGeral), para nenhuma conta sumir da tela.
+export function frentesDosLancamentos(frente: Frente, incluirGeral = false): FrenteLancamento[] | null {
   if (frente === 'todas') return null
-  return [frente, 'geral']
+  return incluirGeral ? [frente, 'geral'] : [frente]
 }
 
 // Aplica o filtro de frente numa consulta de lançamentos do Supabase.
-export function filtrarLancamentos<Q extends { in: (col: string, vals: string[]) => Q }>(query: Q, frente: Frente): Q {
-  const frentes = frentesDosLancamentos(frente)
+export function filtrarLancamentos<Q extends { in: (col: string, vals: string[]) => Q }>(
+  query: Q,
+  frente: Frente,
+  opcoes: { incluirGeral?: boolean } = {},
+): Q {
+  const frentes = frentesDosLancamentos(frente, opcoes.incluirGeral)
   return frentes ? query.in('frente', frentes) : query
 }
 
