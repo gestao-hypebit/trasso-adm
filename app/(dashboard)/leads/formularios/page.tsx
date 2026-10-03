@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, LayoutList } from 'lucide-react'
+import { Plus, LayoutList } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
+import { LeadsSubNav } from '@/components/leads/leads-sub-nav'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,9 +57,7 @@ export default function FormulariosPage() {
       <Header title="Formulários" description="Formulários de captação do site" />
 
       <main className="flex-1 p-4 md:p-6">
-        <Link href="/leads" className="mb-4 inline-flex items-center gap-1.5 text-xs text-brand-lavanda/50 hover:text-brand-lavanda">
-          <ArrowLeft className="h-3.5 w-3.5" /> Leads
-        </Link>
+        <LeadsSubNav />
         <PageHeader title="Formulários" description="Monte aqui os campos que aparecem no site. As mudanças entram no ar em até 1 minuto.">
           <Button onClick={criar} disabled={criando}>
             <Plus className="h-4 w-4" /> Novo formulário

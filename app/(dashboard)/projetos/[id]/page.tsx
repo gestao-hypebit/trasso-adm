@@ -16,6 +16,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { RentabilidadeProjeto } from '@/components/projetos/rentabilidade-projeto'
+import { OnboardingProjeto } from '@/components/projetos/onboarding-projeto'
+import { EntregasProjeto } from '@/components/projetos/entregas-projeto'
+import type { ClientePortal } from '@/components/projetos/portal-link-acoes'
 
 const TAREFA_VAZIA = { titulo: '', prioridade: 'media', data_vencimento: '', descricao: '' }
 
@@ -23,7 +26,9 @@ type Projeto = {
   id: string; nome: string; descricao: string | null; tipo: string | null; status: string
   prioridade: string; progresso: number; valor: number | null; data_inicio: string | null; data_entrega: string | null
   horas_estimadas: number | null
-  clientes: { nome: string } | null
+  cliente_id: string | null
+  revisoes_inclusas: number | null
+  clientes: ClientePortal | null
 }
 type Tarefa = {
   id: string; titulo: string; status: string; prioridade: string; data_vencimento: string | null
@@ -73,7 +78,7 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
     const supabase = createClient()
     async function load() {
       const [{ data: p }, { data: t }] = await Promise.all([
-        supabase.from('projetos').select('*, clientes(nome)').eq('id', id).single(),
+        supabase.from('projetos').select('*, clientes(nome, telefone, whatsapp, portal_token, portal_ativo)').eq('id', id).single(),
         supabase.from('tarefas').select('id, titulo, status, prioridade, data_vencimento').eq('projeto_id', id).order('ordem'),
       ])
       setProjeto(p as unknown as Projeto)
@@ -147,8 +152,10 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
         </Card>
 
         <Tabs defaultValue="tarefas">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 max-w-full overflow-x-auto">
             <TabsTrigger value="tarefas">Tarefas ({tarefas.length})</TabsTrigger>
+            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+            <TabsTrigger value="entregas">Entregas</TabsTrigger>
             <TabsTrigger value="financeiro">Rentabilidade</TabsTrigger>
           </TabsList>
 
@@ -194,6 +201,20 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
                 })}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="onboarding">
+            <OnboardingProjeto projetoId={id} tipo={projeto.tipo} cliente={projeto.clientes} />
+          </TabsContent>
+
+          <TabsContent value="entregas">
+            <EntregasProjeto
+              projetoId={id}
+              clienteId={projeto.cliente_id}
+              cliente={projeto.clientes}
+              revisoesInclusas={projeto.revisoes_inclusas ?? null}
+              onRevisoesChange={(n) => setProjeto((p) => (p ? { ...p, revisoes_inclusas: n } : p))}
+            />
           </TabsContent>
 
           <TabsContent value="financeiro">

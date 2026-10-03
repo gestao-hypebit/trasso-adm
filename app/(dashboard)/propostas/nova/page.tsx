@@ -85,8 +85,11 @@ export default function NovaPropostaPage() {
     const supabase = createClient()
     supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => {
       setClientes(data ?? [])
+      // Vindo do funil de leads: /propostas/nova?cliente=<id>
+      const preSelecionado = new URLSearchParams(window.location.search).get('cliente')
+      if (preSelecionado && (data as ClienteOption[] | null)?.some((c) => c.id === preSelecionado)) setValue('cliente_id', preSelecionado)
     })
-  }, [])
+  }, [setValue])
 
   async function onSubmit(data: FormData) {
     setSubmitError(null)
@@ -167,7 +170,7 @@ export default function NovaPropostaPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Cliente *</Label>
-                      <Select onValueChange={(v) => setValue('cliente_id', v)}>
+                      <Select value={watch('cliente_id') ?? ''} onValueChange={(v) => setValue('cliente_id', v)}>
                         <SelectTrigger><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
                         <SelectContent>
                           {clientes.map((c) => (

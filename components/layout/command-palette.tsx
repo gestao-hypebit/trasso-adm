@@ -2,17 +2,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Users, FolderOpen, FileText, FileSignature, Loader2 } from 'lucide-react'
+import { Search, Users, FolderOpen, FileText, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
-type Tipo = 'cliente' | 'projeto' | 'proposta' | 'contrato'
+type Tipo = 'cliente' | 'projeto' | 'proposta'
 type ResultItem = { id: string; tipo: Tipo; titulo: string; subtitulo?: string; href: string }
 
-const TIPOS: Tipo[] = ['cliente', 'projeto', 'proposta', 'contrato']
-const ICONS: Record<Tipo, React.FC<any>> = { cliente: Users, projeto: FolderOpen, proposta: FileText, contrato: FileSignature }
-const LABELS: Record<Tipo, string> = { cliente: 'Clientes', projeto: 'Projetos', proposta: 'Propostas', contrato: 'Contratos' }
+const TIPOS: Tipo[] = ['cliente', 'projeto', 'proposta']
+const ICONS: Record<Tipo, React.FC<any>> = { cliente: Users, projeto: FolderOpen, proposta: FileText }
+const LABELS: Record<Tipo, string> = { cliente: 'Clientes', projeto: 'Projetos', proposta: 'Propostas' }
 
 const CommandPaletteContext = createContext<{ open: () => void } | null>(null)
 
@@ -59,17 +59,15 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
       const supabase = createClient() as any
       const safe = termo.replace(/[,()%]/g, '')
       const like = `%${safe}%`
-      const [{ data: clientes }, { data: projetos }, { data: propostas }, { data: contratos }] = await Promise.all([
+      const [{ data: clientes }, { data: projetos }, { data: propostas }] = await Promise.all([
         supabase.from('clientes').select('id, nome, empresa').or(`nome.ilike.${like},empresa.ilike.${like}`).limit(5),
         supabase.from('projetos').select('id, nome, clientes(nome)').ilike('nome', like).limit(5),
         supabase.from('propostas').select('id, numero, titulo, clientes(nome)').or(`numero.ilike.${like},titulo.ilike.${like}`).limit(5),
-        supabase.from('contratos').select('id, numero, titulo, clientes(nome)').or(`numero.ilike.${like},titulo.ilike.${like}`).limit(5),
       ])
       const items: ResultItem[] = [
         ...(clientes ?? []).map((c: any) => ({ id: c.id, tipo: 'cliente' as const, titulo: c.nome, subtitulo: c.empresa ?? undefined, href: `/clientes/${c.id}` })),
         ...(projetos ?? []).map((p: any) => ({ id: p.id, tipo: 'projeto' as const, titulo: p.nome, subtitulo: p.clientes?.nome, href: `/projetos/${p.id}` })),
         ...(propostas ?? []).map((p: any) => ({ id: p.id, tipo: 'proposta' as const, titulo: p.titulo, subtitulo: `${p.numero}${p.clientes?.nome ? ' · ' + p.clientes.nome : ''}`, href: `/propostas/${p.id}` })),
-        ...(contratos ?? []).map((c: any) => ({ id: c.id, tipo: 'contrato' as const, titulo: c.titulo, subtitulo: `${c.numero}${c.clientes?.nome ? ' · ' + c.clientes.nome : ''}`, href: `/contratos/${c.id}` })),
       ]
       setResults(items)
       setActiveIndex(0)
@@ -104,7 +102,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Buscar clientes, projetos, propostas, contratos..."
+              placeholder="Buscar clientes, projetos, propostas..."
               className="flex-1 bg-transparent py-3.5 text-sm text-brand-lavanda placeholder:text-brand-lavanda/30 outline-none"
             />
             {loading && <Loader2 className="h-4 w-4 animate-spin text-brand-lavanda/40 shrink-0" />}

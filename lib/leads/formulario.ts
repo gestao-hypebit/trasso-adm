@@ -45,12 +45,14 @@ export const tiposComOpcoes: CampoTipo[] = ['opcoes', 'multiplas', 'select']
 // O campo "nome" é fixo: todo lead precisa de um nome.
 export const CHAVE_NOME = 'nome'
 
+// Etapas do funil, na ordem. "convertido" = venda fechada, "descartado" = perdido.
 export const leadStatusConfig = {
-  novo:        { label: 'Novo',        variant: 'lead' as const },
-  em_contato:  { label: 'Em contato',  variant: 'pendente' as const },
-  qualificado: { label: 'Qualificado', variant: 'default' as const },
-  convertido:  { label: 'Convertido',  variant: 'aprovada' as const },
-  descartado:  { label: 'Descartado',  variant: 'inativo' as const },
+  novo:        { label: 'Novo',                 variant: 'lead' as const },
+  em_contato:  { label: 'Em contato',           variant: 'pendente' as const },
+  qualificado: { label: 'Reunião / qualificado', variant: 'default' as const },
+  proposta:    { label: 'Proposta enviada',     variant: 'outline' as const },
+  convertido:  { label: 'Fechado',              variant: 'aprovada' as const },
+  descartado:  { label: 'Perdido',              variant: 'inativo' as const },
 }
 export type LeadStatus = keyof typeof leadStatusConfig
 

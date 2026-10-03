@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { proximoNumeroContrato } from '@/lib/contratos/numero'
+import { criarOnboarding } from '@/lib/projetos/onboarding'
 import { formatCurrency, toISODateLocal, addMonthsISO, cn } from '@/lib/utils'
 
 type Item = { quantidade: number; valor_unitario: number; recorrencia: string | null }
@@ -149,6 +150,8 @@ export function ConverterContratoDialog({ propostaId, open, onOpenChange }: Prop
         }).select('id').single()
         if (errProjeto) throw errProjeto
         projetoId = novoProjeto.id
+        // Checklist e briefing já nascem com o projeto. Se falhar, dá para iniciar na aba Onboarding.
+        try { await criarOnboarding(supabase, novoProjeto.id, projeto.tipo) } catch (e) { console.error('[converter] onboarding', e) }
       }
 
       const { data: categorias } = await supabase.from('categorias_financeiras').select('id, nome').eq('tipo', 'receita')

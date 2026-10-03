@@ -6,8 +6,8 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
-  FileSignature, CheckSquare, Calendar, BarChart2, Settings, LogOut,
-  StickyNote, Inbox, Target, ChevronDown, X,
+  CheckSquare, Settings, LogOut,
+  StickyNote, Inbox, Target, Star, ChevronDown, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { href: '/clientes',      icon: Users,           label: 'Clientes' },
   { href: '/leads',         icon: Inbox,           label: 'Leads' },
   { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
+  { href: '/avaliacoes',    icon: Star,            label: 'Avaliações' },
   {
     href: '/financeiro', icon: DollarSign, label: 'Financeiro',
     children: [
@@ -40,11 +41,8 @@ const navItems: NavItem[] = [
     ],
   },
   { href: '/propostas',     icon: FileText,        label: 'Propostas' },
-  { href: '/contratos',     icon: FileSignature,   label: 'Contratos' },
   { href: '/tarefas',       icon: CheckSquare,     label: 'Tarefas' },
   { href: '/anotacoes',     icon: StickyNote,      label: 'Anotações' },
-  { href: '/agenda',        icon: Calendar,        label: 'Agenda' },
-  { href: '/relatorios',    icon: BarChart2,       label: 'Relatórios' },
   { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
 ]
 
