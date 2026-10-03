@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { useFrente, frenteLancamentoOpcoes } from '@/components/layout/frente'
+import { linhaOpcoes } from '@/lib/financeiro/linhas'
 
 const schema = z.object({
   tipo: z.enum(['receita', 'despesa']),
@@ -87,14 +87,13 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
   const [isRecorrente, setIsRecorrente] = useState(false)
   const [frequencia, setFrequencia] = useState<Frequencia>('mensal')
   const [meses, setMeses] = useState(12)
-  const { frente } = useFrente()
   // "auto" deixa o banco decidir pela categoria/cliente.
   const [frenteSel, setFrenteSel] = useState<string>('auto')
   const [asaasAtivo, setAsaasAtivo] = useState(false)
 
   useEffect(() => {
-    if (open) setFrenteSel(frente === 'todas' ? 'auto' : frente)
-  }, [open, frente])
+    if (open) setFrenteSel('auto')
+  }, [open])
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -300,12 +299,12 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
             </div>
 
             <div>
-              <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Frente</Label>
+              <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Linha</Label>
               <Select value={frenteSel} onValueChange={setFrenteSel}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="auto">Automática (pela categoria/cliente)</SelectItem>
-                  {frenteLancamentoOpcoes.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                  {linhaOpcoes.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

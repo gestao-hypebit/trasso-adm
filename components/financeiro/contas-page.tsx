@@ -18,12 +18,12 @@ import { formatCurrency, formatDate, cn, whatsappUrl, addMonthsISO } from '@/lib
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO, diasEntre, situacaoDe, aging, baixarCSV, type Situacao } from '@/lib/financeiro'
 import { SeletorMes, periodoInicial, intervaloPeriodo, rotuloPeriodo, type Periodo } from '@/components/financeiro/seletor-mes'
-import { useFrente, filtrarLancamentos, frenteLancamentoOpcoes, type FrenteLancamento } from '@/components/layout/frente'
+import { linhaOpcoes, linhasDeReceita, type Linha } from '@/lib/financeiro/linhas'
 
 type Lancamento = {
   id: string; descricao: string; valor: number; data: string; status: string
   forma_pagamento: string | null; recorrente: boolean; frequencia: string | null
-  frente: FrenteLancamento
+  frente: Linha
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string; whatsapp: string | null; telefone: string | null } | null
 }
@@ -65,24 +65,20 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [baixando, setBaixando] = useState(false)
+  const [linha, setLinha] = useState<Linha | 'todas'>('todas')
   const hoje = hojeISO()
-  const { frente, pronto } = useFrente()
 
   const load = useCallback(async () => {
-    if (!pronto) return
-    const { data } = await filtrarLancamentos(
-      (createClient() as any)
-        .from('lancamentos')
-        .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
-        .eq('tipo', tipo),
-      frente,
-      { incluirGeral: true },
-    ).order('data', { ascending: true })
+    const { data } = await (createClient() as any)
+      .from('lancamentos')
+      .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
+      .eq('tipo', tipo)
+      .order('data', { ascending: true })
     setLancamentos((data as Lancamento[]) ?? [])
     setLoading(false)
-  }, [tipo, frente, pronto])
+  }, [tipo])
 
-  async function mudarFrente(id: string, nova: FrenteLancamento) {
+  async function mudarFrente(id: string, nova: Linha) {
     const anterior = lancamentos.find(l => l.id === id)?.frente
     setLancamentos(prev => prev.map(l => l.id === id ? { ...l, frente: nova } : l))
     const { error } = await (createClient() as any).from('lancamentos').update({ frente: nova }).eq('id', id)
@@ -109,11 +105,13 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     setDeletingId(null)
   }
 
-  const abertos = useMemo(() => lancamentos.filter(l => l.status === 'pendente'), [lancamentos])
+  // Filtro de linha (só em Contas a Receber): vale para a página toda.
+  const daLinha = useMemo(() => linha === 'todas' ? lancamentos : lancamentos.filter(l => l.frente === linha), [lancamentos, linha])
+  const abertos = useMemo(() => daLinha.filter(l => l.status === 'pendente'), [daLinha])
   const vencidos = abertos.filter(l => l.data < hoje)
   const em7 = abertos.filter(l => l.data >= hoje && diasEntre(hoje, l.data) <= 7)
   const [ini, fim] = intervaloPeriodo(periodo)
-  const noPeriodo = lancamentos.filter(l => l.data >= ini && l.data <= fim)
+  const noPeriodo = daLinha.filter(l => l.data >= ini && l.data <= fim)
   const liquidadoMes = noPeriodo.filter(l => l.status === statusLiquidado)
   const soma = (arr: Lancamento[]) => arr.reduce((s, l) => s + l.valor, 0)
   const faixas = aging(abertos, hoje)
@@ -312,6 +310,16 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
             <Input className="pl-9" placeholder={ehReceber ? 'Buscar por descrição, cliente ou categoria...' : 'Buscar por descrição ou categoria...'} value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
+          {ehReceber && (
+            <select
+              value={linha}
+              onChange={(e) => { setLinha(e.target.value as Linha | 'todas'); setSelecionados(new Set()) }}
+              className="h-9 rounded-md border border-white/[0.1] bg-transparent px-3 text-sm text-brand-lavanda outline-none"
+            >
+              <option value="todas" className="bg-brand-noite">Todas as linhas</option>
+              {linhasDeReceita.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
+            </select>
+          )}
         </div>
 
         {selecionados.size > 0 && (
@@ -346,7 +354,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Vencimento</th>
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Descrição</th>
                     {ehReceber && <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Cliente</th>}
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Categoria · frente</th>
+                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Categoria · linha</th>
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Forma</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Valor</th>
                     <th className="text-center text-xs text-brand-lavanda/50 font-medium px-3 py-3">Situação</th>
@@ -384,12 +392,12 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                           {l.categorias_financeiras?.nome ?? '—'}
                           <select
                             value={l.frente}
-                            onChange={(e) => mudarFrente(l.id, e.target.value as FrenteLancamento)}
+                            onChange={(e) => mudarFrente(l.id, e.target.value as Linha)}
                             onClick={(e) => e.stopPropagation()}
-                            title="Frente"
+                            title="Linha"
                             className="mt-0.5 block bg-transparent text-[11px] text-brand-lavanda/40 hover:text-brand-lavanda outline-none cursor-pointer"
                           >
-                            {frenteLancamentoOpcoes.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
+                            {linhaOpcoes.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
                           </select>
                         </td>
                         <td className="px-3 py-3 text-xs text-brand-lavanda/50 whitespace-nowrap">{formaLabel[l.forma_pagamento ?? ''] ?? '—'}</td>

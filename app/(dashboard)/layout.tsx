@@ -1,11 +1,9 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { CommandPaletteProvider } from '@/components/layout/command-palette'
 import { MobileNavProvider } from '@/components/layout/mobile-nav'
-import { FrenteProvider } from '@/components/layout/frente'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <FrenteProvider>
     <CommandPaletteProvider>
       <MobileNavProvider>
         <div className="flex min-h-screen bg-brand-noite">
@@ -18,6 +16,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </MobileNavProvider>
     </CommandPaletteProvider>
-    </FrenteProvider>
   )
 }

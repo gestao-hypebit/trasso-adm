@@ -14,14 +14,14 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { useFrente, filtrarLancamentos, frenteOpcoes, type FrenteLancamento } from '@/components/layout/frente'
+import { labelLinha, type Linha } from '@/lib/financeiro/linhas'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 type Lancamento = {
   id: string; tipo: string; descricao: string; valor: number; data: string; status: string
   forma_pagamento: string | null
-  frente: FrenteLancamento
+  frente: Linha
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string } | null
 }
@@ -42,8 +42,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function FinanceiroPage() {
   const pathname = usePathname()
-  const { frente, pronto } = useFrente()
-  const nomeFrente = frenteOpcoes.find(f => f.value === frente)!.label
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -60,15 +58,14 @@ export default function FinanceiroPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    if (!pronto) return
     const supabase = createClient() as any
-    const { data } = await filtrarLancamentos(
-      supabase.from('lancamentos').select('id, tipo, descricao, valor, data, status, forma_pagamento, frente, categorias_financeiras(nome), clientes(nome)'),
-      frente,
-    ).order('data', { ascending: false })
+    const { data } = await supabase
+      .from('lancamentos')
+      .select('id, tipo, descricao, valor, data, status, forma_pagamento, frente, categorias_financeiras(nome), clientes(nome)')
+      .order('data', { ascending: false })
     setLancamentos((data as Lancamento[]) ?? [])
     setLoading(false)
-  }, [frente, pronto])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -160,20 +157,20 @@ export default function FinanceiroPage() {
       })(),
       icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10',
     },
-    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: frente === 'todas' ? 'Receitas recebidas − Despesas pagas' : 'Sem os custos gerais (veja em Tudo)', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
+    { label: allTime ? 'Resultado Total' : 'Resultado do Mês', valor: totalReceitas - totalDespesas, sub: 'Receitas recebidas − Despesas pagas', icon: TrendingUp, cor: 'text-brand-violeta', bgIcon: 'bg-brand-violeta/10' },
   ]
 
-  // Resultado de cada frente no período (só na visão "Tudo").
+  // Resultado de cada linha de receita no período.
   const porFrente = (['agencia', 'catalogo_place', 'geral'] as const).map(f => {
     const itens = doMes.filter(l => l.frente === f)
     const receitas = itens.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
     const despesas = itens.filter(l => l.tipo === 'despesa' && l.status === 'pago').reduce((s, l) => s + l.valor, 0)
-    return { frente: f, label: f === 'geral' ? 'Custos gerais' : frenteOpcoes.find(o => o.value === f)!.label, receitas, despesas, resultado: receitas - despesas }
+    return { frente: f, label: f === 'geral' ? 'Custos gerais' : labelLinha(f), receitas, despesas, resultado: receitas - despesas }
   })
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header title="Financeiro" description={frente === 'todas' ? 'Agência e Catálogo Place' : nomeFrente} />
+      <Header title="Financeiro" description="Visão geral" />
       <main className="flex-1 p-4 md:p-6">
         <PageHeader title="Financeiro" description={loading ? 'Carregando...' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}>
           <LancamentoForm onSuccess={load} />
@@ -280,19 +277,17 @@ export default function FinanceiroPage() {
           )}
         </div>
 
-        {/* Saldo em Conta: só faz sentido com todas as frentes (é o dinheiro da conta). */}
-        {frente === 'todas' && (
-          <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
-            <div>
-              <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
-              <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                {loading ? '...' : formatCurrency(saldoAtual)}
-              </p>
-              <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
-            </div>
-            <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
+        {/* Saldo em Conta */}
+        <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
+          <div>
+            <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
+            <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+              {loading ? '...' : formatCurrency(saldoAtual)}
+            </p>
+            <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
           </div>
-        )}
+          <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {kpis.map((kpi) => (
@@ -313,17 +308,17 @@ export default function FinanceiroPage() {
           ))}
         </div>
 
-        {frente === 'todas' && !loading && (
+        {!loading && (
           <Card className="mb-6">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Resultado por frente — {allTime ? 'desde o início' : mesLabel}</CardTitle>
+              <CardTitle className="text-base">Resultado por linha — {allTime ? 'desde o início' : mesLabel}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06]">
-                      <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-2.5">Frente</th>
+                      <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-2.5">Linha</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-2.5">Recebido</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-2.5">Pago</th>
                       <th className="text-right text-xs text-brand-lavanda/50 font-medium px-6 py-2.5">Resultado</th>
@@ -347,7 +342,7 @@ export default function FinanceiroPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="px-6 py-3 text-[11px] text-brand-lavanda/40">Custos gerais são os compartilhados entre as frentes (contabilidade, impostos…). Dá para mudar a frente de cada lançamento em Contas a Receber e Contas a Pagar.</p>
+              <p className="px-6 py-3 text-[11px] text-brand-lavanda/40">Custos gerais são os da empresa toda (contabilidade, impostos…). Dá para mudar a linha de cada lançamento em Contas a Receber e Contas a Pagar.</p>
             </CardContent>
           </Card>
         )}

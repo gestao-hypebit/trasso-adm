@@ -17,7 +17,7 @@ import { hojeISO, baixarCSV } from '@/lib/financeiro'
 import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { useFrente, filtrarLancamentos } from '@/components/layout/frente'
+import { linhasDeReceita, type Linha } from '@/lib/financeiro/linhas'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -44,9 +44,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function MrrPage() {
   const pathname = usePathname()
-  const { frente, pronto } = useFrente()
+  const [linha, setLinha] = useState<Linha | 'todas'>('todas')
   const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [lancamentos, setLancamentos] = useState<LancamentoMrr[]>([])
+  const [lancamentos, setLancamentos] = useState<(LancamentoMrr & { frente: Linha })[]>([])
   const [semMigration, setSemMigration] = useState(false)
   const [loading, setLoading] = useState(true)
   const [configAberta, setConfigAberta] = useState(false)
@@ -54,7 +54,6 @@ export default function MrrPage() {
   const hoje = hojeISO()
 
   const load = useCallback(async () => {
-    if (!pronto) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = createClient() as any
     let cats: Categoria[]
@@ -72,16 +71,16 @@ export default function MrrPage() {
 
     const ids = cats.filter(c => c.recorrente).map(c => c.id)
     if (ids.length) {
-      const { data } = await filtrarLancamentos(db.from('lancamentos')
-        .select('valor, data, status, descricao, cliente_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
+      const { data } = await db.from('lancamentos')
+        .select('valor, data, status, descricao, cliente_id, frente, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
         .eq('tipo', 'receita')
-        .in('categoria_id', ids), frente)
+        .in('categoria_id', ids)
       setLancamentos(data ?? [])
     } else {
       setLancamentos([])
     }
     setLoading(false)
-  }, [frente, pronto])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -94,7 +93,10 @@ export default function MrrPage() {
     setSalvandoCat(null)
   }
 
-  const calc = useMemo(() => calcularMrr(lancamentos, hoje), [lancamentos, hoje])
+  const calc = useMemo(
+    () => calcularMrr(linha === 'todas' ? lancamentos : lancamentos.filter(l => l.frente === linha), hoje),
+    [lancamentos, linha, hoje],
+  )
   const marcadas = categorias.filter(c => c.recorrente)
   const pct = (v: number) => `${(v * 100).toFixed(1).replace('.', ',')}%`
   const serieChart = calc.serie.map(s => ({ ...s, mes: mesLabel(s.mesKey) }))
@@ -124,6 +126,14 @@ export default function MrrPage() {
       <Header title="Financeiro" description="Receita recorrente" />
       <main className="flex-1 p-4 md:p-6">
         <PageHeader title="MRR" description="Calculado pelas mensalidades lançadas no financeiro">
+          <select
+            value={linha}
+            onChange={(e) => setLinha(e.target.value as Linha | 'todas')}
+            className="h-8 rounded-md border border-white/[0.1] bg-transparent px-3 text-xs text-brand-lavanda outline-none"
+          >
+            <option value="todas" className="bg-brand-noite">Todas as linhas</option>
+            {linhasDeReceita.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
+          </select>
           <Button variant="outline" size="sm" onClick={exportar} disabled={!calc.ativos.length}><Download className="h-4 w-4" /> Exportar CSV</Button>
           <Button variant="outline" size="sm" onClick={() => setConfigAberta(v => !v)}><Settings2 className="h-4 w-4" /> Categorias</Button>
         </PageHeader>

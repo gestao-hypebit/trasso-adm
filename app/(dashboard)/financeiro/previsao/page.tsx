@@ -16,7 +16,6 @@ import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, toISODateLocal, addMonthsISO, cn } from '@/lib/utils'
 import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
-import { useFrente, filtrarLancamentos } from '@/components/layout/frente'
 
 // Paleta validada (CVD + contraste) contra a superfície escura #141318.
 const COR = { confirmado: '#76A000', saas: '#8B5CF6', pipeline: '#2E9FD0', despesas: '#E0457B' }
@@ -59,31 +58,25 @@ export default function PrevisaoPage() {
   const [lancamentos, setLancamentos] = useState<Lanc[]>([])
   const [mensalidades, setMensalidades] = useState<LancamentoMrr[]>([])
   const [categoriasRecorrentes, setCategoriasRecorrentes] = useState<string[]>([])
-  const { frente, pronto } = useFrente()
-  const comPipeline = frente !== 'catalogo_place'
   const [propostas, setPropostas] = useState<Proposta[]>([])
   const [horizonte, setHorizonte] = useState(6)
   const [probEnviada, setProbEnviada] = useState(30)
   const [probNegociacao, setProbNegociacao] = useState(60)
 
   useEffect(() => {
-    if (!pronto) return
     const supabase = createClient() as any
     async function load() {
       setLoading(true)
       const { data: cats } = await supabase.from('categorias_financeiras').select('id').eq('tipo', 'receita').eq('recorrente', true)
       const recorrentes: string[] = (cats ?? []).map((c: { id: string }) => c.id)
       const [{ data: l }, { data: m }, { data: p }] = await Promise.all([
-        filtrarLancamentos(supabase.from('lancamentos').select('tipo, valor, data, categoria_id').eq('status', 'pendente'), frente),
+        supabase.from('lancamentos').select('tipo, valor, data, categoria_id').eq('status', 'pendente'),
         recorrentes.length
-          ? filtrarLancamentos(supabase.from('lancamentos')
+          ? supabase.from('lancamentos')
               .select('valor, data, status, descricao, cliente_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
-              .eq('tipo', 'receita').in('categoria_id', recorrentes), frente)
+              .eq('tipo', 'receita').in('categoria_id', recorrentes)
           : { data: [] },
-        // Propostas são só da agência.
-        frente === 'catalogo_place'
-          ? { data: [] }
-          : supabase.from('propostas').select('id, numero, titulo, status, valor_final, validade, clientes(nome)').in('status', ['enviada', 'em_negociacao']),
+        supabase.from('propostas').select('id, numero, titulo, status, valor_final, validade, clientes(nome)').in('status', ['enviada', 'em_negociacao']),
       ])
       setCategoriasRecorrentes(recorrentes)
       setLancamentos(l ?? [])
@@ -92,7 +85,7 @@ export default function PrevisaoPage() {
       setLoading(false)
     }
     load()
-  }, [frente, pronto])
+  }, [])
 
   const hoje = toISODateLocal(new Date())
   const mesAtual = hoje.slice(0, 7)
@@ -276,7 +269,7 @@ export default function PrevisaoPage() {
                   <div style={{ width: `${pctSaas}%`, background: COR.saas }} />
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-brand-lavanda/70">Avulsas{comPipeline ? ' + pipeline' : ''} <b className="text-brand-lavanda">{pctAgencia.toFixed(0)}%</b></span>
+                  <span className="text-brand-lavanda/70">Avulsas + pipeline <b className="text-brand-lavanda">{pctAgencia.toFixed(0)}%</b></span>
                   <span className="text-brand-lavanda/70">Mensalidades <b className="text-brand-lavanda">{pctSaas.toFixed(0)}%</b></span>
                 </div>
                 {Object.entries(calc.mrrPorCategoria).map(([nome, v]) => (

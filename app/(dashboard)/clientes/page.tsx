@@ -21,7 +21,6 @@ import { getInitials, formatDate, formatCurrency, formatRelative, whatsappUrl, t
 import { labelOrigem, labelSegmento } from '@/lib/crm/opcoes'
 import { toCSV, downloadCSV } from '@/lib/csv'
 import { createClient } from '@/lib/supabase/client'
-import { useFrente } from '@/components/layout/frente'
 import type { Database } from '@/types/database.types'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
@@ -58,9 +57,8 @@ export default function ClientesPage() {
   const [recarregar, setRecarregar] = useState(0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
-  // O grupo vem da frente escolhida no menu (Agência / Catálogo Place / Tudo).
-  const { frente } = useFrente()
-  const grupoFilter = frente === 'agencia' ? 'agencia' : frente === 'catalogo_place' ? 'saas' : 'todos'
+  // Linha de receita do cliente: serviços (sites, software…) ou Catálogo Place.
+  const [grupoFilter, setGrupoFilter] = useState('todos')
   const [produtoFilter, setProdutoFilter] = useState('')
   const [responsavelFilter, setResponsavelFilter] = useState('todos')
   const [origemFilter, setOrigemFilter] = useState('todos')
@@ -171,11 +169,11 @@ export default function ClientesPage() {
   }, [clientes, search, statusFilter, grupoFilter, produtoFilter, responsavelFilter, origemFilter, segmentoFilter, ordenacao, ordemInvertida, faturadoPorCliente, ultimaInteracaoPorCliente, proximoContatoPorCliente])
 
   const showSaasSubfilter = grupoFilter === 'saas' && produtos.length > 0
-  const filtrosExtrasAtivos = responsavelFilter !== 'todos' || origemFilter !== 'todos' || segmentoFilter !== 'todos'
+  const filtrosExtrasAtivos = grupoFilter !== 'todos' || responsavelFilter !== 'todos' || origemFilter !== 'todos' || segmentoFilter !== 'todos'
   const followUpsAtrasados = Object.values(proximoContatoPorCliente).filter((d) => d.slice(0, 10) < hoje).length
 
   function limparFiltros() {
-    setSearch(''); setStatusFilter('todos'); setProdutoFilter('')
+    setSearch(''); setStatusFilter('todos'); setGrupoFilter('todos'); setProdutoFilter('')
     setResponsavelFilter('todos'); setOrigemFilter('todos'); setSegmentoFilter('todos')
   }
 
@@ -348,6 +346,14 @@ export default function ClientesPage() {
           )}
 
           <div className="flex flex-wrap items-center gap-2">
+            <Select value={grupoFilter} onValueChange={(v) => { setGrupoFilter(v); setProdutoFilter('') }}>
+              <SelectTrigger className="h-8 w-auto min-w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as linhas</SelectItem>
+                <SelectItem value="agencia">Serviços</SelectItem>
+                <SelectItem value="saas">Catálogo Place</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
               <SelectTrigger className="h-8 w-auto min-w-44 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>

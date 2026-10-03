@@ -13,11 +13,11 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { useFrente, filtrarLancamentos, tiposDeCliente } from '@/components/layout/frente'
+import { linhasDeReceita, LINHA_CORES, type Linha } from '@/lib/financeiro/linhas'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-type Lancamento = { tipo: string; valor: number; data: string; status: string; descricao: string; categorias_financeiras: { nome: string } | null }
+type Lancamento = { tipo: string; valor: number; data: string; status: string; descricao: string; frente: Linha; categorias_financeiras: { nome: string } | null }
 type Projeto = { id: string; status: string; data_entrega: string | null; nome: string }
 type PropostaCount = { id: string }
 type ClienteAll = { id: string; created_at: string }
@@ -78,21 +78,15 @@ export default function DashboardPage() {
   const mesLabel = allTime ? 'Desde o início' : format(mesSel, 'MMMM yyyy', { locale: ptBR })
   const isCurrentMes = !allTime && format(mesSel, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
-  const { frente, pronto } = useFrente()
-
   useEffect(() => {
-    if (!pronto) return
     const supabase = createClient() as any
-    const tipos = tiposDeCliente(frente)
-    // Projetos e propostas são da agência: na visão Catálogo Place ficam de fora.
-    const soAgencia = <T,>(q: T) => (frente === 'catalogo_place' ? Promise.resolve({ data: [] }) : q)
     async function load() {
       setLoading(true)
       const [{ data: l }, { data: p }, { data: prop }, { data: cl }, { data: interacoes }, { data: propAprovadas }, { data: contratosAssinados }, { data: tarefasConcluidas }] = await Promise.all([
-        filtrarLancamentos(supabase.from('lancamentos').select('tipo, valor, data, status, descricao, categorias_financeiras(nome)'), frente).order('data', { ascending: true }),
-        soAgencia(supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false })),
-        soAgencia(supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao'])),
-        tipos ? supabase.from('clientes').select('id, created_at').in('tipo', tipos) : supabase.from('clientes').select('id, created_at'),
+        supabase.from('lancamentos').select('tipo, valor, data, status, descricao, frente, categorias_financeiras(nome)').order('data', { ascending: true }),
+        supabase.from('projetos').select('id, status, data_entrega, nome').order('created_at', { ascending: false }),
+        supabase.from('propostas').select('id').in('status', ['enviada', 'em_negociacao']),
+        supabase.from('clientes').select('id, created_at'),
         supabase.from('interacoes').select('id, titulo, data, clientes(id, nome)').order('data', { ascending: false }).limit(8),
         supabase.from('propostas').select('id, numero, titulo, aprovada_em, clientes(nome)').not('aprovada_em', 'is', null).order('aprovada_em', { ascending: false }).limit(8),
         supabase.from('contratos').select('id, numero, titulo, assinado_em, clientes(nome)').not('assinado_em', 'is', null).order('assinado_em', { ascending: false }).limit(8),
@@ -126,7 +120,7 @@ export default function DashboardPage() {
       setLoading(false)
     }
     load()
-  }, [frente, pronto])
+  }, [])
 
   // KPIs do mês selecionado
   const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
@@ -134,14 +128,21 @@ export default function DashboardPage() {
   const faturamento = doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
   const projetosAtivos = projetos.filter(p => p.status === 'em_andamento').length
 
-  // Gráfico histórico (todos os meses com dados)
+  // Receita recebida no período, dividida por linha (serviços x Catálogo Place).
+  const receitaPorLinha = linhasDeReceita.map(o => ({
+    ...o,
+    valor: doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido' && l.frente === o.value).reduce((s, l) => s + l.valor, 0),
+  }))
+
+  // Gráfico histórico (todos os meses com dados). Receita empilhada por linha.
   const revenueData = (() => {
-    const porMes: Record<string, { agencia: number; despesa: number; mesKey: string }> = {}
+    const porMes: Record<string, { agencia: number; catalogo_place: number; despesa: number; mesKey: string }> = {}
     for (const l of lancamentos) {
       if (l.status !== 'recebido' && l.status !== 'pago') continue
       const k = l.data.slice(0, 7)
-      if (!porMes[k]) porMes[k] = { agencia: 0, despesa: 0, mesKey: k }
-      if (l.tipo === 'receita') porMes[k].agencia += l.valor
+      if (!porMes[k]) porMes[k] = { agencia: 0, catalogo_place: 0, despesa: 0, mesKey: k }
+      // Receita marcada como "geral" (raro) conta como serviços.
+      if (l.tipo === 'receita') porMes[k][l.frente === 'catalogo_place' ? 'catalogo_place' : 'agencia'] += l.valor
       if (l.tipo === 'despesa') porMes[k].despesa += l.valor
     }
     return Object.entries(porMes)
@@ -261,19 +262,17 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Saldo em Conta: só faz sentido com todas as frentes (é o dinheiro da conta). */}
-        {frente === 'todas' && (
-          <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
-              <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                {loading ? '...' : formatCurrency(saldoAtual)}
-              </p>
-              <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
-            </div>
-            <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
+        {/* Saldo em Conta */}
+        <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
+            <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+              {loading ? '...' : formatCurrency(saldoAtual)}
+            </p>
+            <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − Total pago · histórico completo</p>
           </div>
-        )}
+          <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
+        </div>
 
         {/* KPIs */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -295,6 +294,42 @@ export default function DashboardPage() {
           <KpiCard title="Novos Clientes" value={loading ? '...' : String(clientesMes.length)} icon={Users} iconColor="text-brand-lima" />
         </div>
 
+        {/* Receita por linha */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              De onde vem a receita — <span className="capitalize font-normal text-brand-lavanda/50">{mesLabel}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {faturamento > 0 && (
+              <div className="flex h-2.5 overflow-hidden rounded-full bg-white/[0.04]">
+                {receitaPorLinha.map(l => (
+                  <div key={l.value} style={{ width: `${(l.valor / faturamento) * 100}%`, background: LINHA_CORES[l.value] }} />
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {receitaPorLinha.map(l => (
+                <div key={l.value} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.04] bg-white/[0.02] px-4 py-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: LINHA_CORES[l.value] }} />
+                    <span className="text-sm text-brand-lavanda/70 truncate">{l.label}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-semibold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                      {loading ? '...' : formatCurrency(l.valor)}
+                    </p>
+                    <p className="text-[11px] text-brand-lavanda/40">
+                      {faturamento > 0 ? `${((l.valor / faturamento) * 100).toFixed(0)}% da receita` : 'sem receita no período'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Gráfico histórico */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
@@ -314,13 +349,17 @@ export default function DashboardPage() {
                       <XAxis dataKey="mes" tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v === 0 ? '' : `${(v/1000).toFixed(0)}k`} width={36} />
                       <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                      <Bar dataKey="agencia" name="Receita" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="agencia" name="Serviços" stackId="receita" fill={LINHA_CORES.agencia} />
+                      <Bar dataKey="catalogo_place" name="Catálogo Place" stackId="receita" fill={LINHA_CORES.catalogo_place} radius={[4, 4, 0, 0]} />
                       <Bar dataKey="despesa" name="Despesa" fill="#FF4D8D" fillOpacity={0.35} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                   <div className="flex items-center gap-4 mt-2 justify-end">
                     <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
-                      <span className="h-2 w-2 rounded-sm bg-brand-violeta" /> Receita
+                      <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES.agencia }} /> Serviços
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
+                      <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES.catalogo_place }} /> Catálogo Place
                     </span>
                     <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
                       <span className="h-2 w-2 rounded-sm bg-brand-rosa/50" /> Despesa

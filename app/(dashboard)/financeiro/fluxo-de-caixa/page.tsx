@@ -15,7 +15,6 @@ import { formatCurrency, cn, addMonthsISO } from '@/lib/utils'
 import { hojeISO, baixarCSV } from '@/lib/financeiro'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { useFrente, filtrarLancamentos } from '@/components/layout/frente'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -52,17 +51,11 @@ export default function FluxoCaixaPage() {
   const [mesesPassados, setMesesPassados] = useState(6)
   const [mesesFuturos, setMesesFuturos] = useState(6)
 
-  const { frente, pronto } = useFrente()
-
   const load = useCallback(async () => {
-    if (!pronto) return
-    const { data } = await filtrarLancamentos(
-      (createClient() as any).from('lancamentos').select('tipo, valor, data, status').neq('status', 'cancelado'),
-      frente,
-    )
+    const { data } = await (createClient() as any).from('lancamentos').select('tipo, valor, data, status').neq('status', 'cancelado')
     setLancs((data as Lanc[]) ?? [])
     setLoading(false)
-  }, [frente, pronto])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
