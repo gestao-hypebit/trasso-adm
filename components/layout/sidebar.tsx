@@ -177,7 +177,7 @@ export function Sidebar() {
                       : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
                   )}
                 >
-                  <Icon className={cn('h-4 w-4 shrink-0', emFinanceiro ? 'text-brand-lima' : 'text-brand-lavanda/30')} />
+                  <Icon className={cn('h-4 w-4 shrink-0', emFinanceiro ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
                   <span className={cn('font-medium', emFinanceiro ? '' : 'font-normal')}>{label}</span>
                   <ChevronDown className={cn('ml-auto h-3.5 w-3.5 text-brand-lavanda/30 transition-transform', financeiroAberto && 'rotate-180')} />
                 </button>
@@ -193,7 +193,7 @@ export function Sidebar() {
                           className={cn(
                             'block rounded-md px-2.5 py-2 md:py-1.5 text-[13px] transition-all duration-100',
                             childActive
-                              ? 'bg-white/[0.08] text-brand-lavanda font-medium'
+                              ? 'bg-brand-rosa/[0.08] text-brand-lavanda font-medium shadow-[inset_2px_0_0_var(--color-brand-rosa)]'
                               : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
                           )}
                         >
@@ -214,14 +214,14 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 md:py-2 text-sm transition-all duration-100',
                 isActive
-                  ? 'bg-white/[0.08] text-brand-lavanda'
+                  ? 'bg-brand-rosa/[0.08] text-brand-lavanda shadow-[inset_2px_0_0_var(--color-brand-rosa)]'
                   : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
               )}
             >
-              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-lima' : 'text-brand-lavanda/30')} />
+              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
               <span className={cn('font-medium', isActive ? '' : 'font-normal')}>{label}</span>
               {href === '/leads' && leadsNovos > 0 && (
-                <span className="ml-auto rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{leadsNovos}</span>
+                <span className="ml-auto rounded-full bg-brand-rosa px-1.5 text-[10px] font-bold leading-4 text-brand-lavanda">{leadsNovos}</span>
               )}
             </Link>
           )
@@ -233,7 +233,7 @@ export function Sidebar() {
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
           <Avatar className="h-7 w-7">
             {userAvatar && <AvatarImage src={userAvatar} alt={userNome} />}
-            <AvatarFallback className="text-[10px] bg-white/[0.1] text-brand-lavanda/70 font-medium">
+            <AvatarFallback className="text-[10px] bg-brand-rosa/15 text-brand-rosa font-semibold">
               {userIniciais}
             </AvatarFallback>
           </Avatar>

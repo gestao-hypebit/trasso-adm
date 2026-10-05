@@ -33,7 +33,7 @@ function resumo(lead: Lead) {
 }
 
 const colunas: { key: LeadStatus; cor: string }[] = [
-  { key: 'novo',        cor: 'border-brand-violeta' },
+  { key: 'novo',        cor: 'border-brand-rosa' },
   { key: 'em_contato',  cor: 'border-yellow-400/70' },
   { key: 'qualificado', cor: 'border-brand-lavanda/40' },
   { key: 'proposta',    cor: 'border-brand-lavanda/70' },
@@ -63,7 +63,7 @@ function LeadCard({ lead, onAbrir, fantasma = false }: { lead: Lead; onAbrir?: (
     <Card className={cn('cursor-pointer hover:border-white/[0.15] transition-colors', fantasma && 'rotate-2 shadow-2xl')} onClick={onAbrir}>
       <CardContent className="p-3 space-y-1.5">
         <div className="flex items-start gap-2">
-          {lead.status === 'novo' && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-lima" aria-label="Novo" />}
+          {lead.status === 'novo' && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-rosa" aria-label="Novo" />}
           <div className="min-w-0">
             <p className="text-sm font-medium text-brand-lavanda leading-snug truncate">{lead.nome}</p>
             {lead.empresa && <p className="text-xs text-brand-lavanda/40 truncate">{lead.empresa}</p>}
@@ -310,7 +310,7 @@ function LeadsConteudo() {
                         <tr key={l.id} onClick={() => abrir(l.id)} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors cursor-pointer group">
                           <td className="px-6 py-3.5">
                             <div className="flex items-center gap-2">
-                              {l.status === 'novo' && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-lima" aria-label="Novo" />}
+                              {l.status === 'novo' && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-rosa" aria-label="Novo" />}
                               <div className="min-w-0">
                                 <p className={cn('truncate max-w-[220px] group-hover:text-brand-lima transition-colors', l.status === 'novo' ? 'font-semibold text-brand-lavanda' : 'font-medium text-brand-lavanda/80')}>{l.nome}</p>
                                 {l.empresa && <p className="text-xs text-brand-lavanda/40 truncate max-w-[220px]">{l.empresa}</p>}

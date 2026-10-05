@@ -51,7 +51,12 @@ export function NotificacoesMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
           <Bell className="h-4 w-4" />
-          {naoLidas.length > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-lima" />}
+          {naoLidas.length > 0 && (
+            <span className="absolute right-2 top-2 flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-rosa opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-rosa" />
+            </span>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] sm:w-80 p-0">

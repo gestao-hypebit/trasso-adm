@@ -10,6 +10,7 @@ const buttonVariants = cva(
       variant: {
         default:     'bg-brand-lima text-brand-noite hover:bg-brand-limaClaro font-semibold',
         violeta:     'bg-brand-violeta/90 text-white hover:bg-brand-violeta',
+        rosa:        'bg-brand-rosa text-brand-lavanda hover:bg-brand-rosa/90 font-semibold shadow-[0_0_24px_-6px_var(--color-brand-rosa)]',
         outline:     'border border-white/[0.12] text-brand-lavanda/80 hover:bg-white/[0.05] hover:text-brand-lavanda',
         ghost:       'text-brand-lavanda/60 hover:text-brand-lavanda hover:bg-white/[0.05]',
         destructive: 'bg-brand-rosa/10 text-brand-rosa border border-brand-rosa/20 hover:bg-brand-rosa/20',

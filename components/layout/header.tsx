@@ -27,8 +27,11 @@ export function Header({ title, description }: HeaderProps) {
       <div className="flex-1 min-w-0">
         {title && (
           <div className="min-w-0">
-            <h1 className="truncate text-base md:text-lg font-semibold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{title}</h1>
-            {description && <p className="truncate text-xs text-brand-lavanda/50">{description}</p>}
+            <h1 className="flex items-center gap-2 text-base md:text-lg font-semibold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-rosa" />
+              <span className="truncate">{title}</span>
+            </h1>
+            {description && <p className="truncate pl-3.5 text-xs text-brand-lavanda/50">{description}</p>}
           </div>
         )}
       </div>

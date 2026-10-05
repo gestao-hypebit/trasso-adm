@@ -157,7 +157,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
               )}
             </PDFDownloadLink>
             {proposta.status === 'rascunho' && (
-              <Button variant="violeta" size="sm" onClick={() => setEnviarOpen(true)}>
+              <Button variant="rosa" size="sm" onClick={() => setEnviarOpen(true)}>
                 <Send className="h-4 w-4" />
                 Enviar Proposta
               </Button>

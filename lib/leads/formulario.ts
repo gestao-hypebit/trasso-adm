@@ -47,7 +47,7 @@ export const CHAVE_NOME = 'nome'
 
 // Etapas do funil, na ordem. "convertido" = venda fechada, "descartado" = perdido.
 export const leadStatusConfig = {
-  novo:        { label: 'Novo',                 variant: 'lead' as const },
+  novo:        { label: 'Novo',                 variant: 'destaque' as const },
   em_contato:  { label: 'Em contato',           variant: 'pendente' as const },
   qualificado: { label: 'Reunião / qualificado', variant: 'default' as const },
   proposta:    { label: 'Proposta',             variant: 'outline' as const },

@@ -12,6 +12,7 @@ const badgeVariants = cva(
         inativo:   'bg-white/[0.05] text-brand-lavanda/40',
         lead:      'bg-brand-violeta/15 text-brand-violeta/90',
         urgente:   'bg-brand-rosa/10 text-brand-rosa',
+        destaque:  'bg-brand-rosa text-brand-lavanda font-semibold',
         aprovada:  'bg-brand-lima/10 text-brand-lima',
         recusada:  'bg-brand-rosa/10 text-brand-rosa',
         pendente:  'bg-yellow-500/10 text-yellow-400',
