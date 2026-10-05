@@ -44,18 +44,11 @@ const s = StyleSheet.create({
     paddingBottom: 62,
   },
   headerTop: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 38,
-  },
-  logo: { height: 30, maxWidth: 140, objectFit: 'contain' },
-  logoTexto: { color: BRANCO, fontSize: 16, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5 },
-  numeroPill: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1, borderColor: '#3D2470', borderRadius: 99,
-    paddingVertical: 5, paddingHorizontal: 11,
+    marginBottom: 34,
   },
-  numeroDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: LIMA, marginRight: 7 },
-  numeroText: { color: LAVANDA, fontSize: 7.5, fontFamily: 'Helvetica-Bold', letterSpacing: 1 },
+  logo: { width: 240, height: 60, objectFit: 'contain', objectPositionX: 'left' },
+  logoTexto: { color: BRANCO, fontSize: 26, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5 },
 
   kicker: {
     color: LIMA, fontSize: 7.5, fontFamily: 'Helvetica-Bold',
@@ -280,10 +273,6 @@ export function PropostaPDF({ proposta, logoUrl, agenciaNome }: {
             {logoUrl
               ? <Image src={logoUrl} style={s.logo} />
               : <Text style={s.logoTexto}>{agenciaNome}</Text>}
-            <View style={s.numeroPill}>
-              <View style={s.numeroDot} />
-              <Text style={s.numeroText}>{proposta.numero}</Text>
-            </View>
           </View>
 
           <Text style={s.kicker}>Proposta comercial</Text>
@@ -366,9 +355,8 @@ export function PropostaPDF({ proposta, logoUrl, agenciaNome }: {
           {todos.length > 0 && (
             <View style={s.section}>
               <View style={s.bigHead} minPresenceAhead={80}>
-                <Text style={s.bigKicker}>O que está incluso</Text>
                 <View style={s.bigTitleRow}>
-                  <Text style={s.bigTitle}>Funcionalidades</Text>
+                  <Text style={s.bigTitle}>O que está incluso</Text>
                   <Text style={s.bigCount}>{todos.length} {todos.length === 1 ? 'item' : 'itens'}</Text>
                 </View>
                 <View style={s.bigBar} />
