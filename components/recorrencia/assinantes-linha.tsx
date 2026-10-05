@@ -19,7 +19,7 @@ import type { Recorrencia } from '@/components/recorrencia/use-recorrencia'
 type Ordem = 'vencimento' | 'nome' | 'nome_desc' | 'mensalidade_desc' | 'mensalidade' | 'atraso' | 'antigos' | 'recentes'
 
 const ordens: { value: Ordem; label: string }[] = [
-  { value: 'vencimento', label: 'Próximo vencimento' },
+  { value: 'vencimento', label: 'Inadimplentes e próximo vencimento' },
   { value: 'nome', label: 'Nome (A–Z)' },
   { value: 'nome_desc', label: 'Nome (Z–A)' },
   { value: 'mensalidade_desc', label: 'Maior mensalidade' },
@@ -45,7 +45,12 @@ function comparar(a: Assinante, b: Assinante, ordem: Ordem): number {
   const vaziosNoFim = (x: string | null, y: string | null, sentido: 1 | -1) =>
     x && y ? x.localeCompare(y) * sentido : x ? -1 : y ? 1 : 0
   switch (ordem) {
-    case 'vencimento': return vaziosNoFim(proximaCobranca(a), proximaCobranca(b), 1)
+    // Inadimplentes primeiro (mais dias em atraso no topo): o Asaas segue gerando cobranças
+    // novas para eles, então a próxima cobrança sozinha os jogaria para o fim da lista.
+    case 'vencimento':
+      return Number(b.atraso > 0) - Number(a.atraso > 0)
+        || (a.atraso > 0 && b.atraso > 0 ? b.diasAtraso - a.diasAtraso : 0)
+        || vaziosNoFim(proximaCobranca(a), proximaCobranca(b), 1)
     case 'nome': return a.nome.localeCompare(b.nome, 'pt-BR')
     case 'nome_desc': return b.nome.localeCompare(a.nome, 'pt-BR')
     case 'mensalidade_desc': return b.mensalidade - a.mensalidade
