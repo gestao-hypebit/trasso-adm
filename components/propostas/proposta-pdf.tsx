@@ -1,6 +1,6 @@
 'use client'
 
-import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Image, StyleSheet, Font, type Styles } from '@react-pdf/renderer'
 
 // Sem isso o react-pdf hifeniza palavras em português ("dig-ital").
 Font.registerHyphenationCallback(word => [word])
@@ -156,6 +156,11 @@ const s = StyleSheet.create({
 
   // ─── SOBRE / OBSERVAÇÕES ───
   textoBloco: { color: TEXTO, fontSize: 9.5, lineHeight: 1.65 },
+  paragrafo: { marginBottom: 6 },
+  subtitulo: { fontFamily: 'Helvetica-Bold', color: NOITE, marginTop: 6, marginBottom: 3 },
+  lista: { flexDirection: 'row', marginBottom: 3 },
+  listaDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: VIOLETA, marginTop: 5, marginRight: 8 },
+  listaTexto: { flex: 1 },
   notaBox: {
     marginTop: 18, paddingVertical: 12, paddingHorizontal: 14,
     backgroundColor: '#F7F5FB', borderLeftWidth: 3, borderLeftColor: VIOLETA, borderRadius: 3,
@@ -185,6 +190,35 @@ function fmt(n: number) {
 function fmtDate(d: string) {
   const data = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T12:00:00`) : new Date(d)
   return data.toLocaleDateString('pt-BR')
+}
+
+// Texto livre do formulário: linhas com "•", "-" ou "*" viram lista; linha curta sem
+// pontuação final seguida de conteúdo vira subtítulo; o resto, parágrafos.
+const MARCADOR = /^\s*[-•*·]\s+/
+function TextoFormatado({ texto, style, corDot }: { texto: string; style: Styles[string]; corDot?: string }) {
+  const linhas = texto.split(/\r?\n/)
+  return (
+    <View>
+      {linhas.map((bruta, i) => {
+        const linha = bruta.trim()
+        if (!linha) return null
+        if (MARCADOR.test(linha)) {
+          return (
+            <View key={i} style={s.lista} wrap={false}>
+              <View style={corDot ? [s.listaDot, { backgroundColor: corDot }] : s.listaDot} />
+              <Text style={[style, s.listaTexto]}>{linha.replace(MARCADOR, '')}</Text>
+            </View>
+          )
+        }
+        const proxima = linhas[i + 1]?.trim()
+        const ehSubtitulo = linha.length <= 40 && !/[.:;,!?)]$/.test(linha) && !!proxima
+        if (ehSubtitulo && linhas.length > 2) {
+          return <Text key={i} style={[style, s.subtitulo]} minPresenceAhead={30}>{linha}</Text>
+        }
+        return <Text key={i} style={[style, s.paragrafo]}>{linha}</Text>
+      })}
+    </View>
+  )
 }
 
 // 1ª linha da descrição do item = nome do módulo; demais linhas = funcionalidades.
@@ -344,7 +378,7 @@ export function PropostaPDF({ proposta, logoUrl, agenciaNome }: {
           {proposta.condicoes_pagamento && (
             <View style={s.investFoot}>
               <Text style={s.investFootLabel}>Condições de pagamento</Text>
-              <Text style={s.investFootText}>{proposta.condicoes_pagamento}</Text>
+              <View style={{ flex: 1 }}><TextoFormatado texto={proposta.condicoes_pagamento} style={s.investFootText} corDot={NOITE} /></View>
             </View>
           )}
         </View>
@@ -392,11 +426,11 @@ export function PropostaPDF({ proposta, logoUrl, agenciaNome }: {
                 <Text style={s.bigTitle}>Sobre o projeto</Text>
                 <View style={s.bigBar} />
               </View>
-              {proposta.descricao && <Text style={s.textoBloco}>{proposta.descricao}</Text>}
+              {proposta.descricao && <TextoFormatado texto={proposta.descricao} style={s.textoBloco} />}
               {proposta.observacoes && (
                 <View style={s.notaBox} wrap={false}>
                   <Text style={s.notaLabel}>Observações</Text>
-                  <Text style={s.notaText}>{proposta.observacoes}</Text>
+                  <TextoFormatado texto={proposta.observacoes} style={s.notaText} />
                 </View>
               )}
             </View>

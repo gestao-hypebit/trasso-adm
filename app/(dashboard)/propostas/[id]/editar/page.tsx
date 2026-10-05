@@ -11,7 +11,7 @@ import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { CampoTexto, AutoTextarea, SUGESTOES_PAGAMENTO, SUGESTOES_OBSERVACOES, MODELO_ESCOPO } from '@/components/propostas/campo-texto'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -208,15 +208,15 @@ export default function EditarPropostaPage({ params }: { params: Promise<{ id: s
                     {errors.titulo && <p className="text-brand-rosa text-xs mt-1">{errors.titulo.message}</p>}
                   </div>
 
-                  <div>
-                    <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Descrição / Escopo</Label>
-                    <Textarea {...register('descricao')} placeholder="Descreva o escopo do projeto..." rows={3} />
-                  </div>
-
-                  <div>
-                    <Label className="text-brand-lavanda/80 text-xs mb-1.5 block">Condições de Pagamento</Label>
-                    <Input {...register('condicoes_pagamento')} placeholder="Ex: 50% na aprovação, 50% na entrega" />
-                  </div>
+                  <CampoTexto
+                    label="Descrição / Escopo"
+                    value={watch('descricao') ?? ''}
+                    onChange={(v) => setValue('descricao', v, { shouldDirty: true })}
+                    placeholder="Contexto do cliente, objetivo do projeto e o que será entregue..."
+                    ajuda='Aparece no PDF em "Sobre o projeto". Linhas com • viram lista.'
+                    modelo={MODELO_ESCOPO}
+                    minLinhas={6}
+                  />
                 </CardContent>
               </Card>
 
@@ -227,7 +227,7 @@ export default function EditarPropostaPage({ params }: { params: Promise<{ id: s
                 <CardContent>
                   <div className="space-y-3">
                     <div className="hidden sm:grid grid-cols-12 gap-2 text-xs text-brand-lavanda/40 px-1">
-                      <span className="col-span-4">Descrição</span>
+                      <span className="col-span-4">Descrição <span className="text-brand-lavanda/25">· 1ª linha = nome, linhas abaixo = funcionalidades</span></span>
                       <span className="col-span-2">Recorrência</span>
                       <span className="col-span-2 text-center">Qtd</span>
                       <span className="col-span-2 text-right">Valor Unit.</span>
@@ -240,9 +240,10 @@ export default function EditarPropostaPage({ params }: { params: Promise<{ id: s
                       const rec = watch(`itens.${idx}.recorrencia`) ?? 'avulso'
                       const isRec = rec !== 'avulso'
                       return (
-                        <div key={field.id} className={`grid grid-cols-6 sm:grid-cols-12 gap-2 items-center rounded-lg px-1 py-2 sm:py-0.5 border-b border-white/[0.06] sm:border-b-0 ${isRec ? 'bg-brand-violeta/5 border border-brand-violeta/20' : ''}`}>
+                        <div key={field.id} className={`grid grid-cols-6 sm:grid-cols-12 gap-2 items-start rounded-lg px-1 py-2 sm:py-1 border-b border-white/[0.06] sm:border-b-0 ${isRec ? 'bg-brand-violeta/5 border border-brand-violeta/20' : ''}`}>
                           <div className="col-span-6 sm:col-span-4">
-                            <Input {...register(`itens.${idx}.descricao`)} placeholder="Descrição do serviço..." className="h-9 text-sm" />
+                            <AutoTextarea {...register(`itens.${idx}.descricao`)} placeholder={`Nome do serviço / módulo
+• funcionalidade (opcional)`} className="min-h-9 py-[7px]" />
                           </div>
                           <div className="col-span-3 sm:col-span-2">
                             <Select
@@ -266,7 +267,7 @@ export default function EditarPropostaPage({ params }: { params: Promise<{ id: s
                           <div className="col-span-3 sm:col-span-2">
                             <Input {...register(`itens.${idx}.valor_unitario`)} type="number" min="0" step="50" className="h-9 text-sm text-right" />
                           </div>
-                          <div className="col-span-2 sm:col-span-1 text-right text-xs font-medium text-brand-lavanda">
+                          <div className="col-span-2 sm:col-span-1 text-right text-xs font-medium text-brand-lavanda pt-2.5">
                             {formatCurrency(qtd * vu)}
                             {isRec && <span className="block text-brand-violeta/60" style={{ fontSize: 9 }}>/{rec}</span>}
                           </div>
@@ -324,8 +325,25 @@ export default function EditarPropostaPage({ params }: { params: Promise<{ id: s
 
               <Card>
                 <CardHeader><CardTitle className="text-base">Termos e Observações</CardTitle></CardHeader>
-                <CardContent>
-                  <Textarea {...register('observacoes')} placeholder="Condições gerais, prazo de entrega, rodadas de revisão..." rows={4} />
+                <CardContent className="space-y-5">
+                  <CampoTexto
+                    label="Condições de Pagamento"
+                    value={watch('condicoes_pagamento') ?? ''}
+                    onChange={(v) => setValue('condicoes_pagamento', v, { shouldDirty: true })}
+                    placeholder="Ex: 50% na aprovação e 50% na entrega"
+                    ajuda="Aparece no PDF junto do valor, no topo da 1ª página."
+                    sugestoes={SUGESTOES_PAGAMENTO}
+                    minLinhas={2}
+                  />
+                  <CampoTexto
+                    label="Termos e Observações"
+                    value={watch('observacoes') ?? ''}
+                    onChange={(v) => setValue('observacoes', v, { shouldDirty: true })}
+                    placeholder="Prazo de entrega, rodadas de revisão, o que não está incluso..."
+                    ajuda='Aparece no PDF em "Observações", no final.'
+                    sugestoes={SUGESTOES_OBSERVACOES}
+                    minLinhas={4}
+                  />
                 </CardContent>
               </Card>
             </div>
