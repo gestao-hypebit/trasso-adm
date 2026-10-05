@@ -51,6 +51,7 @@ function comparar(a: Assinante, b: Assinante, ordem: Ordem): number {
       return Number(b.atraso > 0) - Number(a.atraso > 0)
         || (a.atraso > 0 && b.atraso > 0 ? b.diasAtraso - a.diasAtraso : 0)
         || vaziosNoFim(proximaCobranca(a), proximaCobranca(b), 1)
+        || vaziosNoFim(a.ultimoPagamento, b.ultimoPagamento, -1)
     case 'nome': return a.nome.localeCompare(b.nome, 'pt-BR')
     case 'nome_desc': return b.nome.localeCompare(a.nome, 'pt-BR')
     case 'mensalidade_desc': return b.mensalidade - a.mensalidade
@@ -78,7 +79,8 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
       if (aba === 'ativos') return l.ativo
       if (aba === 'aguardando') return l.ativo && !l.pagoEsteMes
       if (aba === 'atraso') return l.atraso > 0
-      return !l.ativo && l.status !== 'inativo'
+      if (aba === 'canceladas') return l.cancelada
+      return !l.ativo && !l.cancelada && l.status !== 'inativo'
     })
     .filter((l) => !termo || [l.nome, l.empresa].some((v) => v?.toLowerCase().includes(termo)))
     .sort((a, b) => comparar(a, b, ordem) || a.nome.localeCompare(b.nome, 'pt-BR'))
@@ -87,6 +89,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
     { key: 'ativos', label: 'Ativas' },
     { key: 'aguardando', label: 'Aguardando este mês' },
     { key: 'atraso', label: 'Inadimplentes' },
+    { key: 'canceladas', label: 'Canceladas' },
     { key: 'sem_mensalidade', label: 'Sem mensalidade' },
     ...(calc.contagem.so_asaas > 0 ? [{ key: 'so_asaas' as AbaLista, label: 'Só no Asaas' }] : []),
     { key: 'todos', label: 'Todos' },
@@ -213,7 +216,6 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                     : `Oi ${l.nome.split(' ')[0]}! Passando para lembrar da mensalidade${produto} deste mês.`
                   const wa = !l.soNoAsaas && (!l.pagoEsteMes || l.atraso > 0) && l.ativo ? whatsappUrl(l.whatsapp, cobranca) : null
                   const sub = assinaturaAtiva(l)
-                  const cancelada = daLinha(l).length > 0 && !sub
                   return (
                     <tr
                       key={l.chave}
@@ -225,7 +227,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                           <span className="font-medium text-brand-lavanda group-hover:text-brand-lima transition-colors">{l.nome}</span>
                           {l.soNoAsaas && <Badge variant="pendente">Sem cliente ligado</Badge>}
                           {!l.soNoAsaas && !l.clienteId && <Badge variant="pendente">Sem cliente vinculado</Badge>}
-                          {cancelada && <Badge variant="inativo">Assinatura cancelada</Badge>}
+                          {daLinha(l).length > 0 && !sub && <Badge variant="inativo">Assinatura cancelada</Badge>}
                         </div>
                         {l.empresa && l.empresa.trim() !== l.nome && <p className="text-xs text-brand-lavanda/40">{l.empresa}</p>}
                       </td>
@@ -245,6 +247,13 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                             )}
                             <span className="block text-[11px] text-brand-lavanda/40">{formaLabel[sub.formaPagamento] ?? sub.formaPagamento}</span>
                           </>
+                        ) : l.cancelada ? (
+                          <span className="text-brand-lavanda/40">
+                            Cancelada
+                            <span className="block text-[11px]">
+                              {l.pagamentos} pagamento{l.pagamentos === 1 ? '' : 's'}{l.ultimoPagamento && ` · último ${formatDate(l.ultimoPagamento)}`}
+                            </span>
+                          </span>
                         ) : r.asaasCarregando && l.asaasCustomerId ? (
                           <Loader2 className="h-3 w-3 animate-spin text-brand-lavanda/30" />
                         ) : (
@@ -288,7 +297,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
         Clique num assinante para ver a assinatura e as faturas do Asaas.
         MRR bruto = assinaturas ativas no Asaas (valor cobrado, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro.
         MRR líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas.
-        Ativas = tem assinatura ativa ou mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga.
+        Ativas = tem assinatura ativa ou mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga. Canceladas = a assinatura foi cancelada no Asaas depois de ter tido pagamento.
         {linha === 'agencia' && ' Aqui entram só clientes com mensalidade de serviço (software, social…); projetos avulsos ficam de fora.'}
         {calc.semCliente > 0 && ` ${calc.semCliente} assinante(s) aparecem só pela descrição do lançamento, sem cliente cadastrado; nos próximos lançamentos, escolha o cliente.`}
       </p>

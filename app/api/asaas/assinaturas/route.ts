@@ -37,7 +37,6 @@ export async function GET() {
     return NextResponse.json({
       configurado: true,
       assinaturas: assinaturas
-        .filter((a) => !a.deleted)
         .map((a) => {
           const c = porId.get(a.customer)
           return {
@@ -55,7 +54,9 @@ export async function GET() {
             formaPagamento: a.billingType,
             descricao: a.description,
             criadaEm: a.dateCreated,
-            status: a.status,
+            // Removida no Asaas conta como cancelada, mesmo que o status tenha ficado ACTIVE.
+            status: a.deleted ? 'INACTIVE' : a.status,
+            removida: !!a.deleted,
           }
         }),
     })

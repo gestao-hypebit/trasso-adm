@@ -47,9 +47,13 @@ export type Assinante = {
   historico: { data: string; valor: number; status: string; descricao: string }[]
   // Assinatura do Asaas sem cliente do sistema ligado a ela.
   soNoAsaas: boolean
+  // Assinatura desta linha cancelada no Asaas (nenhuma ativa) depois de ter tido pagamento.
+  cancelada: boolean
+  pagamentos: number
+  ultimoPagamento: string | null
 }
 
-export type AbaLista = 'ativos' | 'aguardando' | 'atraso' | 'sem_mensalidade' | 'so_asaas' | 'todos'
+export type AbaLista = 'ativos' | 'aguardando' | 'atraso' | 'canceladas' | 'sem_mensalidade' | 'so_asaas' | 'todos'
 
 export type Dados = {
   clientes: ClienteRec[]
@@ -76,10 +80,11 @@ export function linhaDaAssinatura(s: AssinaturaAsaas, tipoCliente: string, fatur
 export const faturasDoCatalogo = (lancamentos: LancRec[]) =>
   new Set(lancamentos.filter((l) => l.frente === 'catalogo_place' && l.asaas_payment_id).map((l) => l.asaas_payment_id!))
 
-// Assinaturas do Asaas de clientes que não estão ligados a ninguém no sistema.
+// Assinaturas do Asaas de clientes que não estão ligados a ninguém no sistema
+// (as removidas ficam de fora: não há o que ligar).
 export function assinaturasSemCliente(dados: Dados) {
   const ligados = new Set(dados.clientes.map((c) => c.asaas_customer_id).filter(Boolean))
-  return dados.assinaturas.filter((s) => !ligados.has(s.customerId))
+  return dados.assinaturas.filter((s) => !s.removida && !ligados.has(s.customerId))
 }
 
 export function montarLinha(linha: LinhaRec, dados: Dados) {
@@ -128,14 +133,17 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     historicoPorCliente.set(l.cliente_id, [...(historicoPorCliente.get(l.cliente_id) ?? []), { data: l.data, valor: Number(l.valor), status: l.status, descricao: l.descricao }])
   }
   const historico = (id: string) => (historicoPorCliente.get(id) ?? []).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 24)
+  const pagos = (id: string) => (historicoPorCliente.get(id) ?? []).filter((h) => h.status === 'recebido')
 
   const ativosPorChave = new Map(mrr.ativos.map((a) => [a.chave, a]))
   const linhas: Assinante[] = base.map((c) => {
     const a = ativosPorChave.get(c.id)
     const atraso = atrasoPorCliente.get(c.id)
     const subs = assinaturasDo(c)
-    const peloAsaas = asaasCarregado && subs.daLinha.length > 0
+    // As removidas não decidem a fonte: o cliente pode ter saído do Asaas e seguir pagando por fora.
+    const peloAsaas = asaasCarregado && subs.daLinha.some((s) => !s.removida)
     const ativas = subs.daLinha.filter(ativa)
+    const pagamentos = pagos(c.id)
     return {
       chave: c.id, clienteId: c.id, nome: c.nome.trim(), empresa: c.empresa, whatsapp: c.whatsapp ?? c.telefone,
       mensalidade: peloAsaas ? ativas.reduce((t, s) => t + valorMensal(s), 0) : a?.valorMensal ?? 0,
@@ -145,6 +153,9 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       asaasCustomerId: c.asaas_customer_id ?? null, assinaturas: subs.todas, idsDaLinha: subs.daLinha.map((s) => s.id),
       fonte: peloAsaas ? 'asaas' : 'financeiro',
       historico: historico(c.id), soNoAsaas: false,
+      cancelada: asaasCarregado && subs.daLinha.length > 0 && ativas.length === 0 && pagamentos.length > 0,
+      pagamentos: pagamentos.length,
+      ultimoPagamento: pagamentos.reduce<string | null>((m, h) => (!m || h.data > m ? h.data : m), null),
     }
   })
   // Mensalidades lançadas sem cliente vinculado (identificadas pela descrição).
@@ -154,7 +165,7 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       chave: a.chave, clienteId: a.chave.startsWith('d:') ? null : a.chave, nome: a.nome, empresa: null, whatsapp: a.whatsapp,
       mensalidade: a.valorMensal, desde: a.desde, mesesPagos: a.mesesPagos, pagoEsteMes: a.pagoEsteMes, ativo: true,
       atraso: 0, diasAtraso: 0, status: null, asaasCustomerId: null, assinaturas: [], idsDaLinha: [], fonte: 'financeiro',
-      historico: [], soNoAsaas: false,
+      historico: [], soNoAsaas: false, cancelada: false, pagamentos: a.mesesPagos, ultimoPagamento: null,
     })
   }
   // Assinaturas do Asaas sem cliente ligado: não dá para saber a linha. Aparecem
@@ -171,6 +182,7 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
         pagoEsteMes: false, ativo: subs.some(ativa), atraso: 0, diasAtraso: 0, status: null,
         asaasCustomerId: customerId, assinaturas: subs.sort((a, b) => Number(ativa(b)) - Number(ativa(a))),
         idsDaLinha: subs.map((s) => s.id), fonte: 'asaas', historico: [], soNoAsaas: true,
+        cancelada: false, pagamentos: 0, ultimoPagamento: null,
       })
     }
   }
@@ -195,7 +207,8 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       ativos: ativas.length,
       aguardando: doSistema.filter((l) => l.ativo && !l.pagoEsteMes).length,
       atraso: emAtraso.length,
-      sem_mensalidade: doSistema.filter((l) => !l.ativo && l.status !== 'inativo').length,
+      canceladas: doSistema.filter((l) => l.cancelada).length,
+      sem_mensalidade: doSistema.filter((l) => !l.ativo && !l.cancelada && l.status !== 'inativo').length,
       so_asaas: linhas.length - doSistema.length,
       todos: linhas.length,
     } as Record<AbaLista, number>,

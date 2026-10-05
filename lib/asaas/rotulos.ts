@@ -23,6 +23,8 @@ export type AssinaturaAsaas = {
   descricao: string | null
   criadaEm: string
   status: string
+  // Removida (cancelada) no Asaas: só serve para a lista de canceladas.
+  removida?: boolean
 }
 
 export type CobrancaAsaas = {

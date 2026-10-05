@@ -104,7 +104,8 @@ async function listarTudo<T>(recurso: string, filtro = ''): Promise<T[]> {
 // Todas as cobranças com vencimento a partir de `desde` (YYYY-MM-DD).
 export const listarCobrancas = (desde: string) => listarTudo<AsaasPayment>('payments', `dueDate%5Bge%5D=${desde}`)
 
-export const listarAssinaturas = () => listarTudo<AsaasSubscription>('subscriptions')
+// includeDeleted: traz também as removidas (cancelar no Asaas = remover a assinatura).
+export const listarAssinaturas = () => listarTudo<AsaasSubscription>('subscriptions', 'includeDeleted=true')
 
 // Cobranças ainda não pagas de uma situação (PENDING = aguardando, OVERDUE = vencida).
 export const listarCobrancasPorStatus = (status: 'PENDING' | 'OVERDUE') => listarTudo<AsaasPayment>('payments', `status=${status}`)
