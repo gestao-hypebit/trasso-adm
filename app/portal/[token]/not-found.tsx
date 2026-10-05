@@ -9,7 +9,7 @@ export default function PortalNotFound() {
         </div>
         <h1 className="text-lg font-bold text-brand-lavanda mb-2">Link inválido ou expirado</h1>
         <p className="text-sm text-brand-lavanda/50">
-          Este link de acesso não existe mais ou foi revogado. Fale com o seu contato na Trasso para receber um novo link.
+          Este link de acesso não existe mais ou foi revogado. Fale com o seu contato na Slick para receber um novo link.
         </p>
       </div>
     </div>

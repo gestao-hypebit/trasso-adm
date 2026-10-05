@@ -7,7 +7,7 @@ export async function duplicarProposta(supabase: SupabaseClient, propostaId: str
   if (error || !original) throw error ?? new Error('Proposta não encontrada')
 
   const ano = new Date().getFullYear()
-  const base = `TRS-${ano}-`
+  const base = `SLK-${ano}-`
   const { data: existentes } = await db.from('propostas').select('numero').like('numero', `${base}%`)
   const usados = new Set(((existentes ?? []) as { numero: string }[]).map((p) => p.numero))
   let n = usados.size + 1

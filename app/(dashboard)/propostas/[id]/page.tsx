@@ -53,7 +53,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
   const [erroDelete, setErroDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [agenciaNome, setAgenciaNome] = useState('Trasso')
+  const [agenciaNome, setAgenciaNome] = useState('Slick')
   const [converterOpen, setConverterOpen] = useState(false)
   const [enviarOpen, setEnviarOpen] = useState(false)
   const [duplicando, setDuplicando] = useState(false)
@@ -185,8 +185,8 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="h-8 w-8 rounded-lg bg-white/[0.07] border border-white/[0.1] flex items-center justify-center text-brand-lima font-bold text-sm">T</div>
-                      <span className="font-bold text-brand-lavanda">trasso</span>
+                      <div className="h-8 w-8 rounded-lg bg-white/[0.07] border border-white/[0.1] flex items-center justify-center text-brand-lima font-bold text-sm">S</div>
+                      <span className="font-bold text-brand-lavanda">slick</span>
                     </div>
                     <p className="text-xs text-brand-lavanda/40">Criatividade e tecnologia no mesmo traço</p>
                   </div>

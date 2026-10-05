@@ -38,7 +38,7 @@ export function AprovarPropostaButton({ token, propostaId, numero }: { token: st
             <DialogTitle>Aprovar proposta {numero}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-brand-lavanda/70">
-            Ao confirmar, você aprova esta proposta e autoriza a Trasso a dar sequência ao trabalho combinado.
+            Ao confirmar, você aprova esta proposta e autoriza a Slick a dar sequência ao trabalho combinado.
           </p>
           {erro && <p className="text-sm text-brand-rosa">{erro}</p>}
           <DialogFooter className="gap-2">

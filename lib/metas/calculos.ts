@@ -26,7 +26,7 @@ export type MetaMensal = {
 // Paleta validada (CVD + contraste) contra a superfície escura #141318.
 export const FRENTES: { value: Frente; label: string; descricao: string; cor: string }[] = [
   { value: 'catalogo_place', label: 'Catálogo Place', descricao: 'Assinaturas do SaaS', cor: '#8B5CF6' },
-  { value: 'trasso', label: 'Trasso', descricao: 'Serviços (sites, sistemas…)', cor: '#76A000' },
+  { value: 'trasso', label: 'Slick', descricao: 'Serviços (sites, sistemas…)', cor: '#76A000' },
 ]
 
 export const COR_CANCELAMENTO = '#E0457B'

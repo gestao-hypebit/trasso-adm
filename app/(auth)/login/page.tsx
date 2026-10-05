@@ -47,7 +47,7 @@ export default function LoginPage() {
           </div>
         </div>
         <CardTitle className="text-3xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-          trasso
+          slick
         </CardTitle>
         <CardDescription className="text-brand-lavanda/60">
           Cada projeto começa com um traço

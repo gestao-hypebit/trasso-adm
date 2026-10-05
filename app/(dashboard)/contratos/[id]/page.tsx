@@ -42,7 +42,7 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
   const { id } = use(params)
   const [contrato, setContrato] = useState<Contrato | null>(null)
   const [loading, setLoading] = useState(true)
-  const [agencia, setAgencia] = useState<AgenciaPDFData>({ nome: 'Trasso', cnpj: null, email: null, telefone: null, endereco: null, cidade: null, logo_url: null })
+  const [agencia, setAgencia] = useState<AgenciaPDFData>({ nome: 'Slick', cnpj: null, email: null, telefone: null, endereco: null, cidade: null, logo_url: null })
   const [editarOpen, setEditarOpen] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [abrindo, setAbrindo] = useState(false)
@@ -60,7 +60,7 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
       (supabase as any).from('configuracoes_agencia').select('nome, cnpj, email, telefone, endereco, cidade, logo_url').limit(1).maybeSingle(),
     ])
     setContrato(data as unknown as Contrato)
-    if (cfg) setAgencia({ ...cfg, nome: cfg.nome || 'Trasso' })
+    if (cfg) setAgencia({ ...cfg, nome: cfg.nome || 'Slick' })
     setLoading(false)
   }, [id])
 
@@ -151,8 +151,8 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="h-8 w-8 rounded-lg bg-white/[0.07] border border-white/[0.1] flex items-center justify-center text-brand-lima font-bold text-sm">T</div>
-                      <span className="font-bold text-brand-lavanda">trasso</span>
+                      <div className="h-8 w-8 rounded-lg bg-white/[0.07] border border-white/[0.1] flex items-center justify-center text-brand-lima font-bold text-sm">S</div>
+                      <span className="font-bold text-brand-lavanda">slick</span>
                     </div>
                     <p className="text-xs text-brand-lavanda/40">Criatividade e tecnologia no mesmo traço</p>
                   </div>

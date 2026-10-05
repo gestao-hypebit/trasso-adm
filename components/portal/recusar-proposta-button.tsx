@@ -38,7 +38,7 @@ export function RecusarPropostaButton({ token, propostaId, numero }: { token: st
             <DialogTitle>Recusar proposta {numero}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-brand-lavanda/70">
-            Tem certeza que deseja recusar esta proposta? Entre em contato com a Trasso caso queira negociar outros termos.
+            Tem certeza que deseja recusar esta proposta? Entre em contato com a Slick caso queira negociar outros termos.
           </p>
           {erro && <p className="text-sm text-brand-rosa">{erro}</p>}
           <DialogFooter className="gap-2">

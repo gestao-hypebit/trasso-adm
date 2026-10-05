@@ -9,7 +9,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 const FAIXA = `
 <div style="position:fixed;left:12px;bottom:12px;z-index:2147483647;font:500 12px/1 system-ui,sans-serif;background:rgba(17,17,17,.82);color:#fff;padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);pointer-events:none">
-  Prévia criada por <strong style="color:#B8F000">Trasso</strong>
+  Prévia criada por <strong style="color:#B8F000">Slick</strong>
 </div>`
 
 function pagina(titulo: string, texto: string, status: number) {

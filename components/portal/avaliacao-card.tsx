@@ -60,12 +60,12 @@ export function AvaliacaoCard({ token, avaliacaoId, projetoNome, clienteNome, cl
         <div>
           <p className="flex items-center gap-1.5 text-xs text-brand-lima"><Star className="h-3.5 w-3.5" /> Avaliação</p>
           <h3 className="text-lg font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-            Como foi trabalhar com a Trasso{projetoNome ? ` em ${projetoNome}` : ''}?
+            Como foi trabalhar com a Slick{projetoNome ? ` em ${projetoNome}` : ''}?
           </h3>
         </div>
 
         <div>
-          <p className="text-sm text-brand-lavanda/80 mb-2">De 0 a 10, quanto você recomendaria a Trasso para um amigo ou colega?</p>
+          <p className="text-sm text-brand-lavanda/80 mb-2">De 0 a 10, quanto você recomendaria a Slick para um amigo ou colega?</p>
           <div className="grid grid-cols-11 gap-1">
             {Array.from({ length: 11 }, (_, n) => (
               <button
@@ -101,7 +101,7 @@ export function AvaliacaoCard({ token, avaliacaoId, projetoNome, clienteNome, cl
           <div className="space-y-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
             <label className="flex items-start gap-2 text-sm text-brand-lavanda/80">
               <input type="checkbox" checked={autoriza} onChange={(e) => setAutoriza(e.target.checked)} className="mt-1 accent-brand-lima" />
-              Autorizo a Trasso a publicar este depoimento no site e em materiais de divulgação.
+              Autorizo a Slick a publicar este depoimento no site e em materiais de divulgação.
             </label>
             {autoriza && (
               <div className="grid gap-3 sm:grid-cols-2">

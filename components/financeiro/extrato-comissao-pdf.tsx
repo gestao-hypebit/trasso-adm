@@ -135,7 +135,7 @@ export function ExtratoComissaoPDF({
                 <Image src={logoUrl} style={s.logo} />
               ) : (
                 <View style={s.logoPlaceholder}>
-                  <Text style={s.logoPlaceholderText}>{agenciaNome[0]?.toUpperCase() ?? 'T'}</Text>
+                  <Text style={s.logoPlaceholderText}>{agenciaNome[0]?.toUpperCase() ?? 'S'}</Text>
                 </View>
               )}
               <Text style={s.agenciaNome}>{agenciaNome}</Text>

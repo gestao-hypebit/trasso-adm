@@ -136,7 +136,7 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
     if (atual.status === 'novo') atualizar({ status: 'em_contato' })
   }
 
-  const whatsapp = whatsappUrl(atual.telefone, `Oi ${atual.nome.split(' ')[0]}! Aqui é da Trasso, recebemos seu contato pelo site.`)
+  const whatsapp = whatsappUrl(atual.telefone, `Oi ${atual.nome.split(' ')[0]}! Aqui é da Slick, recebemos seu contato pelo site.`)
   const extras = atual.respostas.filter((r) => !CHAVES_CABECALHO.includes(r.chave))
   const utm = atual.utm ? Object.entries(atual.utm) : []
 

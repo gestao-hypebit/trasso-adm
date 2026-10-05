@@ -177,7 +177,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <Header title="Dashboard" description="Visão geral da Trasso" />
+      <Header title="Dashboard" description="Visão geral da Slick" />
       <div className="p-4 md:p-6 space-y-6">
 
         {/* Seletor de mês */}

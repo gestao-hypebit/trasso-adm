@@ -98,7 +98,7 @@ export default function NovaPropostaPage() {
     const { count } = await supabase
       .from('propostas')
       .select('id', { count: 'exact', head: true })
-    const numero = `TRS-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(3, '0')}`
+    const numero = `SLK-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(3, '0')}`
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: propostaRaw, error } = await (supabase as any)

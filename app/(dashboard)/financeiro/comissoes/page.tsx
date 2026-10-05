@@ -74,7 +74,7 @@ export default function ComissoesPage() {
   const [isGenerating, startGenerating] = useTransition()
   const [deletingIndicadorId, setDeletingIndicadorId] = useState<string | null>(null)
   const [deletingIndicacaoId, setDeletingIndicacaoId] = useState<string | null>(null)
-  const [agencia, setAgencia] = useState<{ logoUrl: string | null; nome: string }>({ logoUrl: null, nome: 'Trasso' })
+  const [agencia, setAgencia] = useState<{ logoUrl: string | null; nome: string }>({ logoUrl: null, nome: 'Slick' })
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -90,7 +90,7 @@ export default function ComissoesPage() {
     setComissoes((c.data as any) ?? [])
     setIndicadores((i.data as any) ?? [])
     setIndicacoes((ind.data as any) ?? [])
-    if (ag.data) setAgencia({ logoUrl: ag.data.logo_url, nome: ag.data.nome || 'Trasso' })
+    if (ag.data) setAgencia({ logoUrl: ag.data.logo_url, nome: ag.data.nome || 'Slick' })
     setLoading(false)
   }, [])
 

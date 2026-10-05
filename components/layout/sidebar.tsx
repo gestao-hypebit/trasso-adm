@@ -51,7 +51,7 @@ export function Sidebar() {
   const router = useRouter()
   const { aberto, fechar } = useMobileNav()
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [agenciaNome, setAgenciaNome] = useState('Trasso')
+  const [agenciaNome, setAgenciaNome] = useState('Slick')
   const [userNome, setUserNome] = useState('')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [leadsNovos, setLeadsNovos] = useState(0)
@@ -109,7 +109,7 @@ export function Sidebar() {
     .slice(0, 2)
     .map(n => n[0])
     .join('')
-    .toUpperCase() || 'T'
+    .toUpperCase() || 'S'
 
   const userIniciais = userNome
     .split(' ')

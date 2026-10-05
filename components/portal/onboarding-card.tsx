@@ -63,7 +63,7 @@ export function OnboardingCard({ token, projetoNome, itens, briefing }: {
                     <p className={cn('text-sm', item.concluido ? 'text-brand-lavanda/40 line-through' : 'text-brand-lavanda')}>{item.titulo}</p>
                     {item.descricao && !item.concluido && <p className="text-xs text-brand-lavanda/50 mt-0.5">{item.descricao}</p>}
                   </div>
-                  <Badge variant={doCliente ? 'pendente' : 'outline'} className="shrink-0">{doCliente ? 'Com você' : 'Com a Trasso'}</Badge>
+                  <Badge variant={doCliente ? 'pendente' : 'outline'} className="shrink-0">{doCliente ? 'Com você' : 'Com a Slick'}</Badge>
                 </div>
               )
             })}

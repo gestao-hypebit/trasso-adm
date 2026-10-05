@@ -4,7 +4,7 @@ import { getClienteByToken, registrarAcessoPortal } from '@/lib/portal/auth'
 import { PortalHeader } from '@/components/portal/portal-header'
 
 export const metadata: Metadata = {
-  title: 'Portal do Cliente — Trasso',
+  title: 'Portal do Cliente — Slick',
   robots: { index: false, follow: false },
 }
 

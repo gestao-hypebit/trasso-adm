@@ -67,7 +67,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
   const entregasPendentes = entregas.filter((e) => e.status === 'aguardando').length
   const abaInicial = entregasPendentes > 0 ? 'entregas' : onboardingPendente ? 'onboarding' : 'projetos'
 
-  const agenciaNome = config?.nome ?? 'Trasso'
+  const agenciaNome = config?.nome ?? 'Slick'
   const logoUrl = config?.logo_url ?? null
 
   return (

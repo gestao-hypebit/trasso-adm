@@ -66,7 +66,7 @@ export function EntregaCard({ token, entrega, projetoNome, clienteNome }: { toke
                 ev.tipo === 'aprovada' ? 'bg-brand-lima' : ev.tipo === 'ajustes' ? 'bg-brand-rosa' : 'bg-brand-violeta'
               )} />
               <p className="text-xs text-brand-lavanda/60">
-                <span className="font-medium text-brand-lavanda">{ev.autor === 'agencia' && ev.tipo === 'enviada' ? `Versão ${ev.rodada} enviada pela Trasso` : eventoLabel[ev.tipo]}</span>
+                <span className="font-medium text-brand-lavanda">{ev.autor === 'agencia' && ev.tipo === 'enviada' ? `Versão ${ev.rodada} enviada pela Slick` : eventoLabel[ev.tipo]}</span>
                 {ev.autor === 'cliente' && ev.nome && <> · {ev.nome}</>}
                 {' · '}{formatDate(ev.created_at, "dd/MM 'às' HH:mm")}
               </p>
@@ -89,7 +89,7 @@ export function EntregaCard({ token, entrega, projetoNome, clienteNome }: { toke
             <DialogTitle>{acao === 'aprovar' ? `Aprovar "${entrega.titulo}"` : `Pedir ajustes em "${entrega.titulo}"`}</DialogTitle>
             <DialogDescription>
               {acao === 'aprovar'
-                ? 'Ao aprovar, você confirma que esta versão está de acordo e a Trasso segue para a próxima etapa.'
+                ? 'Ao aprovar, você confirma que esta versão está de acordo e a Slick segue para a próxima etapa.'
                 : 'Descreva o que precisa mudar. Quanto mais específico, mais rápido sai a próxima versão.'}
             </DialogDescription>
           </DialogHeader>

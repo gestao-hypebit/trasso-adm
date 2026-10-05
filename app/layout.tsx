@@ -7,7 +7,7 @@ const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space
 const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' })
 
 export const metadata: Metadata = {
-  title: 'Trasso — Plataforma de Gestão',
+  title: 'Slick — Plataforma de Gestão',
   description: 'Criatividade e tecnologia no mesmo traço',
 }
 

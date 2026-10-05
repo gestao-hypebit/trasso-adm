@@ -339,7 +339,7 @@ export default function ConfiguracoesPage() {
                             <Image src={config.logo_url} alt="Logo" width={80} height={80} className="object-contain" unoptimized />
                           ) : (
                             <span className="text-3xl font-bold text-brand-lima">
-                              {config.nome?.[0]?.toUpperCase() ?? 'T'}
+                              {config.nome?.[0]?.toUpperCase() ?? 'S'}
                             </span>
                           )}
                         </div>
