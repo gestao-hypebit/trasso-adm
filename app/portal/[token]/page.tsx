@@ -28,7 +28,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
       .order('created_at', { ascending: false }),
     supabase
       .from('propostas')
-      .select('*, clientes(nome, empresa, email), proposta_itens(*)')
+      .select('*, clientes(nome, empresa, email), responsavel:profiles!propostas_responsavel_id_fkey(nome), proposta_itens(*)')
       .eq('cliente_id', cliente.id)
       .neq('status', 'rascunho')
       .order('created_at', { ascending: false }),

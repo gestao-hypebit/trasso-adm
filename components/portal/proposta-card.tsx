@@ -13,6 +13,7 @@ export type PropostaCardData = {
   validade: string | null; condicoes_pagamento: string | null; observacoes: string | null
   created_at: string; desconto_percentual: number; valor_total: number
   clientes: { nome: string; empresa: string | null; email: string | null } | null
+  responsavel?: { nome: string } | null
   proposta_itens: Item[]
 }
 
