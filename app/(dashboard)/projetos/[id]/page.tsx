@@ -3,6 +3,12 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Edit, Plus, CheckCircle2, Clock, Loader2 } from 'lucide-react'
+import {
+  DndContext, DragEndEvent, DragOverlay, DragStartEvent,
+  closestCorners, PointerSensor, TouchSensor, useSensor, useSensors,
+  useDroppable, useDraggable,
+} from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,6 +48,47 @@ const tarefaStatusColunas = [
   { key: 'concluida', label: 'Concluída' },
 ]
 
+function TarefaCardConteudo({ tarefa }: { tarefa: Tarefa }) {
+  return (
+    <CardContent className="p-3">
+      <div className="flex items-start gap-2">
+        {tarefa.status === 'concluida'
+          ? <CheckCircle2 className="h-4 w-4 text-brand-lima shrink-0 mt-0.5" />
+          : <Clock className="h-4 w-4 text-brand-violeta shrink-0 mt-0.5" />
+        }
+        <div>
+          <p className={cn('text-xs font-medium', tarefa.status === 'concluida' ? 'text-brand-lavanda/50 line-through' : 'text-brand-lavanda')}>{tarefa.titulo}</p>
+          {tarefa.data_vencimento && <p className="text-[10px] text-brand-lavanda/40 mt-1">{formatDate(tarefa.data_vencimento)}</p>}
+        </div>
+      </div>
+    </CardContent>
+  )
+}
+
+function DroppableColuna({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} className={cn('space-y-2 min-h-[120px] rounded-lg transition-colors', isOver && 'bg-brand-violeta/[0.06]')}>
+      {children}
+    </div>
+  )
+}
+
+function DraggableTarefa({ tarefa }: { tarefa: Tarefa }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: tarefa.id })
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{ transform: CSS.Translate.toString(transform) }}
+      className={cn('cursor-grab active:cursor-grabbing touch-none transition-opacity', isDragging && 'opacity-30')}
+    >
+      <Card className="hover:border-white/[0.15] transition-colors"><TarefaCardConteudo tarefa={tarefa} /></Card>
+    </div>
+  )
+}
+
 export default function ProjetoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [projeto, setProjeto] = useState<Projeto | null>(null)
@@ -50,6 +97,30 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
   const [tarefaOpen, setTarefaOpen] = useState(false)
   const [tarefaForm, setTarefaForm] = useState(TAREFA_VAZIA)
   const [salvandoTarefa, setSalvandoTarefa] = useState(false)
+  const [tarefaAtiva, setTarefaAtiva] = useState<Tarefa | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
+
+  function handleDragStart(event: DragStartEvent) {
+    setTarefaAtiva(tarefas.find((t) => t.id === event.active.id) ?? null)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setTarefaAtiva(null)
+    const { active, over } = event
+    if (!over) return
+    const novoStatus = over.id as string
+    if (!tarefaStatusColunas.find((c) => c.key === novoStatus)) return
+    const tarefa = tarefas.find((t) => t.id === active.id)
+    if (!tarefa || tarefa.status === novoStatus) return
+
+    setTarefas((prev) => prev.map((t) => (t.id === active.id ? { ...t, status: novoStatus } : t)))
+    const { error } = await (createClient() as any).from('tarefas').update({ status: novoStatus }).eq('id', active.id)
+    if (error) setTarefas((prev) => prev.map((t) => (t.id === active.id ? { ...t, status: tarefa.status } : t)))
+  }
 
   async function criarTarefa() {
     if (!tarefaForm.titulo.trim()) return
@@ -172,38 +243,30 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
             {tarefas.length === 0 ? (
               <p className="text-center text-brand-lavanda/40 py-12 text-sm">Nenhuma tarefa neste projeto.</p>
             ) : (
-              <div className="flex gap-4 overflow-x-auto pb-4">
-                {tarefaStatusColunas.map((col) => {
-                  const ts = tarefas.filter((t) => t.status === col.key)
-                  return (
-                    <div key={col.key} className="flex-shrink-0 w-64 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-brand-lavanda">{col.label}</h3>
-                        <span className="text-xs text-brand-lavanda/40 bg-white/[0.06] rounded-full px-2 py-0.5">{ts.length}</span>
+              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {tarefaStatusColunas.map((col) => {
+                    const ts = tarefas.filter((t) => t.status === col.key)
+                    return (
+                      <div key={col.key} className="flex-shrink-0 w-64 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-semibold text-brand-lavanda">{col.label}</h3>
+                          <span className="text-xs text-brand-lavanda/40 bg-white/[0.06] rounded-full px-2 py-0.5">{ts.length}</span>
+                        </div>
+                        <DroppableColuna id={col.key}>
+                          {ts.map((t) => <DraggableTarefa key={t.id} tarefa={t} />)}
+                          {ts.length === 0 && <p className="text-xs text-brand-lavanda/20 text-center py-3">Vazio</p>}
+                        </DroppableColuna>
                       </div>
-                      <div className="space-y-2">
-                        {ts.map((t) => (
-                          <Card key={t.id}>
-                            <CardContent className="p-3">
-                              <div className="flex items-start gap-2">
-                                {t.status === 'concluida'
-                                  ? <CheckCircle2 className="h-4 w-4 text-brand-lima shrink-0 mt-0.5" />
-                                  : <Clock className="h-4 w-4 text-brand-violeta shrink-0 mt-0.5" />
-                                }
-                                <div>
-                                  <p className={cn('text-xs font-medium', t.status === 'concluida' ? 'text-brand-lavanda/50 line-through' : 'text-brand-lavanda')}>{t.titulo}</p>
-                                  {t.data_vencimento && <p className="text-[10px] text-brand-lavanda/40 mt-1">{formatDate(t.data_vencimento)}</p>}
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                        {ts.length === 0 && <p className="text-xs text-brand-lavanda/20 text-center py-3">Vazio</p>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+                <DragOverlay dropAnimation={null}>
+                  {tarefaAtiva ? (
+                    <Card className="w-64 shadow-2xl border-brand-violeta/50 rotate-1 opacity-95"><TarefaCardConteudo tarefa={tarefaAtiva} /></Card>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             )}
           </TabsContent>
 
