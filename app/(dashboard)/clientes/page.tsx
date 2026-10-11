@@ -69,6 +69,10 @@ export default function ClientesPage() {
   const [interacaoCliente, setInteracaoCliente] = useState<Cliente | null>(null)
   const [importarOpen, setImportarOpen] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
+  // Edição em massa: clientes marcados e a origem escolhida para aplicar neles.
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [origemEmMassa, setOrigemEmMassa] = useState('')
+  const [salvandoEmMassa, setSalvandoEmMassa] = useState(false)
 
   useEffect(() => {
     try {
@@ -250,6 +254,48 @@ export default function ClientesPage() {
     )
   }
 
+  const todosFiltradosMarcados = filtered.length > 0 && filtered.every((c) => selecionados.has(c.id))
+
+  function alternarSelecao(id: string) {
+    setSelecionados((atual) => {
+      const novo = new Set(atual)
+      if (novo.has(id)) novo.delete(id)
+      else novo.add(id)
+      return novo
+    })
+  }
+
+  function alternarTodosFiltrados() {
+    setSelecionados((atual) => {
+      const novo = new Set(atual)
+      if (todosFiltradosMarcados) filtered.forEach((c) => novo.delete(c.id))
+      else filtered.forEach((c) => novo.add(c.id))
+      return novo
+    })
+  }
+
+  async function aplicarOrigemEmMassa() {
+    if (!origemEmMassa || selecionados.size === 0) return
+    const ids = [...selecionados]
+    const origem = origemEmMassa === 'sem_origem' ? null : origemEmMassa
+    setSalvandoEmMassa(true)
+    const { error } = await (createClient() as any).from('clientes').update({ origem }).in('id', ids)
+    setSalvandoEmMassa(false)
+    if (error) {
+      setAviso(`Não foi possível alterar a origem: ${error.message}`)
+      return
+    }
+    setClientes((lista) => lista.map((c) => (selecionados.has(c.id) ? { ...c, origem } : c)))
+    setAviso(`Origem de ${ids.length} cliente(s) alterada para ${origem ? labelOrigem(origem) : 'Sem origem'}.`)
+    setSelecionados(new Set())
+    setOrigemEmMassa('')
+  }
+
+  const checkbox = (marcado: boolean, onChange: () => void, label: string, className?: string) => (
+    <input type="checkbox" checked={marcado} onChange={onChange} aria-label={label}
+      className={cn('h-4 w-4 cursor-pointer accent-[#7C3AED]', className)} />
+  )
+
   return (
     <div>
       <Header title="Clientes" description="Gerencie seus clientes e leads" />
@@ -386,6 +432,37 @@ export default function ClientesPage() {
           </div>
         </div>
 
+        {!loading && filtered.length > 0 && (
+          <div className={cn(
+            'sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-sm',
+            selecionados.size > 0 ? 'border-brand-violeta/40 bg-[#1b1823]/95 backdrop-blur' : 'border-white/[0.06] bg-white/[0.02]',
+          )}>
+            <label className="flex items-center gap-2 text-brand-lavanda/70 cursor-pointer">
+              {checkbox(todosFiltradosMarcados, alternarTodosFiltrados, 'Selecionar todos os clientes filtrados')}
+              {selecionados.size > 0 ? `${selecionados.size} selecionado(s)` : 'Selecionar todos'}
+            </label>
+            {selecionados.size > 0 && (
+              <>
+                <span className="text-brand-lavanda/30 hidden sm:inline">·</span>
+                <span className="text-xs text-brand-lavanda/50">Alterar origem para</span>
+                <Select value={origemEmMassa} onValueChange={setOrigemEmMassa}>
+                  <SelectTrigger className="h-8 w-auto min-w-40 text-xs"><SelectValue placeholder="Escolha a origem" /></SelectTrigger>
+                  <SelectContent>
+                    {origemOpcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    <SelectItem value="sem_origem">Sem origem</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={aplicarOrigemEmMassa} disabled={!origemEmMassa || salvandoEmMassa}>
+                  {salvandoEmMassa ? 'Salvando...' : 'Aplicar'}
+                </Button>
+                <Button variant="ghost" size="sm" className="gap-1 text-xs ml-auto" onClick={() => setSelecionados(new Set())}>
+                  <X className="h-3.5 w-3.5" /> Limpar seleção
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20 text-brand-lavanda/40 text-sm">Carregando...</div>
         ) : filtered.length === 0 ? (
@@ -403,6 +480,7 @@ export default function ClientesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06] text-left">
+                      <th className="pl-6 pr-0 py-3 w-4">{checkbox(todosFiltradosMarcados, alternarTodosFiltrados, 'Selecionar todos')}</th>
                       {thOrdenavel('Cliente', 'nome', 'px-6')}
                       <th className="text-xs text-brand-lavanda/50 font-medium px-4 py-3">Status</th>
                       <th className="text-xs text-brand-lavanda/50 font-medium px-4 py-3">Origem</th>
@@ -418,7 +496,8 @@ export default function ClientesPage() {
                     {filtered.map((c) => {
                       const ultima = ultimaInteracaoPorCliente[c.id]
                       return (
-                        <tr key={c.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                        <tr key={c.id} className={cn('border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors', selecionados.has(c.id) && 'bg-brand-violeta/[0.06]')}>
+                          <td className="pl-6 pr-0 py-3">{checkbox(selecionados.has(c.id), () => alternarSelecao(c.id), `Selecionar ${c.nome}`)}</td>
                           <td className="px-6 py-3">
                             <Link href={`/clientes/${c.id}`} className="font-medium text-brand-lavanda hover:text-brand-lima transition-colors">{c.nome}</Link>
                             {c.empresa && <p className="text-xs text-brand-lavanda/50">{c.empresa}</p>}
@@ -451,10 +530,11 @@ export default function ClientesPage() {
               const projetosAtivos = projetosAtivosPorCliente[cliente.id] ?? 0
               const wa = whatsappUrl(cliente.whatsapp || cliente.telefone)
               return (
-                <Card key={cliente.id} className="hover:border-white/[0.12] transition-colors group">
+                <Card key={cliente.id} className={cn('hover:border-white/[0.12] transition-colors group', selecionados.has(cliente.id) && 'border-brand-violeta/50')}>
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 min-w-0">
+                        {checkbox(selecionados.has(cliente.id), () => alternarSelecao(cliente.id), `Selecionar ${cliente.nome}`, 'shrink-0')}
                         <Avatar className="h-10 w-10">
                           <AvatarFallback className="text-sm">{getInitials(cliente.nome)}</AvatarFallback>
                         </Avatar>
