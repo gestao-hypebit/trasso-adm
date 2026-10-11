@@ -14,6 +14,7 @@ export const origemOpcoes = [
   { value: 'catalogo_place', label: 'Catálogo Place' },
   { value: 'trafego_pago', label: 'Tráfego pago' },
   { value: 'captacao_ativa', label: 'Captação ativa' },
+  { value: 'representante_comercial', label: 'Prospecção por representante comercial' },
   { value: 'indicacao', label: 'Indicação' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'linkedin', label: 'LinkedIn' },
