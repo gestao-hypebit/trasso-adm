@@ -1,13 +1,15 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, TrendingUp, TrendingDown, Users, FolderOpen } from 'lucide-react'
+import { Download, TrendingUp, TrendingDown, Users, FolderOpen, Megaphone } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
+import { labelOrigem } from '@/lib/crm/opcoes'
+import { TrafegoPago } from '@/components/relatorios/trafego-pago'
 import { cn } from '@/lib/utils'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,6 +23,7 @@ const tabItems = [
   { key: 'financeiro', label: 'Financeiro', icon: TrendingUp },
   { key: 'projetos', label: 'Projetos', icon: FolderOpen },
   { key: 'crm', label: 'CRM', icon: Users },
+  { key: 'trafego', label: 'Tráfego pago', icon: Megaphone },
 ]
 
 const STATUS_CORES: Record<string, string> = {
@@ -159,11 +162,11 @@ export default function RelatoriosPage() {
 
   const clientesPorOrigem = Object.entries(
     clientes.reduce((acc: any, c: any) => {
-      const origem = c.origem || 'outros'
+      const origem = c.origem || 'sem_origem'
       acc[origem] = (acc[origem] || 0) + 1; return acc
     }, {})
   ).map(([origem, count]: any) => ({
-    origem: origem.charAt(0).toUpperCase() + origem.slice(1),
+    origem: origem === 'sem_origem' ? 'Sem origem' : labelOrigem(origem),
     count,
     pct: clientes.length > 0 ? Math.round((count / clientes.length) * 100) : 0,
   }))
@@ -433,6 +436,8 @@ export default function RelatoriosPage() {
             )}
           </div>
         )}
+
+        {aba === 'trafego' && <TrafegoPago />}
       </main>
     </div>
   )

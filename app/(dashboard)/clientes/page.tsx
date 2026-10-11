@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { NovaInteracaoDialog } from '@/components/clientes/nova-interacao-dialog'
 import { ImportarClientesDialog } from '@/components/clientes/importar-clientes-dialog'
 import { getInitials, formatDate, formatCurrency, formatRelative, whatsappUrl, toISODateLocal, cn } from '@/lib/utils'
-import { labelOrigem, labelSegmento } from '@/lib/crm/opcoes'
+import { labelOrigem, labelSegmento, origemOpcoes } from '@/lib/crm/opcoes'
 import { toCSV, downloadCSV } from '@/lib/csv'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
@@ -130,7 +130,8 @@ export default function ClientesPage() {
 
   const produtoMap = Object.fromEntries(produtos.map((p) => [p.id, p]))
   const responsavelMap = Object.fromEntries(responsaveis.map((r) => [r.id, r.nome]))
-  const origensDisponiveis = [...new Set(clientes.map((c) => c.origem).filter((o): o is string => !!o))].sort()
+  // Todas as origens cadastráveis, mais as que vieram de importação com outro valor.
+  const origensDisponiveis = [...new Set([...origemOpcoes.map((o) => o.value), ...clientes.map((c) => c.origem).filter((o): o is string => !!o)])]
   const segmentosDisponiveis = [...new Set(clientes.map((c) => c.segmento).filter((s): s is string => !!s))].sort()
   const hoje = toISODateLocal(new Date())
 
@@ -150,7 +151,7 @@ export default function ClientesPage() {
         (grupoFilter === 'saas' && (c.tipo === 'saas' || c.tipo === 'ambos'))
       const matchProduto = !produtoFilter || c.produto_id === produtoFilter
       const matchResp = responsavelFilter === 'todos' || (responsavelFilter === 'nenhum' ? !c.responsavel_id : c.responsavel_id === responsavelFilter)
-      const matchOrigem = origemFilter === 'todos' || c.origem === origemFilter
+      const matchOrigem = origemFilter === 'todos' || (origemFilter === 'sem_origem' ? !c.origem : c.origem === origemFilter)
       const matchSegmento = segmentoFilter === 'todos' || c.segmento === segmentoFilter
       return matchSearch && matchStatus && matchGrupo && matchProduto && matchResp && matchOrigem && matchSegmento
     })
@@ -366,6 +367,7 @@ export default function ClientesPage() {
               <SelectTrigger className="h-8 w-auto min-w-40 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todas as origens</SelectItem>
+                <SelectItem value="sem_origem">Sem origem</SelectItem>
                 {origensDisponiveis.map((o) => <SelectItem key={o} value={o}>{labelOrigem(o)}</SelectItem>)}
               </SelectContent>
             </Select>
