@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
-import { FolderOpen, FileText, FileSignature, Layers, ClipboardList, PackageCheck } from 'lucide-react'
+import Link from 'next/link'
+import { FolderOpen, FileText, FileSignature, Layers, ClipboardList, PackageCheck, Megaphone, ChevronRight } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getClienteByToken } from '@/lib/portal/auth'
 import { getServicosContratados } from '@/lib/portal/servicos'
@@ -13,6 +14,7 @@ import { EntregaCard } from '@/components/portal/entrega-card'
 import { AvaliacaoCard } from '@/components/portal/avaliacao-card'
 import { ENTREGA_SELECT, type Entrega } from '@/lib/projetos/entregas'
 import type { Briefing, OnboardingItem } from '@/lib/projetos/onboarding'
+import { nomeMes } from '@/lib/social/tipos'
 
 export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -47,11 +49,13 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
   const nomeProjeto = new Map((projetos ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))
   // Sem projetos, nada de onboarding/entregas; evita um .in() vazio.
   const porProjeto = projetoIds.length > 0
-  const [{ data: itensRaw }, { data: briefingsRaw }, { data: entregasRaw }, { data: avaliacoesRaw }] = await Promise.all([
+  const [{ data: itensRaw }, { data: briefingsRaw }, { data: entregasRaw }, { data: avaliacoesRaw }, { data: planosRaw }] = await Promise.all([
     porProjeto ? db.from('onboarding_itens').select('*').in('projeto_id', projetoIds) : { data: [] },
     porProjeto ? db.from('briefings').select('*').in('projeto_id', projetoIds) : { data: [] },
     porProjeto ? db.from('entregas').select(ENTREGA_SELECT).in('projeto_id', projetoIds).order('created_at', { ascending: false }) : { data: [] },
     db.from('avaliacoes').select('id, projeto_id').eq('cliente_id', cliente.id).eq('status', 'pendente'),
+    // Tabela pode não existir ainda (migration de social media não rodada): o portal segue sem a aba.
+    db.from('social_planejamentos').select('token, mes, status, social_posts(aprovacao)').eq('cliente_id', cliente.id).eq('link_ativo', true).neq('status', 'rascunho').order('mes', { ascending: false }),
   ])
   const itens = (itensRaw ?? []) as OnboardingItem[]
   const briefings = (briefingsRaw ?? []) as Briefing[]
@@ -65,7 +69,9 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
   const onboardingPendente = onboardings.some((o: { itens: OnboardingItem[]; briefing: Briefing | null }) =>
     o.briefing?.status === 'pendente' || o.itens.some((i) => i.responsavel === 'cliente' && !i.concluido))
   const entregasPendentes = entregas.filter((e) => e.status === 'aguardando').length
-  const abaInicial = entregasPendentes > 0 ? 'entregas' : onboardingPendente ? 'onboarding' : 'projetos'
+  const planos = (planosRaw ?? []) as { token: string; mes: string; status: string; social_posts: { aprovacao: string }[] }[]
+  const postsPendentes = planos.reduce((n, p) => n + p.social_posts.filter((x) => x.aprovacao === 'pendente').length, 0)
+  const abaInicial = entregasPendentes > 0 ? 'entregas' : postsPendentes > 0 ? 'social' : onboardingPendente ? 'onboarding' : 'projetos'
 
   const agenciaNome = config?.nome ?? 'Slick'
   const logoUrl = config?.logo_url ?? null
@@ -97,6 +103,12 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
             {entregasPendentes > 0 && <span className="rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{entregasPendentes}</span>}
           </TabsTrigger>
         )}
+        {planos.length > 0 && (
+          <TabsTrigger value="social" className="gap-1.5">
+            <Megaphone className="h-4 w-4" /> Social media
+            {postsPendentes > 0 && <span className="rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{postsPendentes}</span>}
+          </TabsTrigger>
+        )}
         <TabsTrigger value="propostas" className="gap-1.5"><FileText className="h-4 w-4" /> Propostas</TabsTrigger>
         <TabsTrigger value="contratos" className="gap-1.5"><FileSignature className="h-4 w-4" /> Contratos</TabsTrigger>
         <TabsTrigger value="servicos" className="gap-1.5"><Layers className="h-4 w-4" /> Serviços</TabsTrigger>
@@ -120,6 +132,25 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
         {entregas.map((e) => (
           <EntregaCard key={e.id} token={token} entrega={e} projetoNome={nomeProjeto.get(e.projeto_id) ?? ''} clienteNome={cliente.nome} />
         ))}
+      </TabsContent>
+
+      <TabsContent value="social" className="space-y-3">
+        {planos.map((p) => {
+          const total = p.social_posts.length
+          const aprovados = p.social_posts.filter((x) => x.aprovacao === 'aprovado').length
+          const pendentes = p.social_posts.filter((x) => x.aprovacao === 'pendente').length
+          return (
+            <Link key={p.token} href={`/plano/${p.token}`} className="flex items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.16]">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold capitalize text-brand-lavanda">Planejamento de {nomeMes(p.mes)}</p>
+                <p className="mt-0.5 text-sm text-brand-lavanda/50">
+                  {total} posts · {aprovados} aprovados{pendentes > 0 && <span className="text-brand-lima"> · {pendentes} aguardando você</span>}
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-brand-lavanda/30" />
+            </Link>
+          )
+        })}
       </TabsContent>
 
       <TabsContent value="propostas" className="space-y-4">

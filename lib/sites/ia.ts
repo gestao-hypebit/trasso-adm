@@ -28,7 +28,7 @@ function verificarParada(msg: Anthropic.Beta.BetaMessage) {
 const textoDe = (msg: Anthropic.Beta.BetaMessage) =>
   msg.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').map((b) => b.text).join('')
 
-async function pedirJson<S extends z.ZodType>(schema: S, opcoes: { sistema: string; usuario: string; effort: 'low' | 'medium' | 'high'; maxTokens: number }): Promise<z.infer<S>> {
+export async function pedirJson<S extends z.ZodType>(schema: S, opcoes: { sistema: string; usuario: string; effort: 'low' | 'medium' | 'high'; maxTokens: number }): Promise<z.infer<S>> {
   const stream = client.beta.messages.stream({
     model: MODELO,
     max_tokens: opcoes.maxTokens,
