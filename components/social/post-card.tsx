@@ -1,15 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Image as ImageIcon, Layers } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { APROVACAO, FORMATOS, PRODUCAO, REDES, type Post } from '@/lib/social/tipos'
 import { cn, formatDate } from '@/lib/utils'
 
 export const ehVideo = (url: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url)
 
-// Mídias do post: carrossel simples quando há mais de uma.
-export function Midias({ urls, className }: { urls: string[]; className?: string }) {
+// Mídias do post. O container segue o tamanho da arte (sem faixa vazia);
+// com mais de uma, vira carrossel de deslizar (scroll-snap) com setas e aviso.
+export function Midias({ urls, carrossel = false, className }: { urls: string[]; carrossel?: boolean; className?: string }) {
+  const trilho = useRef<HTMLDivElement>(null)
   const [i, setI] = useState(0)
   if (!urls.length) {
     return (
@@ -18,22 +20,46 @@ export function Midias({ urls, className }: { urls: string[]; className?: string
       </div>
     )
   }
-  const atual = urls[Math.min(i, urls.length - 1)]
+  const varias = urls.length > 1
+  const ir = (k: number) => {
+    const el = trilho.current
+    if (el) el.scrollTo({ left: ((k + urls.length) % urls.length) * el.clientWidth, behavior: 'smooth' })
+  }
   return (
-    <div className={cn('relative aspect-[4/5] overflow-hidden bg-black', className)}>
-      {ehVideo(atual)
-        ? <video src={atual} controls playsInline className="h-full w-full object-contain" />
-        // eslint-disable-next-line @next/next/no-img-element
-        : <img src={atual} alt="" className="h-full w-full object-cover" />}
-      {urls.length > 1 && (
-        <>
-          <button type="button" onClick={() => setI((i - 1 + urls.length) % urls.length)} aria-label="Anterior" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><ChevronLeft className="h-4 w-4" /></button>
-          <button type="button" onClick={() => setI((i + 1) % urls.length)} aria-label="Próxima" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><ChevronRight className="h-4 w-4" /></button>
-          <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
-            {urls.map((u, k) => <span key={u} className={cn('h-1.5 w-1.5 rounded-full', k === i ? 'bg-white' : 'bg-white/40')} />)}
-          </div>
-        </>
+    <div className={cn('flex flex-col', className)}>
+      {varias && (
+        <div className="flex items-center gap-2 bg-brand-violeta px-3 py-2 text-xs font-semibold text-white">
+          <Layers className="h-4 w-4 shrink-0" />
+          <span>{carrossel ? 'Carrossel' : 'Várias mídias'} · {urls.length} {urls.some(ehVideo) ? 'mídias' : 'imagens'}</span>
+          <span className="ml-auto flex items-center gap-1 font-normal text-white/85">Deslize para ver <ChevronRight className="h-3.5 w-3.5" /></span>
+        </div>
       )}
+      <div className="relative bg-black">
+        <div
+          ref={trilho}
+          onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
+          className="flex snap-x snap-mandatory items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {urls.map((u) => (
+            <div key={u} className="w-full shrink-0 snap-center">
+              {ehVideo(u)
+                ? <video src={u} controls playsInline className="block h-auto w-full" />
+                // eslint-disable-next-line @next/next/no-img-element
+                : <img src={u} alt="" className="block h-auto w-full" />}
+            </div>
+          ))}
+        </div>
+        {varias && (
+          <>
+            <button type="button" onClick={() => ir(i - 1)} aria-label="Anterior" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><ChevronLeft className="h-4 w-4" /></button>
+            <button type="button" onClick={() => ir(i + 1)} aria-label="Próxima" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><ChevronRight className="h-4 w-4" /></button>
+            <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">{i + 1}/{urls.length}</span>
+            <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
+              {urls.map((u, k) => <span key={u} className={cn('h-1.5 w-1.5 rounded-full', k === i ? 'bg-white' : 'bg-white/40')} />)}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -59,7 +85,7 @@ export function PostCard({ post, interno = false, acoes }: { post: Post; interno
   const aprov = APROVACAO[post.aprovacao]
   return (
     <article id={`post-${post.id}`} className="scroll-mt-24 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] md:grid md:grid-cols-[280px_1fr]">
-      <Midias urls={post.midias} />
+      <Midias urls={post.midias} carrossel={post.formato === 'carrossel'} className="md:self-start" />
       <div className="flex min-w-0 flex-col gap-3 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold capitalize text-brand-lavanda">{formatDate(post.data, "EEEE, dd/MM")}{post.horario && ` · ${post.horario}`}</span>
