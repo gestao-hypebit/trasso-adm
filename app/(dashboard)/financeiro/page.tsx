@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import { labelLinha, type Linha } from '@/lib/financeiro/linhas'
+import { FiltroLinha, type FiltroLinhaValor } from '@/components/financeiro/filtro-linha'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -56,6 +57,7 @@ export default function FinanceiroPage() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [linha, setLinha] = useState<FiltroLinhaValor>('todas')
 
   const load = useCallback(async () => {
     const supabase = createClient() as any
@@ -84,7 +86,11 @@ export default function FinanceiroPage() {
     setConfirmingId(null)
   }
 
-  const doMes = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
+  // Filtro de linha: vale para tudo abaixo, menos o saldo (a conta é uma só)
+  // e o "Resultado por linha", que já mostra a divisão.
+  const daLinha = linha === 'todas' ? lancamentos : lancamentos.filter(l => l.frente === linha)
+  const noPeriodo = lancamentos.filter(l => l.data >= mesStart && l.data <= mesEnd)
+  const doMes = daLinha.filter(l => l.data >= mesStart && l.data <= mesEnd)
   const receitasMes = doMes.filter(l => l.tipo === 'receita')
   const despesasMes = doMes.filter(l => l.tipo === 'despesa')
   const totalReceitas = receitasMes.filter(l => l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
@@ -94,7 +100,7 @@ export default function FinanceiroPage() {
 
   // Vencidos independem do mês selecionado: é o que está atrasado hoje.
   const hojeStr = format(new Date(), 'yyyy-MM-dd')
-  const vencidos = lancamentos.filter(l => l.status === 'pendente' && l.data < hojeStr)
+  const vencidos = daLinha.filter(l => l.status === 'pendente' && l.data < hojeStr)
   const vencidoReceber = vencidos.filter(l => l.tipo === 'receita')
   const vencidoPagar = vencidos.filter(l => l.tipo === 'despesa')
 
@@ -107,7 +113,7 @@ export default function FinanceiroPage() {
   const cashflowData: DiaFluxo[] = (() => {
     if (allTime) {
       const porMes: Record<string, { entradas: number; saidas: number }> = {}
-      for (const l of [...lancamentos].sort((a, b) => a.data.localeCompare(b.data))) {
+      for (const l of [...daLinha].sort((a, b) => a.data.localeCompare(b.data))) {
         const k = l.data.slice(0, 7)
         const lbl = format(new Date(k + '-01T12:00:00Z'), 'MMM/yy', { locale: ptBR })
         const label = lbl.charAt(0).toUpperCase() + lbl.slice(1)
@@ -162,7 +168,7 @@ export default function FinanceiroPage() {
 
   // Resultado de cada linha de receita no período.
   const porFrente = (['agencia', 'catalogo_place', 'geral'] as const).map(f => {
-    const itens = doMes.filter(l => l.frente === f)
+    const itens = noPeriodo.filter(l => l.frente === f)
     const receitas = itens.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
     const despesas = itens.filter(l => l.tipo === 'despesa' && l.status === 'pago').reduce((s, l) => s + l.valor, 0)
     return { frente: f, label: f === 'geral' ? 'Custos gerais' : labelLinha(f), receitas, despesas, resultado: receitas - despesas }
@@ -275,6 +281,8 @@ export default function FinanceiroPage() {
               Mês atual
             </button>
           )}
+          <FiltroLinha valor={linha} onChange={setLinha} />
+          {linha !== 'todas' && <span className="text-[11px] text-brand-lavanda/40">Custos gerais (contabilidade, impostos…) ficam de fora.</span>}
         </div>
 
         {/* Saldo em Conta */}
@@ -333,12 +341,18 @@ export default function FinanceiroPage() {
                         <td className={cn('px-6 py-2.5 text-right font-semibold', f.resultado >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>{formatCurrency(f.resultado)}</td>
                       </tr>
                     ))}
-                    <tr className="bg-white/[0.02] font-semibold">
-                      <td className="px-6 py-2.5 text-brand-lavanda">Total</td>
-                      <td className="px-4 py-2.5 text-right text-brand-lavanda">{formatCurrency(totalReceitas)}</td>
-                      <td className="px-4 py-2.5 text-right text-brand-lavanda">−{formatCurrency(totalDespesas)}</td>
-                      <td className={cn('px-6 py-2.5 text-right', totalReceitas - totalDespesas >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>{formatCurrency(totalReceitas - totalDespesas)}</td>
-                    </tr>
+                    {(() => {
+                      const rec = porFrente.reduce((s, f) => s + f.receitas, 0)
+                      const desp = porFrente.reduce((s, f) => s + f.despesas, 0)
+                      return (
+                        <tr className="bg-white/[0.02] font-semibold">
+                          <td className="px-6 py-2.5 text-brand-lavanda">Total</td>
+                          <td className="px-4 py-2.5 text-right text-brand-lavanda">{formatCurrency(rec)}</td>
+                          <td className="px-4 py-2.5 text-right text-brand-lavanda">−{formatCurrency(desp)}</td>
+                          <td className={cn('px-6 py-2.5 text-right', rec - desp >= 0 ? 'text-brand-lima' : 'text-brand-rosa')}>{formatCurrency(rec - desp)}</td>
+                        </tr>
+                      )
+                    })()}
                   </tbody>
                 </table>
               </div>

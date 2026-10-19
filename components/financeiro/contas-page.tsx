@@ -18,7 +18,8 @@ import { formatCurrency, formatDate, cn, whatsappUrl, addMonthsISO } from '@/lib
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO, diasEntre, situacaoDe, aging, baixarCSV, type Situacao } from '@/lib/financeiro'
 import { SeletorMes, periodoInicial, intervaloPeriodo, rotuloPeriodo, type Periodo } from '@/components/financeiro/seletor-mes'
-import { linhaOpcoes, linhasDeReceita, type Linha } from '@/lib/financeiro/linhas'
+import { linhaOpcoes, type Linha } from '@/lib/financeiro/linhas'
+import { FiltroLinha, type FiltroLinhaValor } from '@/components/financeiro/filtro-linha'
 
 type Lancamento = {
   id: string; descricao: string; valor: number; data: string; status: string
@@ -66,7 +67,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [baixando, setBaixando] = useState(false)
-  const [linha, setLinha] = useState<Linha | 'todas'>('todas')
+  const [linha, setLinha] = useState<FiltroLinhaValor>('todas')
   const [categorias, setCategorias] = useState<{ id: string; nome: string; frente: Linha | null }[]>([])
   const hoje = hojeISO()
 
@@ -299,8 +300,9 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
           </Card>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <SeletorMes valor={periodo} onChange={(p) => { setPeriodo(p); setAba('todas'); setSelecionados(new Set()) }} permitirFuturo />
+          {ehReceber && <FiltroLinha valor={linha} onChange={(v) => { setLinha(v); setSelecionados(new Set()) }} />}
         </div>
 
         {/* Abas de situação */}
@@ -328,16 +330,6 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
             <Input className="pl-9" placeholder={ehReceber ? 'Buscar por descrição, cliente ou categoria...' : 'Buscar por descrição ou categoria...'} value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
-          {ehReceber && (
-            <select
-              value={linha}
-              onChange={(e) => { setLinha(e.target.value as Linha | 'todas'); setSelecionados(new Set()) }}
-              className="h-9 rounded-md border border-white/[0.1] bg-transparent px-3 text-sm text-brand-lavanda outline-none"
-            >
-              <option value="todas" className="bg-brand-noite">Todas as linhas</option>
-              {linhasDeReceita.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
-            </select>
-          )}
         </div>
 
         {selecionados.size > 0 && (
