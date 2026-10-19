@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   Search, AlertTriangle, CalendarClock, Wallet, CheckCircle2, Download, Trash2,
@@ -26,6 +26,7 @@ type Lancamento = {
   forma_pagamento: string | null; recorrente: boolean; frequencia: string | null
   frente: Linha
   categoria_id: string | null
+  asaas_criado: boolean
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string; whatsapp: string | null; telefone: string | null } | null
 }
@@ -75,7 +76,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     const db = createClient() as any
     const [{ data }, { data: cats }] = await Promise.all([
       db.from('lancamentos')
-        .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categoria_id, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
+        .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categoria_id, asaas_criado, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
         .eq('tipo', tipo)
         .order('data', { ascending: true }),
       db.from('categorias_financeiras').select('id, nome, frente').eq('tipo', tipo).order('nome'),
@@ -105,6 +106,25 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   }
 
   useEffect(() => { load() }, [load])
+
+  // Edição do valor direto na tabela: clique no valor, Enter salva, Esc cancela.
+  const [editandoValor, setEditandoValor] = useState<{ id: string; texto: string } | null>(null)
+  const cancelouValor = useRef(false)
+
+  async function salvarValor() {
+    if (!editandoValor) return
+    const { id, texto } = editandoValor
+    setEditandoValor(null)
+    if (cancelouValor.current) { cancelouValor.current = false; return }
+    const anterior = lancamentos.find(l => l.id === id)
+    // Aceita "1.500,50", "1500,50" e "1500.50".
+    const limpo = texto.replace(/[^\d.,]/g, '')
+    const novo = Math.round(Number(limpo.includes(',') ? limpo.replace(/\./g, '').replace(',', '.') : limpo) * 100) / 100
+    if (!anterior || !Number.isFinite(novo) || novo <= 0 || novo === anterior.valor) return
+    setLancamentos(prev => prev.map(l => l.id === id ? { ...l, valor: novo } : l))
+    const { error } = await (createClient() as any).from('lancamentos').update({ valor: novo }).eq('id', id)
+    if (error) setLancamentos(prev => prev.map(l => l.id === id ? anterior : l))
+  }
 
   async function darBaixa(ids: string[]) {
     if (!ids.length) return
@@ -420,7 +440,32 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                         </td>
                         <td className="px-3 py-3 text-xs text-brand-lavanda/50 whitespace-nowrap">{formaLabel[l.forma_pagamento ?? ''] ?? '—'}</td>
                         <td className={cn('px-3 py-3 text-right font-semibold whitespace-nowrap', l.status === 'cancelado' ? 'text-brand-lavanda/30 line-through' : t.cor)}>
-                          {formatCurrency(l.valor)}
+                          {editandoValor?.id === l.id ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <Input
+                                autoFocus
+                                inputMode="decimal"
+                                value={editandoValor.texto}
+                                onChange={(e) => setEditandoValor({ id: l.id, texto: e.target.value })}
+                                onBlur={salvarValor}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') e.currentTarget.blur()
+                                  if (e.key === 'Escape') { cancelouValor.current = true; e.currentTarget.blur() }
+                                }}
+                                className="h-7 w-28 text-right text-sm"
+                              />
+                              {l.asaas_criado && <span className="max-w-[12rem] whitespace-normal text-[10px] font-normal text-yellow-400/80">Veio do Asaas: o próximo aviso dele volta o valor.</span>}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setEditandoValor({ id: l.id, texto: l.valor.toFixed(2).replace('.', ',') })}
+                              title="Editar valor"
+                              className="rounded px-1 -mx-1 hover:bg-white/[0.06] cursor-text"
+                            >
+                              {formatCurrency(l.valor)}
+                            </button>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center whitespace-nowrap">
                           <SituacaoBadge situacao={situacao} data={l.data} hoje={hoje} liquidadoLabel={t.liquidado} />
