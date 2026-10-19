@@ -195,7 +195,7 @@ export default async function PropostaPublicaPage({ params }: { params: Promise<
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-8">
         {logoUrl
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={logoUrl} alt={agenciaNome} className="h-7 w-auto" />
+          ? <img src={logoUrl} alt={agenciaNome} className="h-10 w-auto sm:h-12" />
           : <span className="pp-display text-xl font-bold lowercase">{agenciaNome}</span>}
         <div className="flex items-center gap-3">
           <span className="pp-mono hidden text-[11px] text-[#F7F2FF]/45 sm:inline">Proposta {proposta.numero}</span>
