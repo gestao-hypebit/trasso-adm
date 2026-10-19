@@ -1,4 +1,6 @@
-import { RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowUpRight, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -50,7 +52,12 @@ export function PropostaCard({ token, proposta, logoUrl, agenciaNome }: {
             <h3 className="text-lg font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{proposta.titulo}</h3>
             {proposta.descricao && <p className="text-sm text-brand-lavanda/60 mt-1">{proposta.descricao}</p>}
           </div>
-          <PdfDownloadLinkClient proposta={proposta} logoUrl={logoUrl} agenciaNome={agenciaNome} />
+          <div className="flex shrink-0 items-center gap-2">
+            <Button asChild size="sm" variant="violeta">
+              <Link href={`/proposta/${token}/${proposta.id}`}>Abrir proposta <ArrowUpRight className="h-4 w-4" /></Link>
+            </Button>
+            <PdfDownloadLinkClient proposta={proposta} logoUrl={logoUrl} agenciaNome={agenciaNome} />
+          </div>
         </div>
 
         {itens.length > 0 && (

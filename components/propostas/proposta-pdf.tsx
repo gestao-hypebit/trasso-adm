@@ -1,6 +1,7 @@
 'use client'
 
 import { Document, Page, Text, View, Image, StyleSheet, Font, type Styles } from '@react-pdf/renderer'
+import { PERIODOS, parseItem } from '@/lib/propostas/itens'
 
 // Sem isso o react-pdf hifeniza palavras em português ("dig-ital").
 Font.registerHyphenationCallback(word => [word])
@@ -19,11 +20,6 @@ const BRANCO  = '#FFFFFF'
 const PAD = 48
 const TOP = 40
 
-const PERIODOS: Record<string, { label: string; sufixo: string }> = {
-  mensal:     { label: 'Mensal',     sufixo: '/mês' },
-  trimestral: { label: 'Trimestral', sufixo: '/trimestre' },
-  anual:      { label: 'Anual',      sufixo: '/ano' },
-}
 
 const s = StyleSheet.create({
   page: {
@@ -219,12 +215,6 @@ function TextoFormatado({ texto, style, corDot }: { texto: string; style: Styles
       })}
     </View>
   )
-}
-
-// 1ª linha da descrição do item = nome do módulo; demais linhas = funcionalidades.
-function parseItem(descricao: string) {
-  const [nome, ...resto] = descricao.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-  return { nome: nome ?? '', features: resto.map(l => l.replace(/^[-•*·–]\s*/, '')) }
 }
 
 type Item = {

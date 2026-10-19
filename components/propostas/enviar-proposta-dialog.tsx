@@ -38,9 +38,10 @@ export function EnviarPropostaDialog({ proposta, open, onOpenChange, onEnviada }
       })
   }, [open, proposta.id])
 
-  const portalUrl = cliente && typeof window !== 'undefined' ? `${window.location.origin}/portal/${cliente.portal_token}` : ''
+  // O link abre a página da proposta (landing), que tem aprovar/recusar e leva ao portal.
+  const propostaUrl = cliente && typeof window !== 'undefined' ? `${window.location.origin}/proposta/${cliente.portal_token}/${proposta.id}` : ''
   const primeiroNome = cliente?.nome.split(' ')[0] ?? ''
-  const mensagem = `Olá ${primeiroNome}! Sua proposta ${proposta.numero} — ${proposta.titulo} já está disponível. Você pode ver os detalhes e aprovar por aqui: ${portalUrl}`
+  const mensagem = `Olá ${primeiroNome}! Sua proposta ${proposta.numero} — ${proposta.titulo} já está disponível. Preparei uma página com o que está incluso, o investimento e o botão para aprovar: ${propostaUrl}`
   const waUrl = whatsappUrl(cliente?.whatsapp || cliente?.telefone, mensagem)
   const mailUrl = cliente?.email
     ? `mailto:${cliente.email}?subject=${encodeURIComponent(`Proposta ${proposta.numero} — ${proposta.titulo}`)}&body=${encodeURIComponent(mensagem)}`
@@ -56,7 +57,7 @@ export function EnviarPropostaDialog({ proposta, open, onOpenChange, onEnviada }
   }
 
   async function handleCopiar() {
-    await navigator.clipboard.writeText(portalUrl)
+    await navigator.clipboard.writeText(propostaUrl)
     setCopiado(true)
     setTimeout(() => setCopiado(false), 2000)
     await marcarEnviada()
@@ -68,7 +69,7 @@ export function EnviarPropostaDialog({ proposta, open, onOpenChange, onEnviada }
         <DialogHeader>
           <DialogTitle>Enviar proposta</DialogTitle>
           <DialogDescription>
-            O cliente abre a proposta no portal e pode aprovar ou recusar online. Ao enviar, o status muda para &quot;Enviada&quot;.
+            O cliente abre a página da proposta e pode aprovar ou recusar ali mesmo. Ao enviar, o status muda para &quot;Enviada&quot;.
           </DialogDescription>
         </DialogHeader>
 
@@ -86,7 +87,7 @@ export function EnviarPropostaDialog({ proposta, open, onOpenChange, onEnviada }
           </div>
         ) : (
           <div className="space-y-3 pt-2">
-            <p className="text-xs text-brand-lavanda/40 font-mono break-all rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5">{portalUrl}</p>
+            <p className="text-xs text-brand-lavanda/40 font-mono break-all rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5">{propostaUrl}</p>
             <div className="grid gap-2">
               {waUrl ? (
                 <Button asChild variant="violeta" className="justify-start">
@@ -108,7 +109,7 @@ export function EnviarPropostaDialog({ proposta, open, onOpenChange, onEnviada }
               )}
               <Button variant="outline" className="justify-start" onClick={handleCopiar}>
                 {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copiado ? 'Link copiado' : 'Copiar link do portal'}
+                {copiado ? 'Link copiado' : 'Copiar link da proposta'}
               </Button>
             </div>
           </div>
