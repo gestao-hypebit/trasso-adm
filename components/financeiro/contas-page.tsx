@@ -24,6 +24,7 @@ type Lancamento = {
   id: string; descricao: string; valor: number; data: string; status: string
   forma_pagamento: string | null; recorrente: boolean; frequencia: string | null
   frente: Linha
+  categoria_id: string | null
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string; whatsapp: string | null; telefone: string | null } | null
 }
@@ -66,17 +67,34 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [baixando, setBaixando] = useState(false)
   const [linha, setLinha] = useState<Linha | 'todas'>('todas')
+  const [categorias, setCategorias] = useState<{ id: string; nome: string; frente: Linha | null }[]>([])
   const hoje = hojeISO()
 
   const load = useCallback(async () => {
-    const { data } = await (createClient() as any)
-      .from('lancamentos')
-      .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
-      .eq('tipo', tipo)
-      .order('data', { ascending: true })
+    const db = createClient() as any
+    const [{ data }, { data: cats }] = await Promise.all([
+      db.from('lancamentos')
+        .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categoria_id, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
+        .eq('tipo', tipo)
+        .order('data', { ascending: true }),
+      db.from('categorias_financeiras').select('id, nome, frente').eq('tipo', tipo).order('nome'),
+    ])
     setLancamentos((data as Lancamento[]) ?? [])
+    setCategorias(cats ?? [])
     setLoading(false)
   }, [tipo])
+
+  // Trocar a categoria leva junto a linha dela (ex.: Social Media → Serviços);
+  // categorias genéricas, sem linha, mantêm a que já estava.
+  async function mudarCategoria(id: string, categoriaId: string) {
+    const anterior = lancamentos.find(l => l.id === id)
+    const cat = categorias.find(c => c.id === categoriaId)
+    if (!anterior) return
+    const mudanca = { categoria_id: categoriaId || null, ...(cat?.frente ? { frente: cat.frente } : {}) }
+    setLancamentos(prev => prev.map(l => l.id === id ? { ...l, ...mudanca, categorias_financeiras: cat ? { nome: cat.nome } : null } : l))
+    const { error } = await (createClient() as any).from('lancamentos').update(mudanca).eq('id', id)
+    if (error) setLancamentos(prev => prev.map(l => l.id === id ? anterior : l))
+  }
 
   async function mudarFrente(id: string, nova: Linha) {
     const anterior = lancamentos.find(l => l.id === id)?.frente
@@ -389,7 +407,15 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                         </td>
                         {ehReceber && <td className="px-3 py-3 text-brand-lavanda/70 whitespace-nowrap">{l.clientes?.nome ?? '—'}</td>}
                         <td className="px-3 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">
-                          {l.categorias_financeiras?.nome ?? '—'}
+                          <select
+                            value={l.categoria_id ?? ''}
+                            onChange={(e) => mudarCategoria(l.id, e.target.value)}
+                            title="Categoria"
+                            className="block max-w-[11rem] truncate bg-transparent text-xs text-brand-lavanda/60 hover:text-brand-lavanda outline-none cursor-pointer"
+                          >
+                            <option value="" className="bg-brand-noite">Sem categoria</option>
+                            {categorias.map(c => <option key={c.id} value={c.id} className="bg-brand-noite">{c.nome}</option>)}
+                          </select>
                           <select
                             value={l.frente}
                             onChange={(e) => mudarFrente(l.id, e.target.value as Linha)}
