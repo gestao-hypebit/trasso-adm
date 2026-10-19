@@ -62,7 +62,6 @@ const s = StyleSheet.create({
   rotulo: { color: SUAVE, fontSize: 6.5, fontFamily: 'Helvetica-Bold', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3, marginTop: 4 },
   texto: { fontSize: 8.5, lineHeight: 1.5, color: TEXTO },
   hashtags: { fontSize: 8, color: VIOLETA, marginTop: 4, lineHeight: 1.4 },
-  roteiro: { fontSize: 8, lineHeight: 1.5, color: SUAVE },
   extra: { fontSize: 7, color: MUTED, marginTop: 4 },
   aprov: { marginLeft: 'auto', fontSize: 6.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.8 },
 
@@ -157,12 +156,6 @@ export function PlanejamentoPDF({ cliente, mes, fim, objetivo, posts, logoUrl, a
                     </>
                   )}
                   {p.hashtags && <Text style={s.hashtags}>{p.hashtags}</Text>}
-                  {p.roteiro && (
-                    <>
-                      <Text style={s.rotulo}>{p.formato === 'reels' || p.formato === 'video' ? 'Roteiro' : p.formato === 'carrossel' ? 'Slides' : 'Arte'}</Text>
-                      <Text style={s.roteiro}>{p.roteiro.length > 600 ? `${p.roteiro.slice(0, 600)}…` : p.roteiro}</Text>
-                    </>
-                  )}
                   {p.cta && <Text style={s.extra}>CTA: {p.cta}</Text>}
                 </View>
               </View>

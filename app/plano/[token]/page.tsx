@@ -20,9 +20,10 @@ export default async function PlanoPage({ params, searchParams }: { params: Prom
   if (plano.status === 'rascunho' && admin !== '1') return <Aviso titulo="Planejamento em preparação" texto="Volte daqui a pouco." />
 
   const supabase = createServiceClient() as any
+  // roteiro fica de fora: é o briefing interno da arte, o cliente não vê.
   const [{ data: posts }, { data: config }] = await Promise.all([
     supabase.from('social_posts')
-      .select('id, planejamento_id, data, horario, redes, formato, titulo, legenda, hashtags, roteiro, cta, midias, producao, aprovacao, comentario_cliente, respondido_nome, respondido_em')
+      .select('id, planejamento_id, data, horario, redes, formato, titulo, legenda, hashtags, cta, midias, producao, aprovacao, comentario_cliente, respondido_nome, respondido_em')
       .eq('planejamento_id', plano.id),
     supabase.from('configuracoes_agencia').select('nome, logo_url').limit(1).maybeSingle(),
     admin !== '1' ? supabase.rpc('social_planejamento_visualizar', { p_token: token }) : null,

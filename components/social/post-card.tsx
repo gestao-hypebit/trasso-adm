@@ -79,7 +79,7 @@ export function PostCard({ post, interno = false, acoes }: { post: Post; interno
           </Bloco>
         )}
         {!post.legenda && post.hashtags && <p className="text-sm text-brand-violeta">{post.hashtags}</p>}
-        {post.roteiro && (
+        {interno && post.roteiro && (
           <Bloco titulo={post.formato === 'reels' || post.formato === 'video' ? 'Roteiro' : post.formato === 'carrossel' ? 'Slides' : 'Arte'}>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-lavanda/70">{post.roteiro}</p>
           </Bloco>
