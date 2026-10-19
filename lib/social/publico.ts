@@ -10,13 +10,14 @@ export const getPlanejamentoPorToken = cache(async (token: string) => {
   const supabase = createServiceClient() as any
   const { data } = await supabase
     .from('social_planejamentos')
-    .select('id, mes, objetivo, status, link_ativo, clientes(nome, empresa)')
+    .select('id, mes, data_fim, objetivo, status, link_ativo, clientes(nome, empresa)')
     .eq('token', token)
     .maybeSingle()
   if (!data || !data.link_ativo) return null
   return {
     id: data.id as string,
     mes: data.mes as string,
+    fim: data.data_fim as string | null,
     objetivo: data.objetivo as string | null,
     status: data.status as string,
     clienteNome: (data.clientes?.empresa || data.clientes?.nome || 'Cliente') as string,

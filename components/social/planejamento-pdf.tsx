@@ -1,7 +1,7 @@
 'use client'
 
 import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
-import { APROVACAO, FORMATOS, REDES, nomeMes, ordenarPosts, type Post } from '@/lib/social/tipos'
+import { APROVACAO, FORMATOS, REDES, nomePeriodo, ordenarPosts, type Post } from '@/lib/social/tipos'
 import { formatDate } from '@/lib/utils'
 
 // Sem isso o react-pdf hifeniza palavras em português ("dig-ital").
@@ -28,7 +28,7 @@ const s = StyleSheet.create({
   logoTexto: { color: BRANCO, fontSize: 22, fontFamily: 'Helvetica-Bold', marginBottom: 26 },
   kicker: { color: LIMA, fontSize: 7.5, fontFamily: 'Helvetica-Bold', letterSpacing: 2.4, textTransform: 'uppercase', marginBottom: 8 },
   titulo: { color: BRANCO, fontSize: 26, fontFamily: 'Helvetica-Bold', lineHeight: 1.15, marginBottom: 4 },
-  mes: { color: MUTED, fontSize: 12, textTransform: 'capitalize', marginBottom: 18 },
+  mes: { color: MUTED, fontSize: 12, marginBottom: 18 },
   objetivoLabel: { color: MUTED, fontSize: 6.5, fontFamily: 'Helvetica-Bold', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 4 },
   objetivo: { color: BRANCO, fontSize: 10, lineHeight: 1.5, maxWidth: 440, marginBottom: 18 },
   resumo: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#3A2560', paddingTop: 12 },
@@ -77,9 +77,10 @@ const imagemPdf = (urls: string[]) => urls.find((u) => /\.(png|jpe?g)(\?|$)/i.te
 
 const corAprov = { pendente: '#B8860B', aprovado: '#4D7C0F', ajustes: '#DB2777' } as const
 
-export function PlanejamentoPDF({ cliente, mes, objetivo, posts, logoUrl, agenciaNome, comAprovacao }: {
+export function PlanejamentoPDF({ cliente, mes, fim, objetivo, posts, logoUrl, agenciaNome, comAprovacao }: {
   cliente: string
   mes: string
+  fim: string | null
   objetivo: string | null
   posts: Post[]
   logoUrl: string | null
@@ -87,18 +88,19 @@ export function PlanejamentoPDF({ cliente, mes, objetivo, posts, logoUrl, agenci
   comAprovacao: boolean
 }) {
   const lista = ordenarPosts(posts)
+  const periodo = nomePeriodo(mes, fim)
   const contagem = Object.entries(FORMATOS)
     .map(([k, f]) => ({ label: f.label, n: lista.filter((p) => p.formato === k).length }))
     .filter((c) => c.n > 0)
 
   return (
-    <Document title={`Planejamento ${cliente} - ${nomeMes(mes)}`} author={agenciaNome}>
+    <Document title={`Planejamento ${cliente} - ${periodo}`} author={agenciaNome}>
       <Page size="A4" style={s.page}>
         <View style={s.header}>
           {logoUrl ? <Image src={logoUrl} style={s.logo} /> : <Text style={s.logoTexto}>{agenciaNome.toLowerCase()}</Text>}
           <Text style={s.kicker}>Planejamento de social media</Text>
           <Text style={s.titulo}>{cliente}</Text>
-          <Text style={s.mes}>{nomeMes(mes)}</Text>
+          <Text style={s.mes}>{periodo}</Text>
           {objetivo && (
             <>
               <Text style={s.objetivoLabel}>Objetivo do mês</Text>
@@ -106,7 +108,7 @@ export function PlanejamentoPDF({ cliente, mes, objetivo, posts, logoUrl, agenci
             </>
           )}
           <View style={s.resumo}>
-            <View style={s.resumoCel}><Text style={s.resumoNum}>{lista.length}</Text><Text style={s.resumoLbl}>posts no mês</Text></View>
+            <View style={s.resumoCel}><Text style={s.resumoNum}>{lista.length}</Text><Text style={s.resumoLbl}>posts</Text></View>
             {contagem.map((c) => (
               <View key={c.label} style={s.resumoCel}><Text style={s.resumoNum}>{c.n}</Text><Text style={s.resumoLbl}>{c.label}</Text></View>
             ))}
@@ -170,7 +172,7 @@ export function PlanejamentoPDF({ cliente, mes, objetivo, posts, logoUrl, agenci
 
         <View style={s.footer} fixed>
           <View style={s.footerMark} />
-          <Text style={s.footerText}>{agenciaNome}  ·  {cliente}  ·  {nomeMes(mes)}</Text>
+          <Text style={s.footerText}>{agenciaNome}  ·  {cliente}  ·  {periodo}</Text>
           <View style={s.footerSpacer} />
           <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ehVideo } from '@/components/social/post-card'
 import { createClient } from '@/lib/supabase/client'
-import { APROVACAO, FORMATOS, POST_VAZIO, PRODUCAO, REDES, type Formato, type Post, type Producao, type Rede } from '@/lib/social/tipos'
+import { APROVACAO, FORMATOS, POST_VAZIO, PRODUCAO, REDES, fimDoPeriodo, type Formato, type Post, type Producao, type Rede } from '@/lib/social/tipos'
 import { cn } from '@/lib/utils'
 
 type Form = typeof POST_VAZIO & { data: string }
@@ -19,13 +19,14 @@ const LIMITE_LEGENDA = 2200 // Instagram
 const campo = 'h-9 w-full rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 text-sm text-brand-lavanda outline-none'
 
 // Cria ou edita um post. `post` nulo + `data` = post novo naquele dia.
-export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, onSalvo }: {
+export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, fim, onSalvo }: {
   aberto: boolean
   onClose: () => void
   planejamentoId: string
   post: Post | null
   data: string | null
   mes: string
+  fim: string | null
   onSalvo: () => void
 }) {
   const [form, setForm] = useState<Form>({ ...POST_VAZIO, data: mes })
@@ -119,8 +120,6 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, o
     onClose()
   }
 
-  const prefixoMes = mes.slice(0, 7)
-
   return (
     <Dialog open={aberto} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto">
@@ -135,7 +134,7 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, o
         <div className="grid gap-4 md:grid-cols-[1fr_1fr_1fr]">
           <div className="space-y-1.5">
             <Label>Data</Label>
-            <Input type="date" value={form.data} min={`${prefixoMes}-01`} onChange={(e) => set('data', e.target.value)} />
+            <Input type="date" value={form.data} min={mes} max={fimDoPeriodo(mes, fim)} onChange={(e) => set('data', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label>Horário</Label>

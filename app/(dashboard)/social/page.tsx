@@ -13,11 +13,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
-import { ERRO_MIGRATION, STATUS_PLANEJAMENTO, nomeMes } from '@/lib/social/tipos'
-import { formatDate } from '@/lib/utils'
+import { ERRO_MIGRATION, ERRO_MIGRATION_PERIODO, STATUS_PLANEJAMENTO, fimDoPeriodo, nomeMes, nomePeriodo, umMesDepois } from '@/lib/social/tipos'
+import { cn, formatDate } from '@/lib/utils'
 
 type Linha = {
-  id: string; titulo: string; mes: string; status: string; visualizacoes: number; ultima_visualizacao: string | null
+  id: string; titulo: string; mes: string; data_fim: string | null; status: string; visualizacoes: number; ultima_visualizacao: string | null
   clientes: { nome: string; empresa: string | null } | null
   social_posts: { aprovacao: string }[]
 }
@@ -38,14 +38,14 @@ export default function SocialPage() {
   const [erro, setErro] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [novo, setNovo] = useState(false)
-  const [form, setForm] = useState({ cliente: '', mes: proximoMes(), objetivo: '' })
+  const [form, setForm] = useState({ cliente: '', tipo: 'mes' as 'mes' | 'periodo', mes: proximoMes(), inicio: '', fim: '', objetivo: '' })
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
     const db = createClient() as any
     Promise.all([
       db.from('social_planejamentos')
-        .select('id, titulo, mes, status, visualizacoes, ultima_visualizacao, clientes(nome, empresa), social_posts(aprovacao)')
+        .select('id, titulo, mes, data_fim, status, visualizacoes, ultima_visualizacao, clientes(nome, empresa), social_posts(aprovacao)')
         .order('mes', { ascending: false })
         .order('created_at', { ascending: false }),
       db.from('clientes').select('id, nome, empresa').order('nome'),
@@ -59,22 +59,26 @@ export default function SocialPage() {
 
   async function criar() {
     if (!form.cliente) { setErro('Escolha o cliente.'); return }
+    const mes = form.tipo === 'mes' ? `${form.mes}-01` : form.inicio
+    const fim = form.tipo === 'mes' ? fimDoPeriodo(mes) : form.fim
+    if (!mes || !fim) { setErro('Informe o início e o fim do período.'); return }
+    if (fim < mes) { setErro('O fim do período tem que ser depois do início.'); return }
     setSalvando(true)
     setErro(null)
     const cliente = clientes.find((c) => c.id === form.cliente)
-    const mes = `${form.mes}-01`
     const { data, error } = await (createClient() as any)
       .from('social_planejamentos')
       .insert({
         cliente_id: form.cliente,
         mes,
-        titulo: `${cliente?.empresa || cliente?.nome} · ${nomeMes(mes)}`,
+        data_fim: fim,
+        titulo: `${cliente?.empresa || cliente?.nome} · ${nomePeriodo(mes, fim)}`,
         objetivo: form.objetivo.trim() || null,
       })
       .select('id')
       .single()
     setSalvando(false)
-    if (error) { setErro(error.code === '42P01' ? ERRO_MIGRATION : error.message); return }
+    if (error) { setErro(error.code === '42P01' ? ERRO_MIGRATION : error.message.includes('data_fim') ? ERRO_MIGRATION_PERIODO : error.message); return }
     router.push(`/social/${data.id}`)
   }
 
@@ -127,7 +131,7 @@ export default function SocialPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-brand-lavanda group-hover:text-brand-lima">{p.clientes?.empresa || p.clientes?.nome}</p>
-                          <p className="truncate text-xs capitalize text-brand-lavanda/40">{nomeMes(p.mes)}</p>
+                          <p className="truncate text-xs text-brand-lavanda/40">{nomePeriodo(p.mes, p.data_fim)}</p>
                         </div>
                         <Badge variant={st.variant}>{st.label}</Badge>
                       </div>
@@ -173,8 +177,32 @@ export default function SocialPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Mês</Label>
-              <Input type="month" value={form.mes} onChange={(e) => setForm({ ...form, mes: e.target.value })} />
+              <div className="flex items-center justify-between">
+                <Label>{form.tipo === 'mes' ? 'Mês' : 'Período'}</Label>
+                <div className="flex gap-1 rounded-lg border border-white/[0.06] p-0.5">
+                  {([['mes', 'Mês cheio'], ['periodo', 'Período']] as const).map(([v, label]) => (
+                    <button key={v} type="button"
+                      onClick={() => setForm(v === 'periodo' && !form.inicio
+                        ? { ...form, tipo: v, inicio: `${form.mes}-01`, fim: fimDoPeriodo(`${form.mes}-01`) }
+                        : { ...form, tipo: v })}
+                      className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors', form.tipo === v ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/50 hover:text-brand-lavanda')}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {form.tipo === 'mes' ? (
+                <Input type="month" value={form.mes} onChange={(e) => setForm({ ...form, mes: e.target.value })} />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Ao mudar o início, o fim sugerido é a véspera do mesmo dia no mês seguinte (20 → 19). */}
+                    <Input type="date" aria-label="Início" value={form.inicio} onChange={(e) => setForm({ ...form, inicio: e.target.value, fim: e.target.value ? umMesDepois(e.target.value) : form.fim })} />
+                    <Input type="date" aria-label="Fim" value={form.fim} min={form.inicio || undefined} onChange={(e) => setForm({ ...form, fim: e.target.value })} />
+                  </div>
+                  {form.inicio && form.fim && form.fim >= form.inicio && <p className="text-xs text-brand-lavanda/40">{nomePeriodo(form.inicio, form.fim)}</p>}
+                </>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Objetivo do mês (opcional)</Label>
@@ -184,7 +212,7 @@ export default function SocialPage() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setNovo(false)} disabled={salvando}>Cancelar</Button>
-            <Button onClick={criar} disabled={salvando || !form.mes}>{salvando && <Loader2 className="h-4 w-4 animate-spin" />} Criar</Button>
+            <Button onClick={criar} disabled={salvando || (form.tipo === 'mes' ? !form.mes : !form.inicio || !form.fim)}>{salvando && <Loader2 className="h-4 w-4 animate-spin" />} Criar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

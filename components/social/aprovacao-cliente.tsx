@@ -12,9 +12,9 @@ import { CalendarioMes, LegendaFormatos } from '@/components/social/calendario-m
 import { PostCard } from '@/components/social/post-card'
 import { PdfBotao } from '@/components/social/pdf-botao'
 import { aprovarPendentes, responderPost } from '@/app/plano/[token]/actions'
-import { nomeMes, type Post } from '@/lib/social/tipos'
+import { nomePeriodo, type Post } from '@/lib/social/tipos'
 
-type Plano = { id: string; mes: string; objetivo: string | null; status: string; clienteNome: string; contatoNome: string }
+type Plano = { id: string; mes: string; fim: string | null; objetivo: string | null; status: string; clienteNome: string; contatoNome: string }
 type Acao = { tipo: 'aprovar' | 'ajustes'; post: Post } | { tipo: 'todos' }
 
 const CHAVE_NOME = 'slick-plano-nome'
@@ -84,7 +84,7 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
               <p className="mt-0.5 text-[10px] text-brand-lavanda/40">Planejamento de conteúdo</p>
             </div>
           </div>
-          <PdfBotao rotulo="Baixar PDF" cliente={plano.clienteNome} mes={plano.mes} objetivo={plano.objetivo} posts={posts} logoUrl={logoUrl} agenciaNome={agenciaNome} comAprovacao={false} />
+          <PdfBotao rotulo="Baixar PDF" cliente={plano.clienteNome} mes={plano.mes} fim={plano.fim} objetivo={plano.objetivo} posts={posts} logoUrl={logoUrl} agenciaNome={agenciaNome} comAprovacao={false} />
         </div>
       </header>
 
@@ -98,7 +98,7 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
         <section>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-lima">Planejamento de social media</p>
           <h1 className="text-3xl font-bold text-brand-lavanda md:text-4xl" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{plano.clienteNome}</h1>
-          <p className="mt-1 text-lg capitalize text-brand-lavanda/50">{nomeMes(plano.mes)}</p>
+          <p className="mt-1 text-lg text-brand-lavanda/50">{nomePeriodo(plano.mes, plano.fim)}</p>
           {plano.objetivo && <p className="mt-4 max-w-2xl whitespace-pre-wrap text-brand-lavanda/80">{plano.objetivo}</p>}
 
           <div className="mt-6 max-w-md">
@@ -123,7 +123,7 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
             <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-lavanda/60">Calendário</h2>
             <LegendaFormatos />
           </div>
-          <CalendarioMes mes={plano.mes} posts={posts} onPost={irPara} />
+          <CalendarioMes mes={plano.mes} fim={plano.fim} posts={posts} onPost={irPara} />
           <p className="text-xs text-brand-lavanda/40">Toque em um post para ver os detalhes. Contorno verde = aprovado; rosa = ajuste pedido.</p>
         </section>
 

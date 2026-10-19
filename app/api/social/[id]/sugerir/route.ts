@@ -4,11 +4,11 @@ import { usuarioLogado } from '@/lib/asaas/auth'
 import { iaConfigurada } from '@/lib/sites/ia'
 import { respostaErro } from '@/lib/sites/servidor'
 import { sugerirPauta } from '@/lib/social/ia'
-import { FORMATOS, REDES } from '@/lib/social/tipos'
+import { FORMATOS, REDES, fimDoPeriodo } from '@/lib/social/tipos'
 
 export const maxDuration = 300
 
-// A IA sugere a pauta do mês. Não grava nada: a tela mostra as sugestões e
+// A IA sugere a pauta do período. Não grava nada: a tela mostra as sugestões e
 // você escolhe quais entram no calendário.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await usuarioLogado())) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const supabase = createServiceClient() as any
   const { data: plano } = await supabase
     .from('social_planejamentos')
-    .select('id, mes, objetivo, clientes(nome, empresa, segmento, cidade, observacoes), social_posts(data, titulo)')
+    .select('id, mes, data_fim, objetivo, clientes(nome, empresa, segmento, cidade, observacoes), social_posts(data, titulo)')
     .eq('id', id)
     .maybeSingle()
   if (!plano) return NextResponse.json({ error: 'Planejamento não encontrado.' }, { status: 404 })
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const pauta = await sugerirPauta({
       mes: plano.mes,
+      fim: fimDoPeriodo(plano.mes, plano.data_fim),
       quantidade,
       formatos: formatos.length ? formatos : ['feed', 'carrossel', 'reels', 'stories'],
       redes: redes.length ? redes : ['instagram'],
@@ -40,9 +41,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       contexto,
       existentes: plano.social_posts ?? [],
     })
-    // Descarta datas fora do mês (a IA às vezes escorrega no último dia).
-    const prefixo = plano.mes.slice(0, 7)
-    return NextResponse.json({ posts: pauta.posts.filter((p) => p.data.startsWith(prefixo)) })
+    // Descarta datas fora do período (a IA às vezes escorrega no último dia).
+    const fim = fimDoPeriodo(plano.mes, plano.data_fim)
+    return NextResponse.json({ posts: pauta.posts.filter((p) => p.data >= plano.mes && p.data <= fim) })
   } catch (e) {
     return respostaErro(e, 'social/sugerir')
   }

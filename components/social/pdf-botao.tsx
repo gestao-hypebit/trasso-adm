@@ -9,6 +9,7 @@ import type { Post } from '@/lib/social/tipos'
 type Props = {
   cliente: string
   mes: string
+  fim: string | null
   objetivo: string | null
   posts: Post[]
   logoUrl: string | null
@@ -34,7 +35,7 @@ export function PdfBotao({ rotulo = 'Exportar PDF', ...doc }: Props & { rotulo?:
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `planejamento-${slugify(doc.cliente)}-${doc.mes.slice(0, 7)}.pdf`
+      a.download = `planejamento-${slugify(doc.cliente)}-${doc.mes}.pdf`
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (e) {

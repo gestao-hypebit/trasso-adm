@@ -1,16 +1,16 @@
 import 'server-only'
 import { pedirJson } from '@/lib/sites/ia'
-import { FORMATOS, REDES, PautaSchema, nomeMes, type Pauta } from '@/lib/social/tipos'
+import { FORMATOS, REDES, PautaSchema, nomePeriodo, type Pauta } from '@/lib/social/tipos'
 
-// Sugestão de pauta do mês (usa a mesma integração com o Claude das prévias de site).
+// Sugestão de pauta do período (usa a mesma integração com o Claude das prévias de site).
 
 const SISTEMA_PAUTA = `Você é estrategista de social media sênior da Slick, uma agência brasileira. Você monta o planejamento mensal de conteúdo de um cliente: o que postar, quando e em qual formato, com a legenda pronta para revisão.
 
 O que importa:
 - Português do Brasil natural, no tom da marca do cliente. Legendas com gancho forte na primeira linha, parágrafos curtos e uma chamada para ação no fim.
 - Específico do negócio: fale dos produtos, serviços, público e cidade do cliente. Evite conteúdo genérico que serviria para qualquer empresa.
-- Mix equilibrado ao longo do mês: conteúdo que educa, que gera conexão/bastidores, prova social e venda. Varie os formatos pedidos.
-- Use datas comemorativas do mês só quando fizerem sentido para o negócio.
+- Mix equilibrado ao longo do período: conteúdo que educa, que gera conexão/bastidores, prova social e venda. Varie os formatos pedidos.
+- Use datas comemorativas do período só quando fizerem sentido para o negócio.
 - Distribua os posts nos dias e horários de mais engajamento (evite empilhar no mesmo dia, salvo stories).
 - "roteiro" é o que o designer ou videomaker precisa: para carrossel, o texto de cada slide (Slide 1: ..., Slide 2: ...); para reels/vídeo, o roteiro em cenas com a fala; para post e stories, a descrição da arte e o texto que vai nela.
 - Não invente fatos como verdade (preços, números, prêmios, depoimentos). Quando precisar de um dado que não foi dado, use um marcador entre colchetes, por exemplo "[preço]".
@@ -18,6 +18,7 @@ O que importa:
 
 export type PedidoPauta = {
   mes: string
+  fim: string
   quantidade: number
   formatos: string[]
   redes: string[]
@@ -35,7 +36,7 @@ export function sugerirPauta(p: PedidoPauta): Promise<Pauta> {
     p.cliente.observacoes && `Sobre o cliente: ${p.cliente.observacoes}`,
     p.objetivo && `Objetivo do mês: ${p.objetivo}`,
     p.contexto && `Orientações da agência: ${p.contexto}`,
-    `Mês: ${nomeMes(p.mes)} (${p.mes.slice(0, 7)})`,
+    `Período: ${nomePeriodo(p.mes, p.fim)} (de ${p.mes} a ${p.fim}, todas as datas dentro dele)`,
     `Redes: ${p.redes.map((r) => REDES[r as keyof typeof REDES]?.label ?? r).join(', ')}`,
     `Formatos a usar: ${p.formatos.map((f) => `${f} (${FORMATOS[f as keyof typeof FORMATOS]?.label ?? f})`).join(', ')}`,
     `Quantidade de posts: ${p.quantidade}`,

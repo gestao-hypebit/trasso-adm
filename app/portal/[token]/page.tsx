@@ -14,7 +14,7 @@ import { EntregaCard } from '@/components/portal/entrega-card'
 import { AvaliacaoCard } from '@/components/portal/avaliacao-card'
 import { ENTREGA_SELECT, type Entrega } from '@/lib/projetos/entregas'
 import type { Briefing, OnboardingItem } from '@/lib/projetos/onboarding'
-import { nomeMes } from '@/lib/social/tipos'
+import { nomePeriodo } from '@/lib/social/tipos'
 
 export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -55,7 +55,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
     porProjeto ? db.from('entregas').select(ENTREGA_SELECT).in('projeto_id', projetoIds).order('created_at', { ascending: false }) : { data: [] },
     db.from('avaliacoes').select('id, projeto_id').eq('cliente_id', cliente.id).eq('status', 'pendente'),
     // Tabela pode não existir ainda (migration de social media não rodada): o portal segue sem a aba.
-    db.from('social_planejamentos').select('token, mes, status, social_posts(aprovacao)').eq('cliente_id', cliente.id).eq('link_ativo', true).neq('status', 'rascunho').order('mes', { ascending: false }),
+    db.from('social_planejamentos').select('token, mes, data_fim, status, social_posts(aprovacao)').eq('cliente_id', cliente.id).eq('link_ativo', true).neq('status', 'rascunho').order('mes', { ascending: false }),
   ])
   const itens = (itensRaw ?? []) as OnboardingItem[]
   const briefings = (briefingsRaw ?? []) as Briefing[]
@@ -69,7 +69,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
   const onboardingPendente = onboardings.some((o: { itens: OnboardingItem[]; briefing: Briefing | null }) =>
     o.briefing?.status === 'pendente' || o.itens.some((i) => i.responsavel === 'cliente' && !i.concluido))
   const entregasPendentes = entregas.filter((e) => e.status === 'aguardando').length
-  const planos = (planosRaw ?? []) as { token: string; mes: string; status: string; social_posts: { aprovacao: string }[] }[]
+  const planos = (planosRaw ?? []) as { token: string; mes: string; data_fim: string | null; status: string; social_posts: { aprovacao: string }[] }[]
   const postsPendentes = planos.reduce((n, p) => n + p.social_posts.filter((x) => x.aprovacao === 'pendente').length, 0)
   const abaInicial = entregasPendentes > 0 ? 'entregas' : postsPendentes > 0 ? 'social' : onboardingPendente ? 'onboarding' : 'projetos'
 
@@ -142,7 +142,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
           return (
             <Link key={p.token} href={`/plano/${p.token}`} className="flex items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.16]">
               <div className="min-w-0 flex-1">
-                <p className="font-semibold capitalize text-brand-lavanda">Planejamento de {nomeMes(p.mes)}</p>
+                <p className="font-semibold capitalize text-brand-lavanda">Planejamento · {nomePeriodo(p.mes, p.data_fim)}</p>
                 <p className="mt-0.5 text-sm text-brand-lavanda/50">
                   {total} posts · {aprovados} aprovados{pendentes > 0 && <span className="text-brand-lima"> · {pendentes} aguardando você</span>}
                 </p>

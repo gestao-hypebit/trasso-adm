@@ -10,6 +10,7 @@ import { Header } from '@/components/layout/header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -19,7 +20,7 @@ import { PostDialog } from '@/components/social/post-dialog'
 import { SugerirDialog } from '@/components/social/sugerir-dialog'
 import { PdfBotao } from '@/components/social/pdf-botao'
 import { createClient } from '@/lib/supabase/client'
-import { ERRO_MIGRATION, PRODUCAO, STATUS_PLANEJAMENTO, nomeMes, ordenarPosts, statusPelosPosts, type Planejamento, type Post } from '@/lib/social/tipos'
+import { ERRO_MIGRATION, ERRO_MIGRATION_PERIODO, PRODUCAO, STATUS_PLANEJAMENTO, fimDoPeriodo, nomePeriodo, ordenarPosts, statusPelosPosts, type Planejamento, type Post } from '@/lib/social/tipos'
 import { cn, formatDate, whatsappUrl } from '@/lib/utils'
 
 type Dados = Planejamento & {
@@ -38,7 +39,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
   const [enviar, setEnviar] = useState(false)
   const [mensagem, setMensagem] = useState('')
   const [copiado, setCopiado] = useState(false)
-  const [textos, setTextos] = useState<{ objetivo: string; observacoes: string } | null>(null)
+  const [textos, setTextos] = useState<{ objetivo: string; observacoes: string; inicio: string; fim: string } | null>(null)
   const [salvandoTextos, setSalvandoTextos] = useState(false)
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
 
@@ -59,7 +60,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
     }
     setPlano(p)
     setPosts(ps)
-    setTextos((t) => t ?? { objetivo: p.objetivo ?? '', observacoes: p.observacoes ?? '' })
+    setTextos((t) => t ?? { objetivo: p.objetivo ?? '', observacoes: p.observacoes ?? '', inicio: p.mes, fim: fimDoPeriodo(p.mes, p.data_fim) })
   }, [id])
 
   useEffect(() => {
@@ -73,13 +74,16 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
   }
 
   const nomeCliente = plano.clientes?.empresa || plano.clientes?.nome || 'Cliente'
+  const periodo = nomePeriodo(plano.mes, plano.data_fim)
   const link = typeof window !== 'undefined' ? `${window.location.origin}/plano/${plano.token}` : `/plano/${plano.token}`
   const st = STATUS_PLANEJAMENTO[plano.status] ?? STATUS_PLANEJAMENTO.rascunho
   const telefone = plano.clientes?.whatsapp ?? plano.clientes?.telefone
   const aprovados = posts.filter((p) => p.aprovacao === 'aprovado').length
   const ajustes = posts.filter((p) => p.aprovacao === 'ajustes')
-  const textoPadrao = `Olá, ${plano.clientes?.nome?.split(' ')[0] ?? ''}! O planejamento de conteúdo de ${nomeMes(plano.mes)} está pronto 🎉\n\nSão ${posts.length} posts. Dá uma olhada e aprove (ou peça ajuste) em cada um por aqui:\n${link}`
-  const sujoTextos = textos && (textos.objetivo !== (plano.objetivo ?? '') || textos.observacoes !== (plano.observacoes ?? ''))
+  const textoPadrao = `Olá, ${plano.clientes?.nome?.split(' ')[0] ?? ''}! O planejamento de conteúdo (${periodo}) está pronto 🎉\n\nSão ${posts.length} posts. Dá uma olhada e aprove (ou peça ajuste) em cada um por aqui:\n${link}`
+  const periodoMudou = textos && (textos.inicio !== plano.mes || textos.fim !== fimDoPeriodo(plano.mes, plano.data_fim))
+  const sujoTextos = textos && (periodoMudou || textos.objetivo !== (plano.objetivo ?? '') || textos.observacoes !== (plano.observacoes ?? ''))
+  const foraDoPeriodo = textos ? posts.filter((p) => p.data < textos.inicio || p.data > textos.fim).length : 0
 
   async function marcarEnviado() {
     if (!plano || plano.status !== 'rascunho') return
@@ -96,12 +100,20 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
   }
 
   async function salvarTextos() {
-    if (!textos) return
+    if (!textos || !plano) return
+    if (!textos.inicio || !textos.fim || textos.fim < textos.inicio) { setErro('O fim do período tem que ser depois do início.'); return }
     setSalvandoTextos(true)
-    await (createClient() as any).from('social_planejamentos')
-      .update({ objetivo: textos.objetivo.trim() || null, observacoes: textos.observacoes.trim() || null, updated_at: new Date().toISOString() })
+    setErro(null)
+    const { error } = await (createClient() as any).from('social_planejamentos')
+      .update({
+        objetivo: textos.objetivo.trim() || null,
+        observacoes: textos.observacoes.trim() || null,
+        ...(periodoMudou && { mes: textos.inicio, data_fim: textos.fim, titulo: `${nomeCliente} · ${nomePeriodo(textos.inicio, textos.fim)}` }),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
     setSalvandoTextos(false)
+    if (error) { setErro(error.message.includes('data_fim') ? ERRO_MIGRATION_PERIODO : error.message); return }
     setTextos(null)
     await carregar()
   }
@@ -125,17 +137,17 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
 
   const wa = whatsappUrl(telefone, mensagem)
   const mailto = plano.clientes?.email
-    ? `mailto:${plano.clientes.email}?subject=${encodeURIComponent(`Planejamento de conteúdo · ${nomeMes(plano.mes)}`)}&body=${encodeURIComponent(mensagem)}`
+    ? `mailto:${plano.clientes.email}?subject=${encodeURIComponent(`Planejamento de conteúdo · ${periodo}`)}&body=${encodeURIComponent(mensagem)}`
     : null
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header title="Social media" description={`${nomeCliente} · ${nomeMes(plano.mes)}`} />
+      <Header title="Social media" description={`${nomeCliente} · ${periodo}`} />
 
       <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-3 md:px-6">
         <Link href="/social" className="mr-1 rounded-md p-1 text-brand-lavanda/40 hover:bg-white/[0.06] hover:text-brand-lavanda" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></Link>
         <h1 className="mr-1 truncate text-base font-semibold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{nomeCliente}</h1>
-        <span className="text-sm capitalize text-brand-lavanda/50">{nomeMes(plano.mes)}</span>
+        <span className="text-sm text-brand-lavanda/50">{periodo}</span>
         <Badge variant={st.variant}>{st.label}</Badge>
         {plano.status !== 'rascunho' && (
           <span className="flex items-center gap-1 text-xs text-brand-lavanda/40" title={plano.ultima_visualizacao ? `Última vez: ${formatDate(plano.ultima_visualizacao, 'dd/MM/yyyy HH:mm')}` : 'Ainda não abriram o link'}>
@@ -146,7 +158,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setSugerir(true)}><Wand2 className="h-3.5 w-3.5" /> Sugerir pauta</Button>
           <Button size="sm" variant="outline" onClick={() => setEditando({ post: null, data: plano.mes })}><Plus className="h-3.5 w-3.5" /> Post</Button>
-          <PdfBotao cliente={nomeCliente} mes={plano.mes} objetivo={plano.objetivo} posts={posts} logoUrl={agencia.logo_url} agenciaNome={agencia.nome} comAprovacao={plano.status !== 'rascunho'} />
+          <PdfBotao cliente={nomeCliente} mes={plano.mes} fim={plano.data_fim} objetivo={plano.objetivo} posts={posts} logoUrl={agencia.logo_url} agenciaNome={agencia.nome} comAprovacao={plano.status !== 'rascunho'} />
           <Button size="sm" onClick={() => { setMensagem(textoPadrao); setEnviar(true) }} disabled={!posts.length}>
             <Send className="h-3.5 w-3.5" /> {plano.status === 'rascunho' ? 'Enviar para o cliente' : 'Reenviar'}
           </Button>
@@ -188,7 +200,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
           </div>
 
           {visao === 'calendario' ? (
-            <CalendarioMes mes={plano.mes} posts={posts} onPost={(p) => setEditando({ post: p, data: null })} onNovo={(data) => setEditando({ post: null, data })} mostrarAprovacao={plano.status !== 'rascunho'} />
+            <CalendarioMes mes={plano.mes} fim={plano.data_fim} posts={posts} onPost={(p) => setEditando({ post: p, data: null })} onNovo={(data) => setEditando({ post: null, data })} mostrarAprovacao={plano.status !== 'rascunho'} />
           ) : posts.length === 0 ? (
             <Card><CardContent className="py-14 text-center text-sm text-brand-lavanda/40">Nenhum post ainda. Crie um ou peça uma pauta para a IA.</CardContent></Card>
           ) : (
@@ -228,6 +240,16 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
           {textos && (
             <Card>
               <CardContent className="space-y-3 p-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Período</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="date" aria-label="Início" value={textos.inicio} onChange={(e) => setTextos({ ...textos, inicio: e.target.value })} />
+                    <Input type="date" aria-label="Fim" value={textos.fim} min={textos.inicio || undefined} onChange={(e) => setTextos({ ...textos, fim: e.target.value })} />
+                  </div>
+                  {periodoMudou && foraDoPeriodo > 0 && (
+                    <p className="text-xs text-brand-rosa">{foraDoPeriodo} post{foraDoPeriodo > 1 ? 's ficam' : ' fica'} fora do novo período (some{foraDoPeriodo > 1 ? 'm' : ''} do calendário, mas continua{foraDoPeriodo > 1 ? 'm' : ''} na lista).</p>
+                  )}
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Objetivo do mês <span className="text-brand-lavanda/30">(o cliente vê)</span></Label>
                   <Textarea rows={3} value={textos.objetivo} onChange={(e) => setTextos({ ...textos, objetivo: e.target.value })} />
@@ -281,6 +303,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
         post={editando?.post ?? null}
         data={editando?.data ?? null}
         mes={plano.mes}
+        fim={plano.data_fim}
         onSalvo={carregar}
       />
       <SugerirDialog aberto={sugerir} onClose={() => setSugerir(false)} planejamentoId={id} onAdicionados={carregar} />

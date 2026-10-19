@@ -1,22 +1,27 @@
 'use client'
 
 import { Plus } from 'lucide-react'
-import { FORMATOS, diasDoMes, inicioDaSemana, ordenarPosts, type Post } from '@/lib/social/tipos'
+import { FORMATOS, diasDoPeriodo, inicioDaSemana, ordenarPosts, type Post } from '@/lib/social/tipos'
 import { cn, toISODateLocal } from '@/lib/utils'
 
 const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
 const corAprovacao = { pendente: '', aprovado: 'ring-1 ring-brand-lima/50', ajustes: 'ring-1 ring-brand-rosa/60' } as const
 
-// Grade do mês com os posts em cada dia. No admin, clicar no dia vazio cria um post.
-export function CalendarioMes({ mes, posts, onPost, onNovo, mostrarAprovacao = true }: {
+// Grade do período com os posts em cada dia. No admin, clicar no dia vazio cria um post.
+export function CalendarioMes({ mes, fim, posts, onPost, onNovo, mostrarAprovacao = true }: {
   mes: string
+  fim?: string | null
   posts: Post[]
   onPost: (p: Post) => void
   onNovo?: (data: string) => void
   mostrarAprovacao?: boolean
 }) {
-  const dias = diasDoMes(mes)
+  const dias = diasDoPeriodo(mes, fim)
+  // Período que atravessa meses: o primeiro dia e cada dia 1 mostram o mês.
+  const variosMeses = dias[0].slice(0, 7) !== dias[dias.length - 1].slice(0, 7)
   const vazios = inicioDaSemana(mes)
   const hoje = toISODateLocal(new Date())
   const porDia = new Map<string, Post[]>()
@@ -40,6 +45,7 @@ export function CalendarioMes({ mes, posts, onPost, onNovo, mostrarAprovacao = t
               <div className="mb-1 flex items-center justify-between">
                 <span className={cn('flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px]', dia === hoje ? 'bg-brand-lima font-bold text-brand-noite' : 'text-brand-lavanda/50')}>
                   {Number(dia.slice(8))}
+                  {variosMeses && (i === 0 || dia.endsWith('-01')) && ` ${MESES[Number(dia.slice(5, 7)) - 1]}`}
                 </span>
                 {onNovo && (
                   <button
