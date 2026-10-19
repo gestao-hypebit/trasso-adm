@@ -70,6 +70,9 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
   const [ordem, setOrdem] = useState<Ordem>('vencimento')
   const [aberto, setAberto] = useState<string | null>(null)
 
+  // O serviço digitado aqui; sem ele, a descrição da assinatura no Asaas.
+  const servico = (l: Assinante) => r.servicoDe(linha, l.chave) ?? daLinha(l).find((s) => s.descricao)?.descricao ?? null
+
   const termo = busca.toLowerCase()
   const visiveis = calc.linhas
     .filter((l) => {
@@ -82,7 +85,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
       if (aba === 'canceladas') return l.cancelada
       return !l.ativo && !l.cancelada && l.status !== 'inativo'
     })
-    .filter((l) => !termo || [l.nome, l.empresa].some((v) => v?.toLowerCase().includes(termo)))
+    .filter((l) => !termo || [l.nome, l.empresa, servico(l)].some((v) => v?.toLowerCase().includes(termo)))
     .sort((a, b) => comparar(a, b, ordem) || a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const abas: { key: AbaLista; label: string }[] = [
@@ -98,10 +101,10 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
   function exportar() {
     baixarCSV(
       `mrr-${linha === 'catalogo_place' ? 'catalogo-place' : 'servicos'}-${r.dados.hoje}.csv`,
-      ['Cliente', 'Empresa', 'Mensalidade', 'Desde', 'Meses pagos', 'Pago este mês', 'Em atraso', 'Próxima cobrança (Asaas)'],
+      ['Cliente', 'Empresa', 'Serviço', 'Mensalidade', 'Desde', 'Meses pagos', 'Pago este mês', 'Em atraso', 'Próxima cobrança (Asaas)'],
       visiveis.map((l) => {
         const s = assinaturaAtiva(l)
-        return [l.nome, l.empresa ?? '', l.mensalidade, mesLabel(l.desde), String(l.mesesPagos), l.pagoEsteMes ? 'Sim' : 'Não', l.atraso, s ? formatDate(s.proximaCobranca) : '']
+        return [l.nome, l.empresa ?? '', servico(l) ?? '', l.mensalidade, mesLabel(l.desde), String(l.mesesPagos), l.pagoEsteMes ? 'Sim' : 'Não', l.atraso, s ? formatDate(s.proximaCobranca) : '']
       }),
     )
   }
@@ -179,7 +182,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
         <div className="flex gap-2">
           <div className="relative flex-1 lg:w-56 lg:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
-            <Input className="pl-9" placeholder="Buscar assinante..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+            <Input className="pl-9" placeholder="Buscar assinante ou serviço..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
           <Select value={ordem} onValueChange={(v) => setOrdem(v as Ordem)}>
             <SelectTrigger className="w-auto min-w-44" aria-label="Ordenar por"><SelectValue /></SelectTrigger>
@@ -216,6 +219,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                     : `Oi ${l.nome.split(' ')[0]}! Passando para lembrar da mensalidade${produto} deste mês.`
                   const wa = !l.soNoAsaas && (!l.pagoEsteMes || l.atraso > 0) && l.ativo ? whatsappUrl(l.whatsapp, cobranca) : null
                   const sub = assinaturaAtiva(l)
+                  const desc = servico(l)
                   return (
                     <tr
                       key={l.chave}
@@ -229,6 +233,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                           {!l.soNoAsaas && !l.clienteId && <Badge variant="pendente">Sem cliente vinculado</Badge>}
                           {daLinha(l).length > 0 && !sub && <Badge variant="inativo">Assinatura cancelada</Badge>}
                         </div>
+                        {desc && <p className="mt-0.5 text-xs text-brand-lima/80">{desc}</p>}
                         {l.empresa && l.empresa.trim() !== l.nome && <p className="text-xs text-brand-lavanda/40">{l.empresa}</p>}
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -294,7 +299,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
       </Card>
 
       <p className="text-[11px] text-brand-lavanda/40">
-        Clique num assinante para ver a assinatura e as faturas do Asaas.
+        Clique num assinante para ver a assinatura e as faturas do Asaas e para descrever o serviço (ex.: social media, software sob demanda).
         MRR bruto = assinaturas ativas no Asaas (valor cobrado, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro.
         MRR líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas.
         Ativas = tem assinatura ativa ou mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga. Canceladas = a assinatura foi cancelada no Asaas depois de ter tido pagamento.
@@ -310,6 +315,9 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
         clientesSemAsaas={calc.clientesSemAsaas}
         customersSemCliente={calc.customersSemCliente}
         onAlterado={r.recarregarTudo}
+        servico={selecionado ? r.servicoDe(linha, selecionado.chave) : null}
+        servicoAsaas={selecionado ? daLinha(selecionado).find((s) => s.descricao)?.descricao ?? null : null}
+        onSalvarServico={(texto) => r.salvarServico(linha, selecionado!.chave, texto)}
       />
     </div>
   )

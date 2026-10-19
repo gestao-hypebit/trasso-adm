@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO } from '@/lib/financeiro'
-import { montarLinha, assinaturasSemCliente, ativa, type ClienteRec, type Dados, type LancRec } from '@/lib/recorrencia'
+import { montarLinha, assinaturasSemCliente, ativa, type ClienteRec, type Dados, type LancRec, type LinhaRec } from '@/lib/recorrencia'
 import { valorMensal, type AssinaturaAsaas } from '@/lib/asaas/rotulos'
 
 export type Categoria = { id: string; nome: string; recorrente: boolean }
+
+// Descrição do serviço por assinante: chave `${linha}:${chave do assinante}`.
+const chaveServico = (linha: LinhaRec, chave: string) => `${linha}:${chave}`
 
 // Usado só enquanto a migration 20261001000000_categorias_mrr.sql não foi aplicada.
 const CATEGORIA_MENSALIDADE_RE = /mensal|assinatura|cat[aá]logo|recorr|saas|plano|retainer|fee/i
@@ -18,6 +21,9 @@ export function useRecorrencia() {
   const [lancamentos, setLancamentos] = useState<LancRec[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [semMigration, setSemMigration] = useState(false)
+  const [servicos, setServicos] = useState<Map<string, string>>(new Map())
+  // Sem a migration 20261020000000_assinatura_servicos.sql não dá para guardar a descrição.
+  const [semTabelaServicos, setSemTabelaServicos] = useState(false)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [asaas, setAsaas] = useState<{ configurado: boolean; assinaturas: AssinaturaAsaas[] } | null>(null)
@@ -27,13 +33,14 @@ export function useRecorrencia() {
   const carregar = useCallback(async () => {
     const db = createClient() as any
     const campos = 'id, nome, empresa, whatsapp, telefone, status, created_at, tipo'
-    const [resClientes, resLanc, resCats] = await Promise.all([
+    const [resClientes, resLanc, resCats, resServicos] = await Promise.all([
       db.from('clientes').select(`${campos}, asaas_customer_id`).order('nome'),
       db.from('lancamentos')
         .select('valor, data, status, descricao, cliente_id, categoria_id, frente, asaas_payment_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
         .eq('tipo', 'receita')
         .in('frente', ['catalogo_place', 'agencia']),
       db.from('categorias_financeiras').select('id, nome, recorrente').eq('tipo', 'receita').order('nome'),
+      db.from('assinatura_servicos').select('chave, linha, descricao'),
     ])
 
     // Sem a migration do Asaas a coluna não existe: carrega sem ela.
@@ -61,6 +68,9 @@ export function useRecorrencia() {
       setSemMigration(false)
     }
 
+    setSemTabelaServicos(!!resServicos.error)
+    setServicos(new Map(((resServicos.data ?? []) as { chave: string; linha: LinhaRec; descricao: string }[])
+      .map((s) => [chaveServico(s.linha, s.chave), s.descricao])))
     setClientes(cls ?? [])
     setLancamentos(lancs ?? [])
     setCategorias(cats)
@@ -91,6 +101,27 @@ export function useRecorrencia() {
     if (!error) await carregar()
   }
 
+  const servicoDe = useCallback((linha: LinhaRec, chave: string) => servicos.get(chaveServico(linha, chave)) ?? null, [servicos])
+
+  // Texto vazio apaga a descrição.
+  async function salvarServico(linha: LinhaRec, chave: string, descricao: string) {
+    const db = createClient() as any
+    const texto = descricao.trim()
+    const { error } = texto
+      ? await db.from('assinatura_servicos').upsert({ chave, linha, descricao: texto, updated_at: new Date().toISOString() })
+      : await db.from('assinatura_servicos').delete().eq('chave', chave).eq('linha', linha)
+    if (error) return error.code === '42P01' || error.code === 'PGRST205'
+      ? 'Rode a migration 20261020000000_assinatura_servicos.sql no Supabase para guardar o serviço.'
+      : error.message
+    setServicos((m) => {
+      const novo = new Map(m)
+      if (texto) novo.set(chaveServico(linha, chave), texto)
+      else novo.delete(chaveServico(linha, chave))
+      return novo
+    })
+    return null
+  }
+
   const resultado = useMemo(() => {
     const dados: Dados = {
       clientes,
@@ -112,6 +143,7 @@ export function useRecorrencia() {
   return {
     ...resultado,
     loading, erro, categorias, semMigration, alternarCategoria,
+    servicoDe, salvarServico, semTabelaServicos,
     asaasCarregando: asaas === null,
     asaasLigado: !!asaas?.configurado,
     erroAsaas,

@@ -6,6 +6,7 @@ import { ExternalLink, Copy, Check, MessageCircle, Loader2, Link2, FileText, Use
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AcaoAsaasDialog, type AcaoAsaas } from '@/components/catalogo/acao-asaas-dialog'
 import { createClient } from '@/lib/supabase/client'
@@ -28,6 +29,7 @@ const statusLancamento: Record<string, { label: string; variant: 'aprovada' | 'p
 
 export function AssinantePainel({
   assinante, linha, onClose, asaasConfigurado, clientesSemAsaas, customersSemCliente, onAlterado,
+  servico, servicoAsaas, onSalvarServico,
 }: {
   assinante: Assinante | null
   linha: LinhaRec
@@ -37,6 +39,11 @@ export function AssinantePainel({
   customersSemCliente: Opcao[]
   // Algo mudou (vínculo ou alteração no Asaas): a tela recarrega os dados.
   onAlterado: () => void
+  // Descrição do serviço (ex.: "Social media"), guardada no sistema; a do Asaas é só sugestão.
+  servico: string | null
+  servicoAsaas: string | null
+  // Devolve a mensagem de erro, ou nulo se salvou.
+  onSalvarServico: (texto: string) => Promise<string | null>
 }) {
   const [cobrancas, setCobrancas] = useState<CobrancaAsaas[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -47,6 +54,10 @@ export function AssinantePainel({
   const [acao, setAcao] = useState<AcaoAsaas | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [recarga, setRecarga] = useState(0)
+  const [editandoServico, setEditandoServico] = useState(false)
+  const [textoServico, setTextoServico] = useState('')
+  const [salvandoServico, setSalvandoServico] = useState(false)
+  const [erroServico, setErroServico] = useState<string | null>(null)
 
   const customerId = assinante?.asaasCustomerId ?? null
   const chave = assinante?.chave ?? null
@@ -55,6 +66,8 @@ export function AssinantePainel({
   useEffect(() => {
     setAviso(null)
     setAcao(null)
+    setEditandoServico(false)
+    setErroServico(null)
   }, [chave])
 
   useEffect(() => {
@@ -98,6 +111,14 @@ export function AssinantePainel({
     }
     onAlterado()
     onClose()
+  }
+
+  async function salvarServico() {
+    setSalvandoServico(true)
+    const falha = await onSalvarServico(textoServico)
+    setSalvandoServico(false)
+    setErroServico(falha)
+    if (!falha) setEditandoServico(false)
   }
 
   function aposAcao(mensagem: string) {
@@ -154,6 +175,42 @@ export function AssinantePainel({
               <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso"><X className="h-3.5 w-3.5" /></button>
             </div>
           )}
+
+          {/* Serviço */}
+          <section>
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-lavanda/50">Serviço</h3>
+            {editandoServico ? (
+              <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); salvarServico() }}>
+                <Input
+                  autoFocus
+                  value={textoServico}
+                  onChange={(e) => setTextoServico(e.target.value)}
+                  placeholder="Ex.: Social media, software sob demanda, tráfego pago…"
+                  maxLength={200}
+                />
+                {erroServico && <p className="text-xs text-brand-rosa">{erroServico}</p>}
+                <div className="flex gap-2">
+                  <Button size="sm" type="submit" disabled={salvandoServico}>{salvandoServico && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Salvar</Button>
+                  <Button size="sm" type="button" variant="ghost" onClick={() => { setEditandoServico(false); setErroServico(null) }}>Cancelar</Button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setTextoServico(servico ?? servicoAsaas ?? ''); setEditandoServico(true) }}
+                className="group flex w-full items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left transition-colors hover:border-white/[0.12]"
+              >
+                {servico ? (
+                  <span className="text-sm text-brand-lavanda">{servico}</span>
+                ) : (
+                  <span className="text-sm text-brand-lavanda/40">
+                    {servicoAsaas ? <>{servicoAsaas} <span className="text-[11px]">(descrição do Asaas)</span></> : 'Descreva o que é esta assinatura'}
+                  </span>
+                )}
+                <Pencil className="h-3.5 w-3.5 shrink-0 text-brand-lavanda/30 group-hover:text-brand-lavanda" />
+              </button>
+            )}
+          </section>
 
           {/* Resumo */}
           <div className="grid grid-cols-2 gap-3">
