@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { format, startOfMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths, differenceInCalendarMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Header } from '@/components/layout/header'
@@ -12,12 +12,14 @@ import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { SeletorMes, periodoInicial, intervaloPeriodo, rotuloPeriodo, type Periodo } from '@/components/financeiro/seletor-mes'
 import { FiltroLinha, type FiltroLinhaValor } from '@/components/financeiro/filtro-linha'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency, cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import type { Linha } from '@/lib/financeiro/linhas'
 
 type Receita = {
-  valor: number; data: string; status: string; frente: Linha
+  id: string; descricao: string; valor: number; data: string; status: string; frente: Linha
   categorias_financeiras: { nome: string } | null
+  clientes: { nome: string } | null
 }
 
 type Base = 'recebido' | 'previsto'
@@ -56,7 +58,7 @@ export default function ReceitasPorCategoriaPage() {
   useEffect(() => {
     ;(createClient() as any)
       .from('lancamentos')
-      .select('valor, data, status, frente, categorias_financeiras(nome)')
+      .select('id, descricao, valor, data, status, frente, categorias_financeiras(nome), clientes(nome)')
       .eq('tipo', 'receita')
       .neq('status', 'cancelado')
       .then(({ data }: { data: Receita[] | null }) => {
@@ -86,10 +88,20 @@ export default function ReceitasPorCategoriaPage() {
   ).sort((a, b) => b.valor - a.valor)
   const maior = ranking[0]?.valor ?? 0
 
-  // Evolução: 12 meses terminando no mês escolhido (ou no mês atual, em "desde o início").
-  const fimSerie = startOfMonth(periodo.tudo ? new Date() : periodo.mes)
-  const serie = Array.from({ length: 12 }, (_, i) => {
-    const mes = subMonths(fimSerie, 11 - i)
+  // Evolução: com um mês escolhido, os 12 meses até ele; em "desde o início",
+  // do primeiro ao último lançamento, para a soma das colunas bater com o ranking.
+  const fimSerie = (() => {
+    if (!periodo.tudo) return startOfMonth(periodo.mes)
+    const ultimo = validas.reduce((m, r) => (r.data > m ? r.data : m), format(new Date(), 'yyyy-MM-dd'))
+    return new Date(ultimo.slice(0, 7) + '-01T12:00:00')
+  })()
+  const meses = (() => {
+    if (!periodo.tudo) return 12
+    const primeira = validas.reduce((m, r) => (r.data < m ? r.data : m), format(fimSerie, 'yyyy-MM-dd'))
+    return differenceInCalendarMonths(fimSerie, new Date(primeira.slice(0, 7) + '-01T12:00:00')) + 1
+  })()
+  const serie = Array.from({ length: meses }, (_, i) => {
+    const mes = subMonths(fimSerie, meses - 1 - i)
     const chave = format(mes, 'yyyy-MM')
     const itens = validas.filter(r => r.data.startsWith(chave) && (!selecionada || nomeCategoria(r) === selecionada))
     const curto = format(mes, 'MMM', { locale: ptBR })
@@ -101,12 +113,16 @@ export default function ReceitasPorCategoriaPage() {
       qtd: itens.length,
     }
   })
-  const total12 = serie.reduce((s, m) => s + m.valor, 0)
+  const totalSerie = serie.reduce((s, m) => s + m.valor, 0)
+  const rotuloSerie = periodo.tudo ? `desde o início (${meses} meses)` : `últimos 12 meses`
   const mesesComValor = serie.filter(m => m.valor > 0).length
   const melhorMes = serie.reduce((a, b) => (b.valor > a.valor ? b : a), serie[0])
   const mesAtivo = periodo.tudo ? null : format(periodo.mes, 'yyyy-MM')
 
   const doSelecionado = selecionada ? ranking.find(c => c.nome === selecionada) : null
+  const lancamentosSel = selecionada
+    ? doPeriodo.filter(r => nomeCategoria(r) === selecionada).sort((a, b) => b.data.localeCompare(a.data))
+    : []
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -152,9 +168,9 @@ export default function ReceitasPorCategoriaPage() {
           </Card>
           <Card>
             <CardContent className="p-5">
-              <p className="text-xs text-brand-lavanda/50">Média mensal · últimos 12 meses{selecionada ? ` · ${selecionada}` : ''}</p>
-              <p className="mt-1 text-xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{loading ? '...' : formatCurrency(total12 / 12)}</p>
-              <p className="mt-0.5 text-xs text-brand-lavanda/40">{formatCurrency(total12)} em 12 meses · {mesesComValor} mês(es) com receita</p>
+              <p className="text-xs text-brand-lavanda/50">Média mensal · {rotuloSerie}{selecionada ? ` · ${selecionada}` : ''}</p>
+              <p className="mt-1 text-xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{loading ? '...' : formatCurrency(totalSerie / meses)}</p>
+              <p className="mt-0.5 text-xs text-brand-lavanda/40">{formatCurrency(totalSerie)} em {meses} meses · {mesesComValor} mês(es) com receita</p>
             </CardContent>
           </Card>
         </div>
@@ -208,7 +224,7 @@ export default function ReceitasPorCategoriaPage() {
                 <div>
                   <CardTitle className="text-base">Evolução mês a mês · {selecionada ?? 'todas as categorias'}</CardTitle>
                   <p className="text-xs text-brand-lavanda/40">
-                    Últimos 12 meses{melhorMes?.valor > 0 ? ` · melhor mês: ${melhorMes.rotuloLongo} (${formatCurrency(melhorMes.valor)})` : ''}
+                    {rotuloSerie.charAt(0).toUpperCase() + rotuloSerie.slice(1)}{melhorMes?.valor > 0 ? ` · melhor mês: ${melhorMes.rotuloLongo} (${formatCurrency(melhorMes.valor)})` : ''}
                   </p>
                 </div>
                 {selecionada && (
@@ -222,8 +238,8 @@ export default function ReceitasPorCategoriaPage() {
               {doSelecionado === undefined && selecionada && (
                 <p className="mb-2 text-[11px] text-brand-lavanda/40">Essa categoria não teve receita em {rotuloPeriodo(periodo).toLowerCase()}, mas aparece nos outros meses.</p>
               )}
-              {total12 === 0 ? (
-                <div className="flex h-[260px] items-center justify-center text-sm text-brand-lavanda/30">Sem receitas nos últimos 12 meses</div>
+              {totalSerie === 0 ? (
+                <div className="flex h-[260px] items-center justify-center text-sm text-brand-lavanda/30">Sem receitas no período</div>
               ) : (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
@@ -243,6 +259,50 @@ export default function ReceitasPorCategoriaPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Lançamentos que formam o valor da categoria escolhida, no período */}
+        {selecionada && (
+          <Card className="mt-6">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <CardTitle className="text-base">Lançamentos de {selecionada} · {rotuloPeriodo(periodo).toLowerCase()}</CardTitle>
+                <span className="text-xs text-brand-lavanda/50">{lancamentosSel.length} lançamento{lancamentosSel.length !== 1 ? 's' : ''} · <span className="font-semibold text-brand-lavanda">{formatCurrency(doSelecionado?.valor ?? 0)}</span></span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {lancamentosSel.length === 0 ? (
+                <p className="px-6 py-8 text-center text-sm text-brand-lavanda/40">Nenhum lançamento dessa categoria em {rotuloPeriodo(periodo).toLowerCase()}.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06]">
+                        <th className="px-6 py-2.5 text-left text-xs font-medium text-brand-lavanda/50">Data</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-brand-lavanda/50">Descrição</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-brand-lavanda/50">Cliente</th>
+                        <th className="px-3 py-2.5 text-center text-xs font-medium text-brand-lavanda/50">Situação</th>
+                        <th className="px-6 py-2.5 text-right text-xs font-medium text-brand-lavanda/50">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lancamentosSel.map((r) => (
+                        <tr key={r.id} className="border-b border-white/[0.04]">
+                          <td className="whitespace-nowrap px-6 py-2.5 text-xs text-brand-lavanda/60">{formatDate(r.data)}</td>
+                          <td className="px-3 py-2.5 text-brand-lavanda">{r.descricao}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-brand-lavanda/70">{r.clientes?.nome ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-center">
+                            <Badge variant={r.status === 'recebido' ? 'concluido' : 'pendente'}>{r.status === 'recebido' ? 'Recebido' : 'A receber'}</Badge>
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-2.5 text-right font-semibold text-brand-lavanda">{formatCurrency(r.valor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   )
