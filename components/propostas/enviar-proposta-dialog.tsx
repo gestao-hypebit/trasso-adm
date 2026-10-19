@@ -24,24 +24,31 @@ export function EnviarPropostaDialog({ proposta, open, onOpenChange, onEnviada }
   const [cliente, setCliente] = useState<ClienteEnvio | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiado, setCopiado] = useState(false)
+  const [slug, setSlug] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setLoading(true)
     const supabase = createClient() as any
-    supabase.from('propostas')
-      .select('clientes(id, nome, email, whatsapp, telefone, portal_token, portal_ativo)')
-      .eq('id', proposta.id).single()
-      .then(({ data }: { data: { clientes: ClienteEnvio | null } | null }) => {
-        setCliente(data?.clientes ?? null)
-        setLoading(false)
-      })
+    Promise.all([
+      supabase.from('propostas')
+        .select('clientes(id, nome, email, whatsapp, telefone, portal_token, portal_ativo)')
+        .eq('id', proposta.id).single(),
+      // Link curto (gerado uma vez e reaproveitado). Se a função não existir
+      // ainda no banco, segue com o link longo.
+      supabase.rpc('propostas_gerar_slug', { p_id: proposta.id }),
+    ]).then(([{ data }, { data: s }]: [{ data: { clientes: ClienteEnvio | null } | null }, { data: string | null }]) => {
+      setCliente(data?.clientes ?? null)
+      setSlug(s ?? null)
+      setLoading(false)
+    })
   }, [open, proposta.id])
 
   // O link abre a página da proposta (landing), que tem aprovar/recusar e leva ao portal.
-  const propostaUrl = cliente && typeof window !== 'undefined' ? `${window.location.origin}/proposta/${cliente.portal_token}/${proposta.id}` : ''
-  const primeiroNome = cliente?.nome.split(' ')[0] ?? ''
-  const mensagem = `Olá ${primeiroNome}! Sua proposta ${proposta.numero} — ${proposta.titulo} já está disponível. Preparei uma página com o que está incluso, o investimento e o botão para aprovar: ${propostaUrl}`
+  const origem = typeof window !== 'undefined' ? window.location.origin : ''
+  const propostaUrl = !cliente ? '' : slug ? `${origem}/proposta/${slug}` : `${origem}/proposta/${cliente.portal_token}/${proposta.id}`
+  const nomeCliente = cliente?.nome.trim() ?? ''
+  const mensagem = `Olá, ${nomeCliente}! Sua proposta ${proposta.numero} — ${proposta.titulo} já está disponível. Preparei uma página com o que está incluso, o investimento e o botão para aprovar: ${propostaUrl}`
   const waUrl = whatsappUrl(cliente?.whatsapp || cliente?.telefone, mensagem)
   const mailUrl = cliente?.email
     ? `mailto:${cliente.email}?subject=${encodeURIComponent(`Proposta ${proposta.numero} — ${proposta.titulo}`)}&body=${encodeURIComponent(mensagem)}`
