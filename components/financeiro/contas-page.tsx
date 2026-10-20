@@ -152,6 +152,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [ini, fim] = intervaloPeriodo(periodo)
   const noPeriodo = daLinha.filter(l => l.data >= ini && l.data <= fim)
   const liquidadoMes = noPeriodo.filter(l => l.status === statusLiquidado)
+  const abertosPeriodo = noPeriodo.filter(l => l.status === 'pendente')
   const soma = (arr: Lancamento[]) => arr.reduce((s, l) => s + l.valor, 0)
   const faixas = aging(abertos, hoje)
   const maxFaixa = Math.max(...faixas.map(f => f.valor), 1)
@@ -165,9 +166,10 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     }, {} as Record<string, number>)
   ).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
-  // As abas contam só o período escolhido; os cartões do topo mostram a situação de hoje.
+  // As abas e os cartões "Total em aberto" e liquidado contam o período escolhido;
+  // "Vencido" e "Vence em 7 dias" mostram a situação de hoje.
   const contagem: Record<Aba, number> = {
-    aberto: noPeriodo.filter(l => l.status === 'pendente').length,
+    aberto: abertosPeriodo.length,
     vencidas: noPeriodo.filter(l => l.status === 'pendente' && l.data < hoje).length,
     semana: noPeriodo.filter(l => l.status === 'pendente' && l.data >= hoje && diasEntre(hoje, l.data) <= 7).length,
     liquidadas: liquidadoMes.length,
@@ -231,7 +233,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const kpis = [
     { label: 'Vencido', valor: soma(vencidos), sub: `${vencidos.length} título(s) em atraso`, icon: AlertTriangle, cor: 'text-brand-rosa', bg: 'bg-brand-rosa/10', aba: 'vencidas' as Aba },
     { label: 'Vence em 7 dias', valor: soma(em7), sub: `${em7.length} título(s)`, icon: CalendarClock, cor: 'text-yellow-400', bg: 'bg-yellow-400/10', aba: 'semana' as Aba },
-    { label: 'Total em aberto', valor: soma(abertos), sub: `${abertos.length} título(s)`, icon: Wallet, cor: 'text-brand-lavanda', bg: 'bg-brand-violeta/10', aba: 'aberto' as Aba },
+    { label: `Em aberto · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(abertosPeriodo), sub: `${abertosPeriodo.length} título(s)`, icon: Wallet, cor: 'text-brand-lavanda', bg: 'bg-brand-violeta/10', aba: 'aberto' as Aba },
     { label: `${t.liquidado} · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(liquidadoMes), sub: `${liquidadoMes.length} baixa(s)`, icon: CheckCircle2, cor: t.cor, bg: ehReceber ? 'bg-brand-lima/10' : 'bg-brand-rosa/10', aba: 'liquidadas' as Aba },
   ]
 

@@ -135,6 +135,14 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
   const historico = (id: string) => (historicoPorCliente.get(id) ?? []).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 24)
   const pagos = (id: string) => (historicoPorCliente.get(id) ?? []).filter((h) => h.status === 'recebido')
 
+  // Faturas do Asaas recebidas no mês atual. Contam como "pago este mês" para quem é
+  // cobrado por assinatura, mesmo que o lançamento esteja numa categoria não recorrente
+  // (ex.: Social Media).
+  const mesAtual = hoje.slice(0, 7)
+  const faturasPagasMes = new Set(daLinha
+    .filter((l) => l.status === 'recebido' && l.asaas_payment_id && l.data.slice(0, 7) === mesAtual)
+    .map((l) => l.asaas_payment_id!))
+
   const ativosPorChave = new Map(mrr.ativos.map((a) => [a.chave, a]))
   const linhas: Assinante[] = base.map((c) => {
     const a = ativosPorChave.get(c.id)
@@ -148,7 +156,8 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       chave: c.id, clienteId: c.id, nome: c.nome.trim(), empresa: c.empresa, whatsapp: c.whatsapp ?? c.telefone,
       mensalidade: peloAsaas ? ativas.reduce((t, s) => t + valorMensal(s), 0) : a?.valorMensal ?? 0,
       desde: a?.desde ?? null, mesesPagos: a?.mesesPagos ?? 0,
-      pagoEsteMes: a?.pagoEsteMes ?? false, ativo: peloAsaas ? ativas.length > 0 : !!a,
+      pagoEsteMes: (a?.pagoEsteMes ?? false) || (peloAsaas && subs.daLinha.some((s) => s.cobrancasRecentes.some((id) => faturasPagasMes.has(id)))),
+      ativo: peloAsaas ? ativas.length > 0 : !!a,
       atraso: atraso?.valor ?? 0, diasAtraso: atraso ? diasEntre(atraso.maisAntigo, hoje) : 0, status: c.status,
       asaasCustomerId: c.asaas_customer_id ?? null, assinaturas: subs.todas, idsDaLinha: subs.daLinha.map((s) => s.id),
       fonte: peloAsaas ? 'asaas' : 'financeiro',
