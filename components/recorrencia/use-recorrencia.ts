@@ -132,7 +132,10 @@ export function useRecorrencia() {
       asaasCarregado: !!asaas?.configurado && !erroAsaas && (asaas?.assinaturas.length ?? 0) > 0,
       hoje,
     }
-    const semCliente = assinaturasSemCliente(dados).filter(ativa)
+    // Sem cliente ligado: só as que já pagaram pedem atenção; as que esperam o
+    // 1º pagamento (cliente ainda não cadastrado de propósito) só são contadas.
+    const ativasSemCliente = assinaturasSemCliente(dados).filter(ativa)
+    const semCliente = ativasSemCliente.filter((s) => s.jaPagou !== false)
     const linhas = LINHAS_REC.map((l) => montarLinha(l, dados))
     const porLinha = Object.fromEntries(linhas.map((l) => [l.linha, l])) as Record<LinhaRec, ResultadoLinha>
     const soma = (f: (l: ResultadoLinha) => number) => linhas.reduce((t, l) => t + f(l), 0)
@@ -145,11 +148,16 @@ export function useRecorrencia() {
         mrrBruto: soma((l) => l.mrrBruto),
         mrrLiquido: soma((l) => l.mrr.mrr),
         ativas: soma((l) => l.ativas),
+        emDia: soma((l) => l.emDia),
         assinaturas: soma((l) => l.totalAssinaturas),
         inadimplentes: soma((l) => l.inadimplentes),
         atraso: soma((l) => l.totalAtraso),
       },
-      semCliente: { qtd: semCliente.length, valor: semCliente.reduce((t, s) => t + valorMensal(s), 0) },
+      semCliente: {
+        qtd: semCliente.length,
+        valor: semCliente.reduce((t, s) => t + valorMensal(s), 0),
+        aguardandoPagamento: ativasSemCliente.length - semCliente.length,
+      },
     }
   }, [clientes, lancamentos, categorias, asaas, erroAsaas, hoje])
 

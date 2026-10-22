@@ -34,7 +34,7 @@ function TooltipSerie({ active, payload, label }: any) {
 
 export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: LinhaRec) => void }) {
   const linhas: ResultadoLinha[] = r.linhas
-  const { mrrBruto: bruto, mrrLiquido: liquido, ativas, assinaturas, inadimplentes, atraso } = r.total
+  const { mrrBruto: bruto, mrrLiquido: liquido, ativas, emDia, assinaturas, inadimplentes, atraso } = r.total
 
   // Histórico pelos lançamentos (líquido): é o que existe mês a mês.
   const base = linhas[0].mrr.serie
@@ -58,10 +58,15 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
         >
           <span>
             <AlertTriangle className="mr-1.5 inline h-4 w-4 text-yellow-400" />
-            {r.semCliente.qtd} assinatura(s) ativa(s) no Asaas ({formatCurrency(r.semCliente.valor)}/mês) não estão ligadas a nenhum cliente e não entram no MRR.
+            {r.semCliente.qtd} assinatura(s) ativa(s) no Asaas ({formatCurrency(r.semCliente.valor)}/mês) já com pagamento não estão ligadas a nenhum cliente e não entram no MRR.
           </span>
           <span className="shrink-0 text-xs text-yellow-400">Ligar →</span>
         </button>
+      )}
+      {r.semCliente.qtd === 0 && r.semCliente.aguardandoPagamento > 0 && (
+        <p className="text-xs text-brand-lavanda/40">
+          {r.semCliente.aguardandoPagamento} assinatura(s) nova(s) no Asaas ainda sem o 1º pagamento e sem cliente cadastrado. Quando pagar, cadastre o cliente e ligue em &quot;Só no Asaas&quot;.
+        </p>
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -111,7 +116,7 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
               <thead>
                 <tr className="border-b border-white/[0.06]">
                   <th className="px-6 py-2.5 text-left text-xs font-medium text-brand-lavanda/50">Linha</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-brand-lavanda/50">Ativas</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-brand-lavanda/50" title="Assinatura ativa e nada vencido. Inadimplentes aparecem na coluna Inadimplência.">Ativas</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-brand-lavanda/50">MRR bruto</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-brand-lavanda/50">Líquido</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-brand-lavanda/50">Inadimplência</th>
@@ -128,7 +133,7 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
                         {bruto > 0 && <span className="text-xs font-normal text-brand-lavanda/40">{pct(l.mrrBruto / bruto)}</span>}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-brand-lavanda/70">{l.ativas}</td>
+                    <td className="px-4 py-3 text-right text-brand-lavanda/70">{l.emDia}</td>
                     <td className="px-4 py-3 text-right font-semibold text-brand-lavanda">{formatCurrency(l.mrrBruto)}</td>
                     <td className="px-4 py-3 text-right text-brand-lavanda/60">{formatCurrency(l.mrr.mrr)}</td>
                     <td className={cn('px-4 py-3 text-right', l.totalAtraso > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/30')}>
@@ -139,7 +144,7 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
                 ))}
                 <tr className="bg-white/[0.02] font-semibold">
                   <td className="px-6 py-3 text-brand-lavanda">Agência (total)</td>
-                  <td className="px-4 py-3 text-right text-brand-lavanda">{ativas}</td>
+                  <td className="px-4 py-3 text-right text-brand-lavanda">{emDia}</td>
                   <td className="px-4 py-3 text-right text-brand-lima">{formatCurrency(bruto)}</td>
                   <td className="px-4 py-3 text-right text-brand-lavanda/70">{formatCurrency(liquido)}</td>
                   <td className={cn('px-4 py-3 text-right', atraso > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/30')}>{atraso > 0 ? formatCurrency(atraso) : '—'}</td>
@@ -214,7 +219,7 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
       </div>
 
       <p className="text-[11px] text-brand-lavanda/30">
-        MRR bruto = assinaturas ativas no Asaas pelo valor cobrado (planos não mensais convertidos para mensal); cliente fora do Asaas entra pelo valor lançado.
+        Ativas = assinatura ativa e nada vencido (canceladas e inadimplentes ficam de fora). MRR bruto = assinaturas ativas no Asaas pelo valor cobrado (planos não mensais convertidos para mensal), incluindo inadimplentes até cancelarem; cliente fora do Asaas entra pelo valor lançado.
         Líquido, evolução e movimento vêm das mensalidades lançadas no financeiro (já sem as taxas do Asaas).
         Uma assinatura é do Catálogo Place ou da Clubelly quando o cliente é só desse SaaS (pelo produto do cadastro), quando as faturas dela estão ligadas a lançamentos dessa linha ou quando a descrição fala em &quot;Catálogo&quot; ou &quot;Clubelly&quot;; as demais são de Serviços.
       </p>

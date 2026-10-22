@@ -48,7 +48,7 @@ export function MrrCard() {
             <span key={l.linha} className="flex items-center gap-1.5 text-brand-lavanda/60">
               <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES[l.linha] }} />
               {nomeLinha[l.linha]} <span className="font-medium text-brand-lavanda">{formatCurrency(l.mrrBruto)}</span>
-              <span className="text-brand-lavanda/30">({l.ativas})</span>
+              <span className="text-brand-lavanda/30">({l.emDia})</span>
             </span>
           ))}
           {inadimplentes > 0 && <span className="text-brand-rosa/80">{inadimplentes} inadimplente{inadimplentes === 1 ? '' : 's'}</span>}

@@ -161,6 +161,15 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     .filter((l) => l.status === 'recebido' && l.asaas_payment_id && l.data.slice(0, 7) === mesAtual)
     .map((l) => l.asaas_payment_id!))
 
+  // Quem segue pagando por fora do Asaas: mensalidade recebida neste mês ou no
+  // anterior num lançamento sem fatura do Asaas ligada.
+  const [ano, mes] = hoje.split('-').map(Number)
+  const ant = new Date(ano, mes - 2, 1)
+  const mesAnterior = `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`
+  const pagandoPorFora = new Set(daLinha
+    .filter((l) => l.cliente_id && l.status === 'recebido' && !l.asaas_payment_id && [mesAtual, mesAnterior].includes(l.data.slice(0, 7)))
+    .map((l) => l.cliente_id!))
+
   const ativosPorChave = new Map(mrr.ativos.map((a) => [a.chave, a]))
   const linhas: Assinante[] = base.map((c) => {
     const a = ativosPorChave.get(c.id)
@@ -170,17 +179,20 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     const peloAsaas = asaasCarregado && subs.daLinha.some((s) => !s.removida)
     const ativas = subs.daLinha.filter(ativa)
     const pagamentos = pagos(c.id)
+    // Cancelou no Asaas depois de ter pago e não está pagando por fora: saiu, mesmo
+    // que ainda tenha fatura recente do Asaas lançada no financeiro.
+    const cancelada = asaasCarregado && subs.daLinha.length > 0 && ativas.length === 0 && pagamentos.length > 0 && !pagandoPorFora.has(c.id)
     return {
       chave: c.id, clienteId: c.id, nome: c.nome.trim(), empresa: c.empresa, whatsapp: c.whatsapp ?? c.telefone,
       mensalidade: peloAsaas ? ativas.reduce((t, s) => t + valorMensal(s), 0) : a?.valorMensal ?? 0,
       desde: a?.desde ?? null, mesesPagos: a?.mesesPagos ?? 0,
       pagoEsteMes: (a?.pagoEsteMes ?? false) || (peloAsaas && subs.daLinha.some((s) => s.cobrancasRecentes.some((id) => faturasPagasMes.has(id)))),
-      ativo: peloAsaas ? ativas.length > 0 : !!a,
+      ativo: peloAsaas ? ativas.length > 0 : !cancelada && !!a,
       atraso: atraso?.valor ?? 0, diasAtraso: atraso ? diasEntre(atraso.maisAntigo, hoje) : 0, status: c.status,
       asaasCustomerId: c.asaas_customer_id ?? null, assinaturas: subs.todas, idsDaLinha: subs.daLinha.map((s) => s.id),
       fonte: peloAsaas ? 'asaas' : 'financeiro',
       historico: historico(c.id), soNoAsaas: false,
-      cancelada: asaasCarregado && subs.daLinha.length > 0 && ativas.length === 0 && pagamentos.length > 0,
+      cancelada,
       pagamentos: pagamentos.length,
       ultimoPagamento: pagamentos.reduce<string | null>((m, h) => (!m || h.data > m ? h.data : m), null),
     }
@@ -219,6 +231,9 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
   const doSistema = linhas.filter((l) => !l.soNoAsaas)
   const emAtraso = doSistema.filter((l) => l.atraso > 0)
   const ativas = doSistema.filter((l) => l.ativo)
+  // Ativas de verdade: assinatura ativa e nada vencido. Inadimplente fica de fora
+  // da contagem (tem a própria aba), mas segue no MRR até cancelar.
+  const emDia = ativas.filter((l) => l.atraso === 0)
   const mrrBruto = ativas.reduce((t, l) => t + l.mensalidade, 0)
   return {
     linha,
@@ -231,9 +246,10 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     // Assinaturas = quem tem mensalidade recente ou está devendo.
     totalAssinaturas: doSistema.filter((l) => l.ativo || l.atraso > 0).length,
     ativas: ativas.length,
+    emDia: emDia.length,
     inadimplentes: emAtraso.length,
     contagem: {
-      ativos: ativas.length,
+      ativos: emDia.length,
       aguardando: doSistema.filter((l) => l.ativo && !l.pagoEsteMes).length,
       atraso: emAtraso.length,
       canceladas: doSistema.filter((l) => l.cancelada).length,

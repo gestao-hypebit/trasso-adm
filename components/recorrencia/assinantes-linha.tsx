@@ -79,7 +79,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
       if (aba === 'so_asaas') return l.soNoAsaas
       if (aba === 'todos') return true
       if (l.soNoAsaas) return false
-      if (aba === 'ativos') return l.ativo
+      if (aba === 'ativos') return l.ativo && l.atraso === 0
       if (aba === 'aguardando') return l.ativo && !l.pagoEsteMes
       if (aba === 'atraso') return l.atraso > 0
       if (aba === 'canceladas') return l.cancelada
@@ -236,6 +236,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="font-medium text-brand-lavanda group-hover:text-brand-lima transition-colors">{l.nome}</span>
                           {l.soNoAsaas && <Badge variant="pendente">Sem cliente ligado</Badge>}
+                          {l.soNoAsaas && l.assinaturas.every((s) => s.jaPagou === false) && <Badge variant="inativo">Aguardando 1º pagamento</Badge>}
                           {!l.soNoAsaas && !l.clienteId && <Badge variant="pendente">Sem cliente vinculado</Badge>}
                           {daLinha(l).length > 0 && !sub && <Badge variant="inativo">Assinatura cancelada</Badge>}
                         </div>
@@ -308,7 +309,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
         Clique num assinante para ver a assinatura e as faturas do Asaas e para descrever o serviço (ex.: social media, software sob demanda).
         MRR bruto = assinaturas ativas no Asaas (valor cobrado, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro.
         MRR líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas.
-        Ativas = tem assinatura ativa ou mensalidade lançada neste mês ou no anterior. Inadimplentes = tem mensalidade vencida e não paga. Canceladas = a assinatura foi cancelada no Asaas depois de ter tido pagamento.
+        Ativas = tem assinatura ativa (ou mensalidade lançada neste mês ou no anterior) e nada vencido. Inadimplentes = tem mensalidade vencida e não paga; seguem no MRR até cancelar. Canceladas = a assinatura foi cancelada no Asaas depois de ter tido pagamento e não há pagamento por fora.
         {linha === 'agencia' && ' Aqui entram só clientes com mensalidade de serviço (software, social…); projetos avulsos ficam de fora.'}
         {calc.semCliente > 0 && ` ${calc.semCliente} assinante(s) aparecem só pela descrição do lançamento, sem cliente cadastrado; nos próximos lançamentos, escolha o cliente.`}
       </p>

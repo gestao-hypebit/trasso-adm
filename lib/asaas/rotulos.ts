@@ -19,6 +19,8 @@ export type AssinaturaAsaas = {
   // Ids das faturas recentes (últimos ~2 meses e em aberto): servem para saber,
   // pelos lançamentos ligados a elas, de que linha de receita é a assinatura.
   cobrancasRecentes: string[]
+  // Teve fatura paga nos últimos ~2 meses (falso = ainda esperando o 1º pagamento).
+  jaPagou?: boolean
   formaPagamento: string
   descricao: string | null
   criadaEm: string

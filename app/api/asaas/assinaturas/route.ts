@@ -29,6 +29,11 @@ export async function GET() {
       const atual = proximaAberta.get(p.subscription)
       if (!atual || p.dueDate < atual) proximaAberta.set(p.subscription, p.dueDate)
     }
+    // Assinaturas com fatura paga nos últimos ~2 meses. As que nunca pagaram (cliente
+    // novo esperando o 1º pagamento) não pesam no aviso de "sem cliente ligado".
+    const comPagamento = new Set(recentes
+      .filter((p) => p.subscription && !p.deleted && ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(p.status))
+      .map((p) => p.subscription!))
     const qtdVencidas = new Map<string, number>()
     for (const p of vencidas) {
       if (!p.subscription || p.deleted) continue
@@ -51,6 +56,7 @@ export async function GET() {
             proximaCobranca: proximaAberta.get(a.id) ?? a.nextDueDate,
             vencidas: qtdVencidas.get(a.id) ?? 0,
             cobrancasRecentes: cobrancasDa.get(a.id) ?? [],
+            jaPagou: comPagamento.has(a.id),
             formaPagamento: a.billingType,
             descricao: a.description,
             criadaEm: a.dateCreated,
