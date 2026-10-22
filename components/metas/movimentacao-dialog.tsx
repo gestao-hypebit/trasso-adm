@@ -136,7 +136,7 @@ export function MovimentacaoDialog({ open, onOpenChange, editando, dataPadrao, t
           {/* Frente */}
           <div className="space-y-2">
             <Label>Frente</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {FRENTES.map((f) => {
                 const ativo = form.frente === f.value
                 return (
@@ -221,7 +221,7 @@ export function MovimentacaoDialog({ open, onOpenChange, editando, dataPadrao, t
           )}
 
           <div className="space-y-2">
-            <Label>{form.frente === 'catalogo_place' ? 'Mensalidade (R$)' : 'Valor do serviço (R$)'}</Label>
+            <Label>{form.frente !== 'trasso' ? 'Mensalidade (R$)' : 'Valor do serviço (R$)'}</Label>
             <Input inputMode="decimal" placeholder="0,00" value={form.valor} onChange={(e) => set('valor', e.target.value)} />
           </div>
 

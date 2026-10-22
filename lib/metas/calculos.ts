@@ -1,6 +1,6 @@
 import { toISODateLocal } from '@/lib/utils'
 
-export type Frente = 'catalogo_place' | 'trasso'
+export type Frente = 'catalogo_place' | 'clubelly' | 'trasso'
 export type TipoMov = 'novo' | 'cancelamento'
 
 export type Movimentacao = {
@@ -26,8 +26,12 @@ export type MetaMensal = {
 // Paleta validada (CVD + contraste) contra a superfície escura #141318.
 export const FRENTES: { value: Frente; label: string; descricao: string; cor: string }[] = [
   { value: 'catalogo_place', label: 'Catálogo Place', descricao: 'Assinaturas do SaaS', cor: '#8B5CF6' },
+  { value: 'clubelly', label: 'Clubelly', descricao: 'Assinaturas do SaaS', cor: '#2BA3D6' },
   { value: 'trasso', label: 'Slick', descricao: 'Serviços (sites, sistemas…)', cor: '#76A000' },
 ]
+
+// Frentes de assinatura (SaaS): o valor é mensalidade e entra no MRR.
+export const FRENTES_SAAS = FRENTES.filter((f) => f.value !== 'trasso')
 
 export const COR_CANCELAMENTO = '#E0457B'
 

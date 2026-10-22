@@ -33,28 +33,27 @@ function TooltipSerie({ active, payload, label }: any) {
 }
 
 export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: LinhaRec) => void }) {
-  const linhas: ResultadoLinha[] = [r.catalogo, r.servicos]
-  const bruto = r.catalogo.mrrBruto + r.servicos.mrrBruto
-  const liquido = r.catalogo.mrr.mrr + r.servicos.mrr.mrr
-  const ativas = r.catalogo.ativas + r.servicos.ativas
-  const assinaturas = r.catalogo.totalAssinaturas + r.servicos.totalAssinaturas
-  const inadimplentes = r.catalogo.inadimplentes + r.servicos.inadimplentes
-  const atraso = r.catalogo.totalAtraso + r.servicos.totalAtraso
+  const linhas: ResultadoLinha[] = r.linhas
+  const { mrrBruto: bruto, mrrLiquido: liquido, ativas, assinaturas, inadimplentes, atraso } = r.total
 
   // Histórico pelos lançamentos (líquido): é o que existe mês a mês.
-  const serie = r.catalogo.mrr.serie.map((s, i) => ({
+  const base = linhas[0].mrr.serie
+  const serie = base.map((s, i) => ({
     mes: mesLabel(s.mesKey),
-    catalogo: s.mrr,
-    servicos: r.servicos.mrr.serie[i]?.mrr ?? 0,
+    ...Object.fromEntries(linhas.map((l) => [l.linha, l.mrr.serie[i]?.mrr ?? 0])),
   }))
-  const nomeMesPassado = mesLabel(r.catalogo.mrr.serie[10].mesKey, 'MMMM').toLowerCase()
+  const nomeMesPassado = mesLabel(base[10].mesKey, 'MMMM').toLowerCase()
+  // Serviços embaixo na pilha; os SaaS por cima.
+  const naPilha = [...linhas].reverse()
+  // Leva para a primeira linha com assinatura sem cliente ligado.
+  const linhaSemCliente = linhas.find((l) => l.contagem.so_asaas > 0)?.linha ?? 'catalogo_place'
 
   return (
     <div className="space-y-6">
       {r.semCliente.qtd > 0 && (
         <button
           type="button"
-          onClick={() => onAbrir('catalogo_place')}
+          onClick={() => onAbrir(linhaSemCliente)}
           className="flex w-full items-center justify-between gap-3 rounded-xl border border-yellow-400/20 bg-yellow-400/[0.05] px-4 py-2.5 text-left text-sm text-brand-lavanda/80 transition-colors hover:bg-yellow-400/[0.08]"
         >
           <span>
@@ -165,12 +164,14 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
                 <XAxis dataKey="mes" tick={{ fill: 'rgba(245,242,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'rgba(245,242,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))} />
                 <Tooltip content={<TooltipSerie />} />
-                <Area dataKey="servicos" name="Serviços" stackId="mrr" type="monotone" stroke={LINHA_CORES.agencia} fill={LINHA_CORES.agencia} fillOpacity={0.25} strokeWidth={2} />
-                <Area dataKey="catalogo" name="Catálogo Place" stackId="mrr" type="monotone" stroke={LINHA_CORES.catalogo_place} fill={LINHA_CORES.catalogo_place} fillOpacity={0.2} strokeWidth={2} />
+                {naPilha.map((l) => (
+                  <Area key={l.linha} dataKey={l.linha} name={nomeLinha[l.linha]} stackId="mrr" type="monotone"
+                    stroke={LINHA_CORES[l.linha]} fill={LINHA_CORES[l.linha]} fillOpacity={0.2} strokeWidth={2} />
+                ))}
               </AreaChart>
             </ResponsiveContainer>
-            <div className="mt-2 flex justify-end gap-4">
-              {(['agencia', 'catalogo_place'] as const).map((l) => (
+            <div className="mt-2 flex flex-wrap justify-end gap-4">
+              {naPilha.map(({ linha: l }) => (
                 <span key={l} className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
                   <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES[l] }} /> {nomeLinha[l]}
                 </span>
@@ -215,7 +216,7 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
       <p className="text-[11px] text-brand-lavanda/30">
         MRR bruto = assinaturas ativas no Asaas pelo valor cobrado (planos não mensais convertidos para mensal); cliente fora do Asaas entra pelo valor lançado.
         Líquido, evolução e movimento vêm das mensalidades lançadas no financeiro (já sem as taxas do Asaas).
-        Uma assinatura é do Catálogo quando o cliente é só do Catálogo, quando as faturas dela estão ligadas a lançamentos do Catálogo ou quando a descrição fala em &quot;Catálogo&quot;; as demais são de Serviços.
+        Uma assinatura é do Catálogo Place ou da Clubelly quando o cliente é só desse SaaS (pelo produto do cadastro), quando as faturas dela estão ligadas a lançamentos dessa linha ou quando a descrição fala em &quot;Catálogo&quot; ou &quot;Clubelly&quot;; as demais são de Serviços.
       </p>
     </div>
   )

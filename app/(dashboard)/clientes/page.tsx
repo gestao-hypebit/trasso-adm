@@ -19,6 +19,7 @@ import { NovaInteracaoDialog } from '@/components/clientes/nova-interacao-dialog
 import { ImportarClientesDialog } from '@/components/clientes/importar-clientes-dialog'
 import { getInitials, formatDate, formatCurrency, formatRelative, whatsappUrl, toISODateLocal, cn } from '@/lib/utils'
 import { labelOrigem, labelSegmento, origemOpcoes } from '@/lib/crm/opcoes'
+import { ehLinhaSaas, labelLinha, linhaDoProduto, temSaas, LINHAS_SAAS } from '@/lib/financeiro/linhas'
 import { toCSV, downloadCSV } from '@/lib/csv'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
@@ -36,7 +37,7 @@ const statusLabel: Record<string, string> = {
   ativo: 'Ativo', inativo: 'Inativo', lead: 'Lead', prospecto: 'Prospecto',
 }
 const grupoLabel: Record<string, string> = {
-  todos: 'Todos', agencia: 'Agência', saas: 'Catálogo Place', ambos: 'Agência + Catálogo',
+  todos: 'Todos', agencia: 'Agência', saas: 'SaaS', ambos: 'Agência + SaaS',
 }
 const ordenacaoLabel: Record<Ordenacao, string> = {
   recentes: 'Mais recentes', nome: 'Nome (A–Z)', faturado: 'Maior faturamento',
@@ -57,7 +58,8 @@ export default function ClientesPage() {
   const [recarregar, setRecarregar] = useState(0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
-  // Linha de receita do cliente: serviços (sites, software…) ou Catálogo Place.
+  // Linha de receita do cliente: serviços (sites, software…), Catálogo Place ou Clubelly.
+  // Os SaaS saem do produto do cadastro.
   const [grupoFilter, setGrupoFilter] = useState('todos')
   const [produtoFilter, setProdutoFilter] = useState('')
   const [responsavelFilter, setResponsavelFilter] = useState('todos')
@@ -152,7 +154,8 @@ export default function ClientesPage() {
       const matchGrupo =
         grupoFilter === 'todos' ||
         (grupoFilter === 'agencia' && (c.tipo === 'agencia' || c.tipo === 'ambos')) ||
-        (grupoFilter === 'saas' && (c.tipo === 'saas' || c.tipo === 'ambos'))
+        (grupoFilter === 'saas' && temSaas(c.tipo)) ||
+        (ehLinhaSaas(grupoFilter) && temSaas(c.tipo) && linhaDoProduto(c.produto_id ? produtoMap[c.produto_id]?.nome : null) === grupoFilter)
       const matchProduto = !produtoFilter || c.produto_id === produtoFilter
       const matchResp = responsavelFilter === 'todos' || (responsavelFilter === 'nenhum' ? !c.responsavel_id : c.responsavel_id === responsavelFilter)
       const matchOrigem = origemFilter === 'todos' || (origemFilter === 'sem_origem' ? !c.origem : c.origem === origemFilter)
@@ -171,7 +174,7 @@ export default function ClientesPage() {
     }
     const ordenada = [...lista].sort(cmp[ordenacao])
     return ordemInvertida ? ordenada.reverse() : ordenada
-  }, [clientes, search, statusFilter, grupoFilter, produtoFilter, responsavelFilter, origemFilter, segmentoFilter, ordenacao, ordemInvertida, faturadoPorCliente, ultimaInteracaoPorCliente, proximoContatoPorCliente])
+  }, [clientes, produtos, search, statusFilter, grupoFilter, produtoFilter, responsavelFilter, origemFilter, segmentoFilter, ordenacao, ordemInvertida, faturadoPorCliente, ultimaInteracaoPorCliente, proximoContatoPorCliente])
 
   const showSaasSubfilter = grupoFilter === 'saas' && produtos.length > 0
   const filtrosExtrasAtivos = grupoFilter !== 'todos' || responsavelFilter !== 'todos' || origemFilter !== 'todos' || segmentoFilter !== 'todos'
@@ -398,7 +401,8 @@ export default function ClientesPage() {
               <SelectContent>
                 <SelectItem value="todos">Todas as linhas</SelectItem>
                 <SelectItem value="agencia">Serviços</SelectItem>
-                <SelectItem value="saas">Catálogo Place</SelectItem>
+                <SelectItem value="saas">Todos os SaaS</SelectItem>
+                {LINHAS_SAAS.map((l) => <SelectItem key={l} value={l}>{labelLinha(l)}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>

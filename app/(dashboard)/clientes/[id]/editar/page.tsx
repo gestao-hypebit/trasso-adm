@@ -214,13 +214,13 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                     <Label>Grupo</Label>
                     <Select
                       defaultValue={cliente.tipo ?? 'agencia'}
-                      onValueChange={(v) => { setValue('tipo', v as ClienteFormData['tipo']); setValue('produto_id', undefined) }}
+                      onValueChange={(v) => { setValue('tipo', v as ClienteFormData['tipo']); if (v === 'agencia') setValue('produto_id', undefined) }}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="agencia">Agência</SelectItem>
-                        <SelectItem value="saas">Catálogo Place</SelectItem>
-                        <SelectItem value="ambos">Agência + Catálogo Place</SelectItem>
+                        <SelectItem value="saas">SaaS (Catálogo Place, Clubelly)</SelectItem>
+                        <SelectItem value="ambos">Agência + SaaS</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -228,8 +228,8 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                     <div className="space-y-2">
                       <Label>Produto SaaS</Label>
                       <Select
-                        defaultValue={cliente.produto_id ?? undefined}
-                        onValueChange={(v) => setValue('produto_id', v)}
+                        value={watch('produto_id') ?? ''}
+                        onValueChange={(v) => setValue('produto_id', v, { shouldValidate: true })}
                       >
                         <SelectTrigger><SelectValue placeholder="Selecione o produto..." /></SelectTrigger>
                         <SelectContent>
@@ -246,6 +246,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
                           )}
                         </SelectContent>
                       </Select>
+                      {errors.produto_id && <p className="text-xs text-brand-rosa">{errors.produto_id.message}</p>}
                     </div>
                   )}
                   <div className="space-y-2">

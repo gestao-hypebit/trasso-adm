@@ -17,7 +17,7 @@ import { DefinirMetasDialog } from '@/components/metas/definir-metas-dialog'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, toISODateLocal } from '@/lib/utils'
 import {
-  FRENTES, COR_CANCELAMENTO, agrupar, corFrente, fimMes, inicioMes, labelCanal, labelFrente,
+  FRENTES, FRENTES_SAAS, COR_CANCELAMENTO, agrupar, corFrente, fimMes, inicioMes, labelCanal, labelFrente,
   mesAtual, nomeMes, resumirFrente, somarMeses,
   type Frente, type MetaMensal, type Movimentacao, type ResumoFrente, type TipoMov,
 } from '@/lib/metas/calculos'
@@ -72,8 +72,11 @@ export default function MetasPage() {
 
   const totalNovos = novosMes.length
   const totalCanc = cancMes.length
-  const cp = resumos.find((r) => r.frente === 'catalogo_place')!
-  const mrrLiquido = cp.valorGanho - cp.valorPerdido
+  // MRR que entrou e saiu nas frentes de assinatura (Catálogo Place e Clubelly).
+  const saas = resumos.filter((r) => FRENTES_SAAS.some((f) => f.value === r.frente))
+  const mrrGanho = saas.reduce((s, r) => s + r.valorGanho, 0)
+  const mrrPerdido = saas.reduce((s, r) => s + r.valorPerdido, 0)
+  const mrrLiquido = mrrGanho - mrrPerdido
 
   const porCanal = agrupar(novosMes, (m) => m.canal ?? 'outro')
   const porMotivo = agrupar(cancMes, (m) => m.motivo?.trim() || 'Sem motivo informado')
@@ -171,7 +174,7 @@ export default function MetasPage() {
         )}
 
         {/* Progresso por frente */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {resumos.map((r) => <CardFrente key={r.frente} r={r} mes={mes} loading={loading} />)}
         </div>
 
@@ -187,9 +190,9 @@ export default function MetasPage() {
             valor={loading ? '...' : `${totalNovos - totalCanc > 0 ? '+' : ''}${totalNovos - totalCanc}`}
             sub="novos menos cancelamentos" />
           <Tile icon={Gauge} iconCls={mrrLiquido >= 0 ? 'text-brand-lima' : 'text-brand-rosa'}
-            titulo="MRR líquido · Catálogo Place"
+            titulo="MRR líquido · SaaS"
             valor={loading ? '...' : `${mrrLiquido > 0 ? '+' : ''}${formatCurrency(mrrLiquido)}`}
-            sub={`+${formatCurrency(cp.valorGanho)} entrou · −${formatCurrency(cp.valorPerdido)} saiu`} />
+            sub={saas.map((r) => `${labelFrente(r.frente)} ${r.valorGanho - r.valorPerdido >= 0 ? '+' : '−'}${formatCurrency(Math.abs(r.valorGanho - r.valorPerdido))}`).join(' · ')} />
         </div>
 
         {/* Canais e motivos */}

@@ -165,19 +165,19 @@ export default function NovoClientePage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Grupo</Label>
-                    <Select onValueChange={(v) => { setValue('tipo', v as any); setValue('produto_id', undefined) }} defaultValue="agencia">
+                    <Select onValueChange={(v) => { setValue('tipo', v as any); if (v === 'agencia') setValue('produto_id', undefined) }} defaultValue="agencia">
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="agencia">Agência</SelectItem>
-                        <SelectItem value="saas">Catálogo Place</SelectItem>
-                        <SelectItem value="ambos">Agência + Catálogo Place</SelectItem>
+                        <SelectItem value="saas">SaaS (Catálogo Place, Clubelly)</SelectItem>
+                        <SelectItem value="ambos">Agência + SaaS</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   {(tipoValue === 'saas' || tipoValue === 'ambos') && (
                     <div className="space-y-2">
                       <Label>Produto SaaS</Label>
-                      <Select onValueChange={(v) => setValue('produto_id', v)}>
+                      <Select value={watch('produto_id') ?? ''} onValueChange={(v) => setValue('produto_id', v, { shouldValidate: true })}>
                         <SelectTrigger><SelectValue placeholder="Selecione o produto..." /></SelectTrigger>
                         <SelectContent>
                           {produtos.map((p) => (
@@ -193,6 +193,7 @@ export default function NovoClientePage() {
                           )}
                         </SelectContent>
                       </Select>
+                      {errors.produto_id && <p className="text-xs text-brand-rosa">{errors.produto_id.message}</p>}
                     </div>
                   )}
                   <div className="space-y-2">

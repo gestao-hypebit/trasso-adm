@@ -1,4 +1,4 @@
-// Receita recorrente (MRR) de cada linha de receita: Catálogo Place e Serviços.
+// Receita recorrente (MRR) de cada linha de receita: Catálogo Place, Clubelly e Serviços.
 //
 // Fonte do valor de cada cliente:
 //   - tem assinatura da linha no Asaas → valor cobrado (bruto), convertido para
@@ -11,15 +11,26 @@ import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
 import { diasEntre } from '@/lib/financeiro'
 import { formatCurrency } from '@/lib/utils'
 import { cicloLabel, valorMensal, type AssinaturaAsaas } from '@/lib/asaas/rotulos'
+import { ehLinhaSaas, linhaDoProduto, linhaPelaDescricao, temSaas, LINHAS_SAAS, type LinhaSaas } from '@/lib/financeiro/linhas'
 
-export type LinhaRec = 'catalogo_place' | 'agencia'
+export type LinhaRec = LinhaSaas | 'agencia'
 
-export const nomeLinha: Record<LinhaRec, string> = { catalogo_place: 'Catálogo Place', agencia: 'Serviços' }
+// Ordem em que as linhas aparecem nas telas.
+export const LINHAS_REC: LinhaRec[] = [...LINHAS_SAAS, 'agencia']
+
+export const nomeLinha: Record<LinhaRec, string> = { catalogo_place: 'Catálogo Place', clubelly: 'Clubelly', agencia: 'Serviços' }
+
+// "do Catálogo Place", "da Clubelly", "de Serviços".
+export const artigoLinha = (l: LinhaRec) => ({ catalogo_place: 'do', clubelly: 'da', agencia: 'de' })[l]
 
 export type ClienteRec = {
   id: string; nome: string; empresa: string | null; whatsapp: string | null; telefone: string | null
   status: string; created_at: string; tipo: string; asaas_customer_id?: string | null
+  produto?: { nome: string } | null
 }
+
+// Qual SaaS o cliente assina pelo cadastro (nulo = cliente só da agência).
+export const saasDoCliente = (c: ClienteRec): LinhaSaas | null => (temSaas(c.tipo) ? linhaDoProduto(c.produto?.nome) : null)
 
 export type LancRec = LancamentoMrr & { categoria_id: string | null; asaas_payment_id?: string | null; frente: string }
 
@@ -66,19 +77,24 @@ export type Dados = {
 
 export const ativa = (s: AssinaturaAsaas) => s.status === 'ACTIVE'
 
-// Uma assinatura do Asaas é do Catálogo quando:
-//   - o cliente é do tipo "saas" (só tem Catálogo); ou
-//   - alguma fatura dela está ligada a um lançamento do Catálogo no financeiro; ou
-//   - a descrição dela fala em "Catálogo".
+// Uma assinatura do Asaas é de um SaaS (Catálogo Place ou Clubelly) quando:
+//   - o cliente é do tipo "saas" (só tem SaaS): vale o produto do cadastro; ou
+//   - alguma fatura dela está ligada a um lançamento desse SaaS no financeiro; ou
+//   - a descrição dela fala em "Catálogo" ou "Clubelly".
 // Senão, é de Serviços.
-const CATALOGO_RE = /cat[aá]logo/i
-export function linhaDaAssinatura(s: AssinaturaAsaas, tipoCliente: string, faturasCatalogo: Set<string>): LinhaRec {
-  const catalogo = tipoCliente === 'saas' || s.cobrancasRecentes.some((id) => faturasCatalogo.has(id)) || CATALOGO_RE.test(s.descricao ?? '')
-  return catalogo ? 'catalogo_place' : 'agencia'
+export function linhaDaAssinatura(s: AssinaturaAsaas, cliente: ClienteRec, faturasSaas: Map<string, LinhaSaas>): LinhaRec {
+  if (cliente.tipo === 'saas') return saasDoCliente(cliente)!
+  const pelaFatura = s.cobrancasRecentes.map((id) => faturasSaas.get(id)).find(Boolean)
+  return pelaFatura ?? linhaPelaDescricao(s.descricao) ?? 'agencia'
 }
 
-export const faturasDoCatalogo = (lancamentos: LancRec[]) =>
-  new Set(lancamentos.filter((l) => l.frente === 'catalogo_place' && l.asaas_payment_id).map((l) => l.asaas_payment_id!))
+// Assinatura sem cliente ligado: só dá para ir pela descrição. Na dúvida, Catálogo
+// (onde está a maioria), para aparecer numa lista e você ligar ao cliente certo.
+export const linhaSemCliente = (s: AssinaturaAsaas): LinhaSaas => linhaPelaDescricao(s.descricao) ?? 'catalogo_place'
+
+// Fatura do Asaas → linha SaaS do lançamento ligado a ela.
+export const faturasDosSaas = (lancamentos: LancRec[]) =>
+  new Map(lancamentos.filter((l) => ehLinhaSaas(l.frente) && l.asaas_payment_id).map((l) => [l.asaas_payment_id!, l.frente as LinhaSaas]))
 
 // Assinaturas do Asaas de clientes que não estão ligados a ninguém no sistema
 // (as removidas ficam de fora: não há o que ligar).
@@ -93,32 +109,34 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
   const recorrente = (l: LancRec) => !!l.categoria_id && dados.recorrentes.includes(l.categoria_id)
   const mensalidades = daLinha.filter(recorrente)
   const mrr = calcularMrr(mensalidades, hoje)
-  const faturasCatalogo = faturasDoCatalogo(dados.lancamentos)
+  const ehSaas = linha !== 'agencia'
+  const faturasSaas = faturasDosSaas(dados.lancamentos)
 
   // Assinaturas do cliente: as desta linha primeiro, ativas antes das canceladas.
   const assinaturasDo = (c: ClienteRec) => {
     if (!c.asaas_customer_id) return { todas: [] as AssinaturaAsaas[], daLinha: [] as AssinaturaAsaas[] }
-    const ehDaLinha = (s: AssinaturaAsaas) => linhaDaAssinatura(s, c.tipo, faturasCatalogo) === linha
+    const ehDaLinha = (s: AssinaturaAsaas) => linhaDaAssinatura(s, c, faturasSaas) === linha
     const peso = (s: AssinaturaAsaas) => Number(ehDaLinha(s)) * 2 + Number(ativa(s))
     const todas = assinaturas.filter((s) => s.customerId === c.asaas_customer_id).sort((a, b) => peso(b) - peso(a))
     return { todas, daLinha: todas.filter(ehDaLinha) }
   }
 
   // Quem aparece na lista desta linha.
-  //   Catálogo: todo cliente do Catálogo (sem mensalidade = cancelou ou falta lançar)
-  //             + quem tem lançamento do Catálogo mesmo cadastrado com outro tipo.
+  //   SaaS (Catálogo, Clubelly): todo cliente cadastrado com esse produto (sem
+  //             mensalidade = cancelou ou falta lançar) + quem tem lançamento da
+  //             linha mesmo cadastrado de outro jeito.
   //   Serviços: só quem tem (ou teve) mensalidade de serviço ou assinatura de serviço;
   //             cliente só de projeto não entra.
-  const comLancamento = new Set((linha === 'catalogo_place' ? daLinha : mensalidades).map((l) => l.cliente_id).filter(Boolean))
+  const comLancamento = new Set((ehSaas ? daLinha : mensalidades).map((l) => l.cliente_id).filter(Boolean))
   const base = clientes.filter((c) => {
     if (comLancamento.has(c.id)) return true
-    if (linha === 'catalogo_place') return c.tipo === 'saas' || c.tipo === 'ambos'
+    if (ehSaas) return saasDoCliente(c) === linha
     return c.tipo !== 'saas' && assinaturasDo(c).daLinha.length > 0
   })
 
-  // Em atraso: no Catálogo, qualquer receita vencida; em Serviços, só mensalidades
+  // Em atraso: nos SaaS, qualquer receita vencida; em Serviços, só mensalidades
   // (parcela de projeto atrasada não é inadimplência de assinatura).
-  const paraAtraso = linha === 'catalogo_place' ? daLinha : mensalidades
+  const paraAtraso = ehSaas ? daLinha : mensalidades
   const atrasoPorCliente = new Map<string, { valor: number; maisAntigo: string }>()
   for (const l of paraAtraso) {
     if (!l.cliente_id || l.status !== 'pendente' || l.data >= hoje) continue
@@ -177,12 +195,14 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       historico: [], soNoAsaas: false, cancelada: false, pagamentos: a.mesesPagos, ultimoPagamento: null,
     })
   }
-  // Assinaturas do Asaas sem cliente ligado: não dá para saber a linha. Aparecem
-  // na lista do Catálogo (onde está a maioria) para você ligar ao cliente certo.
+  // Assinaturas do Asaas sem cliente ligado: a linha sai da descrição (ver
+  // linhaSemCliente). Aparecem na lista para você ligar ao cliente certo.
   const semCliente = new Map<string, AssinaturaAsaas[]>()
   for (const s of assinaturasSemCliente(dados)) semCliente.set(s.customerId, [...(semCliente.get(s.customerId) ?? []), s])
-  if (linha === 'catalogo_place') {
-    for (const [customerId, subs] of semCliente) {
+  if (ehSaas) {
+    for (const [customerId, todas] of semCliente) {
+      const subs = todas.filter((s) => linhaSemCliente(s) === linha)
+      if (!subs.length) continue
       const s0 = subs[0]
       linhas.push({
         chave: `a:${customerId}`, clienteId: null, nome: s0.customerNome ?? 'Cliente do Asaas', empresa: s0.customerEmail,
@@ -222,8 +242,9 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       todos: linhas.length,
     } as Record<AbaLista, number>,
     semCliente: doSistema.filter((l) => !l.clienteId).length,
-    // Clientes com lançamento do Catálogo cadastrados só como "Agência".
-    tipoErrado: linha === 'catalogo_place' ? base.filter((c) => c.tipo !== 'saas' && c.tipo !== 'ambos') : [],
+    // Clientes com lançamento desta linha SaaS cujo cadastro não diz esse produto
+    // (cadastrados só como Agência ou com o outro SaaS).
+    tipoErrado: ehSaas ? base.filter((c) => saasDoCliente(c) !== linha) : [],
     clientesSemAsaas: base.filter((c) => !c.asaas_customer_id).map((c) => ({ id: c.id, nome: c.nome.trim() })),
     customersSemCliente: [...semCliente.entries()].map(([id, subs]) => ({
       id, nome: `${subs[0].customerNome ?? id} · ${formatCurrency(subs[0].valor)}/${cicloLabel[subs[0].ciclo] ?? subs[0].ciclo}`,

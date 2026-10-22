@@ -14,7 +14,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { linhasDeReceita, LINHA_CORES, type Linha } from '@/lib/financeiro/linhas'
+import { ehLinhaSaas, linhasDeReceita, LINHA_CORES, type Linha } from '@/lib/financeiro/linhas'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -129,7 +129,7 @@ export default function DashboardPage() {
   const faturamento = doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
   const projetosAtivos = projetos.filter(p => p.status === 'em_andamento').length
 
-  // Receita recebida no período, dividida por linha (serviços x Catálogo Place).
+  // Receita recebida no período, dividida por linha (serviços, Catálogo Place, Clubelly).
   const receitaPorLinha = linhasDeReceita.map(o => ({
     ...o,
     valor: doMes.filter(l => l.tipo === 'receita' && l.status === 'recebido' && l.frente === o.value).reduce((s, l) => s + l.valor, 0),
@@ -137,13 +137,13 @@ export default function DashboardPage() {
 
   // Gráfico histórico (todos os meses com dados). Receita empilhada por linha.
   const revenueData = (() => {
-    const porMes: Record<string, { agencia: number; catalogo_place: number; despesa: number; mesKey: string }> = {}
+    const porMes: Record<string, { agencia: number; catalogo_place: number; clubelly: number; despesa: number; mesKey: string }> = {}
     for (const l of lancamentos) {
       if (l.status !== 'recebido' && l.status !== 'pago') continue
       const k = l.data.slice(0, 7)
-      if (!porMes[k]) porMes[k] = { agencia: 0, catalogo_place: 0, despesa: 0, mesKey: k }
+      if (!porMes[k]) porMes[k] = { agencia: 0, catalogo_place: 0, clubelly: 0, despesa: 0, mesKey: k }
       // Receita marcada como "geral" (raro) conta como serviços.
-      if (l.tipo === 'receita') porMes[k][l.frente === 'catalogo_place' ? 'catalogo_place' : 'agencia'] += l.valor
+      if (l.tipo === 'receita') porMes[k][ehLinhaSaas(l.frente) ? l.frente : 'agencia'] += l.valor
       if (l.tipo === 'despesa') porMes[k].despesa += l.valor
     }
     return Object.entries(porMes)
@@ -313,7 +313,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {receitaPorLinha.map(l => (
                 <div key={l.value} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.04] bg-white/[0.02] px-4 py-3">
                   <div className="flex items-center gap-2 min-w-0">
@@ -353,18 +353,19 @@ export default function DashboardPage() {
                       <XAxis dataKey="mes" tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#F5F2FF60', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v === 0 ? '' : `${(v/1000).toFixed(0)}k`} width={36} />
                       <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                      <Bar dataKey="agencia" name="Serviços" stackId="receita" fill={LINHA_CORES.agencia} />
-                      <Bar dataKey="catalogo_place" name="Catálogo Place" stackId="receita" fill={LINHA_CORES.catalogo_place} radius={[4, 4, 0, 0]} />
+                      {linhasDeReceita.map((o, i) => (
+                        <Bar key={o.value} dataKey={o.value} name={o.label} stackId="receita" fill={LINHA_CORES[o.value]}
+                          radius={i === linhasDeReceita.length - 1 ? [4, 4, 0, 0] : undefined} />
+                      ))}
                       <Bar dataKey="despesa" name="Despesa" fill="#FF4D8D" fillOpacity={0.35} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                   <div className="flex items-center gap-4 mt-2 justify-end">
-                    <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
-                      <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES.agencia }} /> Serviços
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
-                      <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES.catalogo_place }} /> Catálogo Place
-                    </span>
+                    {linhasDeReceita.map((o) => (
+                      <span key={o.value} className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
+                        <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES[o.value] }} /> {o.label}
+                      </span>
+                    ))}
                     <span className="flex items-center gap-1.5 text-[11px] text-brand-lavanda/50">
                       <span className="h-2 w-2 rounded-sm bg-brand-rosa/50" /> Despesa
                     </span>

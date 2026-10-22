@@ -19,6 +19,10 @@ export const clienteSchema = z.object({
   responsavel_id: z.string().uuid().optional().or(z.literal('')),
   tags: z.array(z.string()).optional(),
   observacoes: z.string().optional(),
+}).refine((c) => c.tipo === 'agencia' || !!c.produto_id, {
+  // O produto diz qual SaaS é (Catálogo Place ou Clubelly).
+  message: 'Escolha o produto SaaS',
+  path: ['produto_id'],
 })
 
 export type ClienteFormData = z.infer<typeof clienteSchema>

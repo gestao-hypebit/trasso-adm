@@ -5,7 +5,7 @@ import { LINHA_CORES, linhasDeReceita, type Linha } from '@/lib/financeiro/linha
 
 export type FiltroLinhaValor = Linha | 'todas'
 
-// Botões "Tudo / Serviços / Catálogo Place" para ver de onde veio o dinheiro.
+// Botões "Tudo / Serviços / Catálogo Place / Clubelly" para ver de onde veio o dinheiro.
 export function FiltroLinha({ valor, onChange }: { valor: FiltroLinhaValor; onChange: (v: FiltroLinhaValor) => void }) {
   const opcoes: { value: FiltroLinhaValor; label: string; cor?: string }[] = [
     { value: 'todas', label: 'Tudo' },

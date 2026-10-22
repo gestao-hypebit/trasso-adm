@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { createClient } from '@/lib/supabase/client'
 import { parseCSV, normalizarCabecalho, toCSV, downloadCSV } from '@/lib/csv'
 import { origemOpcoes, segmentoOpcoes } from '@/lib/crm/opcoes'
+import { linhaDoProduto, linhaPelaDescricao, type LinhaSaas } from '@/lib/financeiro/linhas'
 
 const ALIASES: Record<string, string> = {
   nome: 'nome', name: 'nome', contato: 'nome',
@@ -51,7 +52,13 @@ export function ImportarClientesDialog({ open, onOpenChange, onImported }: {
   }
 
   async function montarPrevia(ls: Linha[], status: string, ignoradas: string[]) {
-    const { data: existentes } = await createClient().from('clientes').select('email')
+    const db = createClient()
+    const [{ data: existentes }, { data: produtos }] = await Promise.all([
+      db.from('clientes').select('email'),
+      db.from('produtos').select('id, nome').eq('tipo', 'saas'),
+    ])
+    // Tipo "Clubelly" ou "Catálogo Place" na planilha = cliente SaaS com esse produto.
+    const produtoDaLinha = (s: LinhaSaas) => ((produtos ?? []) as { id: string; nome: string }[]).find((p) => linhaDoProduto(p.nome) === s)?.id ?? null
     const emails = new Set((existentes ?? []).map((c: { email: string | null }) => c.email?.toLowerCase()).filter(Boolean))
     let semNome = 0, duplicadas = 0
     const validas: Record<string, unknown>[] = []
@@ -62,6 +69,7 @@ export function ImportarClientesDialog({ open, onOpenChange, onImported }: {
       if (email) emails.add(email)
       const statusLinha = normalizarCabecalho(l.status ?? '')
       const tipoLinha = normalizarCabecalho(l.tipo ?? '')
+      const saas = linhaPelaDescricao(l.tipo)
       validas.push({
         nome: l.nome.trim(),
         empresa: l.empresa?.trim() || null,
@@ -76,7 +84,8 @@ export function ImportarClientesDialog({ open, onOpenChange, onImported }: {
         segmento: l.segmento ? normalizarOpcao(l.segmento, segmentoOpcoes) : null,
         origem: l.origem ? normalizarOpcao(l.origem, origemOpcoes) : null,
         status: ['ativo', 'inativo', 'lead', 'prospecto'].includes(statusLinha) ? statusLinha : status,
-        tipo: ['agencia', 'saas', 'ambos'].includes(tipoLinha) ? tipoLinha : 'agencia',
+        tipo: saas ? 'saas' : ['agencia', 'saas', 'ambos'].includes(tipoLinha) ? tipoLinha : 'agencia',
+        ...(saas ? { produto_id: produtoDaLinha(saas) } : {}),
         tags: l.tags ? l.tags.split(/[,|]/).map((t) => t.trim()).filter(Boolean) : null,
         observacoes: l.observacoes?.trim() || null,
       })

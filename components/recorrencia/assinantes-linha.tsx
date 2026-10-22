@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AssinantePainel } from '@/components/catalogo/assinante-painel'
 import { baixarCSV } from '@/lib/financeiro'
 import { cicloLabel, formaLabel } from '@/lib/asaas/rotulos'
-import { ativa, nomeLinha, type AbaLista, type Assinante, type LinhaRec } from '@/lib/recorrencia'
+import { artigoLinha, ativa, nomeLinha, saasDoCliente, type AbaLista, type Assinante, type LinhaRec } from '@/lib/recorrencia'
 import { cn, formatCurrency, formatDate, whatsappUrl } from '@/lib/utils'
 import type { Recorrencia } from '@/components/recorrencia/use-recorrencia'
 
@@ -63,8 +63,8 @@ function comparar(a: Assinante, b: Assinante, ordem: Ordem): number {
 }
 
 export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec }) {
-  const calc = linha === 'catalogo_place' ? r.catalogo : r.servicos
-  const produto = linha === 'catalogo_place' ? ' do Catálogo Place' : ''
+  const calc = r.porLinha[linha]
+  const produto = linha === 'agencia' ? '' : ` ${artigoLinha(linha)} ${nomeLinha[linha]}`
   const [busca, setBusca] = useState('')
   const [aba, setAba] = useState<AbaLista>('ativos')
   const [ordem, setOrdem] = useState<Ordem>('vencimento')
@@ -100,7 +100,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
 
   function exportar() {
     baixarCSV(
-      `mrr-${linha === 'catalogo_place' ? 'catalogo-place' : 'servicos'}-${r.dados.hoje}.csv`,
+      `mrr-${linha === 'agencia' ? 'servicos' : linha.replace('_', '-')}-${r.dados.hoje}.csv`,
       ['Cliente', 'Empresa', 'Serviço', 'Mensalidade', 'Desde', 'Meses pagos', 'Pago este mês', 'Em atraso', 'Próxima cobrança (Asaas)'],
       visiveis.map((l) => {
         const s = assinaturaAtiva(l)
@@ -118,11 +118,17 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
       {calc.tipoErrado.length > 0 && (
         <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/[0.05] px-4 py-2.5 text-sm text-brand-lavanda/80">
           <AlertTriangle className="mr-1.5 inline h-4 w-4 text-yellow-400" />
-          {calc.tipoErrado.length === 1 ? 'Este cliente tem' : 'Estes clientes têm'} mensalidade do Catálogo, mas {calc.tipoErrado.length === 1 ? 'está cadastrado' : 'estão cadastrados'} só como Agência:{' '}
-          {calc.tipoErrado.map((c, i) => (
-            <span key={c.id}>{i > 0 && ', '}<Link href={`/clientes/${c.id}`} className="font-medium text-brand-lavanda hover:text-brand-lima">{c.nome.trim()}</Link></span>
-          ))}
-          . Mude o tipo para &quot;Agência + Catálogo&quot; no cadastro.
+          {calc.tipoErrado.length === 1 ? 'Este cliente tem' : 'Estes clientes têm'} mensalidade {artigoLinha(linha)} {nomeLinha[linha]}, mas o cadastro não diz isso:{' '}
+          {calc.tipoErrado.map((c, i) => {
+            const outro = saasDoCliente(c)
+            return (
+              <span key={c.id}>
+                {i > 0 && ', '}<Link href={`/clientes/${c.id}`} className="font-medium text-brand-lavanda hover:text-brand-lima">{c.nome.trim()}</Link>
+                <span className="text-brand-lavanda/50"> ({outro ? `produto ${nomeLinha[outro]}` : 'só Agência'})</span>
+              </span>
+            )
+          })}
+          . Ajuste o grupo e o produto SaaS no cadastro.
         </div>
       )}
 

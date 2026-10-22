@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { linhaOpcoes } from '@/lib/financeiro/linhas'
+import { linhaOpcoes, linhaPelaDescricao } from '@/lib/financeiro/linhas'
 
 const schema = z.object({
   tipo: z.enum(['receita', 'despesa']),
@@ -247,8 +247,8 @@ export function LancamentoForm({ defaultTipo = 'receita', onSuccess }: Lancament
                 </SelectContent>
               </Select>
               {errors.categoria && <p className="text-brand-rosa text-xs mt-1">{errors.categoria.message}</p>}
-              {asaasAtivo && tipo === 'receita' && /cat[aá]logo/i.test(watch('categoria') ?? '') && (
-                <p className="text-yellow-400 text-xs mt-1">As mensalidades do Catálogo já entram sozinhas pelo Asaas. Lançar aqui pode duplicar.</p>
+              {asaasAtivo && tipo === 'receita' && linhaPelaDescricao(watch('categoria')) && (
+                <p className="text-yellow-400 text-xs mt-1">As mensalidades {linhaPelaDescricao(watch('categoria')) === 'clubelly' ? 'da Clubelly' : 'do Catálogo'} já entram sozinhas pelo Asaas. Lançar aqui pode duplicar.</p>
               )}
             </div>
 

@@ -1,5 +1,6 @@
 import 'server-only'
 import { buscarAssinatura, buscarClienteAsaas, type AsaasPayment } from '@/lib/asaas/api'
+import { labelLinha, linhaDoProduto, linhaPelaDescricao, type LinhaSaas } from '@/lib/financeiro/linhas'
 
 // Transforma uma cobrança do Asaas em lançamento, sem nunca duplicar:
 //
@@ -29,7 +30,16 @@ export type Resultado = {
   detalhe?: string
 }
 
-type ClienteRow = { id: string; nome: string; email: string | null; cpf_cnpj: string | null; asaas_customer_id: string | null; tipo: string | null }
+type ClienteRow = {
+  id: string; nome: string; email: string | null; cpf_cnpj: string | null; asaas_customer_id: string | null; tipo: string | null
+  produto: { nome: string } | null
+}
+
+// SaaS da cobrança (nulo = é da agência): a descrição manda; senão, cliente só
+// de SaaS segue o produto do cadastro.
+function saasDaCobranca(p: AsaasPayment, cliente: ClienteRow): LinhaSaas | null {
+  return linhaPelaDescricao(p.description) ?? (cliente.tipo === 'saas' ? linhaDoProduto(cliente.produto?.nome) : null)
+}
 
 export type Contexto = {
   supabase: any
@@ -86,7 +96,7 @@ function fimDoMes(data: string) {
 
 async function carregarClientes(ctx: Contexto) {
   if (!ctx.clientes) {
-    const { data, error } = await ctx.supabase.from('clientes').select('id, nome, email, cpf_cnpj, asaas_customer_id, tipo')
+    const { data, error } = await ctx.supabase.from('clientes').select('id, nome, email, cpf_cnpj, asaas_customer_id, tipo, produto:produtos(nome)')
     if (error) throw error
     ctx.clientes = data ?? []
   }
@@ -256,12 +266,14 @@ export async function processarCobranca(
   // Nenhum: cria
   const resultado = { ...base, acao: 'criado' as const, cliente: cliente.nome, valorSistema: liquido(p) }
   if (ctx.simular) return resultado
-  const categoria = cliente.tipo === 'saas'
-    ? await categoriaId(ctx, 'Catálogo Place', 'receita')
+  // A categoria de cada SaaS tem o nome dele ("Catálogo Place", "Clubelly").
+  const saas = saasDaCobranca(p, cliente)
+  const categoria = saas
+    ? await categoriaId(ctx, labelLinha(saas), 'receita')
     : await categoriaId(ctx, p.subscription ? 'Mensalidade de Software' : 'Serviços prestados', 'receita')
   const { error } = await ctx.supabase.from('lancamentos').insert({
     tipo: 'receita',
-    descricao: p.description || `${cliente.tipo === 'saas' ? 'Catálogo Place' : 'Cobrança'} — ${cliente.nome}`,
+    descricao: p.description || `${saas ? labelLinha(saas) : 'Cobrança'} — ${cliente.nome}`,
     valor: liquido(p),
     data: p.dueDate,
     status,

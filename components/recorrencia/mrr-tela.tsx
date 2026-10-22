@@ -13,14 +13,18 @@ import { useRecorrencia, type Categoria } from '@/components/recorrencia/use-rec
 import { VisaoGeral } from '@/components/recorrencia/visao-geral'
 import { AssinantesLinha } from '@/components/recorrencia/assinantes-linha'
 import { LINHA_CORES } from '@/lib/financeiro/linhas'
+import { nomeLinha, type LinhaRec } from '@/lib/recorrencia'
 import { cn } from '@/lib/utils'
 
-export type AbaMrr = 'geral' | 'catalogo' | 'servicos'
+export type AbaMrr = 'geral' | 'catalogo' | 'clubelly' | 'servicos'
+
+// Aba (como fica no endereço) → linha de receita.
+export const LINHA_DA_ABA: Record<Exclude<AbaMrr, 'geral'>, LinhaRec> = { catalogo: 'catalogo_place', clubelly: 'clubelly', servicos: 'agencia' }
+const abaDaLinha = (l: LinhaRec) => (Object.keys(LINHA_DA_ABA) as Exclude<AbaMrr, 'geral'>[]).find((a) => LINHA_DA_ABA[a] === l)!
 
 const ABAS: { key: AbaMrr; label: string; cor?: string }[] = [
   { key: 'geral', label: 'Visão geral' },
-  { key: 'catalogo', label: 'Catálogo Place', cor: LINHA_CORES.catalogo_place },
-  { key: 'servicos', label: 'Serviços', cor: LINHA_CORES.agencia },
+  ...(Object.entries(LINHA_DA_ABA) as [AbaMrr, LinhaRec][]).map(([key, l]) => ({ key, label: nomeLinha[l], cor: LINHA_CORES[l] })),
 ]
 
 export function MrrTela({ abaInicial }: { abaInicial: AbaMrr }) {
@@ -49,7 +53,7 @@ export function MrrTela({ abaInicial }: { abaInicial: AbaMrr }) {
     <div className="flex min-h-screen flex-col">
       <Header title="Financeiro" description="Receita recorrente e assinaturas" />
       <main className="flex-1 p-4 md:p-6">
-        <PageHeader title="MRR e assinaturas" description="Receita recorrente da agência: Catálogo Place e Serviços">
+        <PageHeader title="MRR e assinaturas" description="Receita recorrente da agência: Catálogo Place, Clubelly e Serviços">
           <Button variant="outline" size="sm" asChild><Link href="/catalogo/asaas"><PlugZap className="h-4 w-4" /> Integração Asaas</Link></Button>
           <Button variant="outline" size="sm" onClick={() => setConfigAberta((v) => !v)}><Settings2 className="h-4 w-4" /> Categorias</Button>
         </PageHeader>
@@ -126,9 +130,9 @@ export function MrrTela({ abaInicial }: { abaInicial: AbaMrr }) {
         {r.loading ? (
           <div className="flex items-center justify-center py-20 text-sm text-brand-lavanda/40">Carregando...</div>
         ) : aba === 'geral' ? (
-          <VisaoGeral r={r} onAbrir={(l) => setAba(l === 'catalogo_place' ? 'catalogo' : 'servicos')} />
+          <VisaoGeral r={r} onAbrir={(l) => setAba(abaDaLinha(l))} />
         ) : (
-          <AssinantesLinha key={aba} r={r} linha={aba === 'catalogo' ? 'catalogo_place' : 'agencia'} />
+          <AssinantesLinha key={aba} r={r} linha={LINHA_DA_ABA[aba]} />
         )}
       </main>
     </div>

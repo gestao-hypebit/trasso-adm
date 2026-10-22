@@ -7,14 +7,12 @@ import { LINHA_CORES } from '@/lib/financeiro/linhas'
 import { nomeLinha } from '@/lib/recorrencia'
 import { formatCurrency } from '@/lib/utils'
 
-// MRR da agência (Catálogo Place + Serviços), com o mesmo cálculo da tela
+// MRR da agência (Catálogo Place + Clubelly + Serviços), com o mesmo cálculo da tela
 // Financeiro → MRR e assinaturas. Clicar leva para lá.
 export function MrrCard() {
   const r = useRecorrencia()
-  const linhas = [r.catalogo, r.servicos]
-  const bruto = r.catalogo.mrrBruto + r.servicos.mrrBruto
-  const liquido = r.catalogo.mrr.mrr + r.servicos.mrr.mrr
-  const inadimplentes = r.catalogo.inadimplentes + r.servicos.inadimplentes
+  const { linhas } = r
+  const { mrrBruto: bruto, mrrLiquido: liquido, inadimplentes } = r.total
   const carregando = r.loading || r.asaasCarregando
 
   return (

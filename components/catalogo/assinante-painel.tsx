@@ -15,7 +15,7 @@ import {
   cicloLabel, formaLabel, assinaturaStatus, cobrancaStatus,
   type CobrancaAsaas,
 } from '@/lib/asaas/rotulos'
-import { nomeLinha, type Assinante, type LinhaRec } from '@/lib/recorrencia'
+import { artigoLinha, nomeLinha, type Assinante, type LinhaRec } from '@/lib/recorrencia'
 
 export type { Assinante }
 
@@ -131,7 +131,6 @@ export function AssinantePainel({
   if (!assinante) return <Sheet open={false} />
 
   const a = assinante
-  const outraLinha = nomeLinha[linha === 'catalogo_place' ? 'agencia' : 'catalogo_place']
   const primeiroNome = a.nome.split(' ')[0]
   const abertas = (cobrancas ?? []).filter((c) => cobrancaStatus(c.status).aberta)
   const pagas = (cobrancas ?? []).filter((c) => ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(c.status))
@@ -140,7 +139,7 @@ export function AssinantePainel({
   function mensagemFatura(c: CobrancaAsaas) {
     const venc = formatDate(c.vencimento)
     const quando = c.status === 'OVERDUE' ? `que venceu em ${venc}` : `com vencimento em ${venc}`
-    return `Oi ${primeiroNome}! Tudo bem? Segue o link da fatura${linha === 'catalogo_place' ? ' do Catálogo Place' : ''} de ${formatCurrency(c.valor)}, ${quando}: ${c.faturaUrl}`
+    return `Oi ${primeiroNome}! Tudo bem? Segue o link da fatura${linha === 'agencia' ? '' : ` ${artigoLinha(linha)} ${nomeLinha[linha]}`} de ${formatCurrency(c.valor)}, ${quando}: ${c.faturaUrl}`
   }
 
   return (
@@ -239,7 +238,7 @@ export function AssinantePainel({
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <Badge variant={st.variant}>{st.label}</Badge>
                           {!a.soNoAsaas && !a.idsDaLinha.includes(s.id) && (
-                            <Badge variant="outline" title={`É de ${outraLinha} e não entra no MRR de ${nomeLinha[linha]}.`}>{outraLinha}</Badge>
+                            <Badge variant="outline" title={`É de outra linha e não entra no MRR ${artigoLinha(linha)} ${nomeLinha[linha]}.`}>Outra linha</Badge>
                           )}
                         </div>
                       </div>

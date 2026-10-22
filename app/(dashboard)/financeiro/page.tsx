@@ -167,7 +167,7 @@ export default function FinanceiroPage() {
   ]
 
   // Resultado de cada linha de receita no período.
-  const porFrente = (['agencia', 'catalogo_place', 'geral'] as const).map(f => {
+  const porFrente = (['agencia', 'catalogo_place', 'clubelly', 'geral'] as const).map(f => {
     const itens = noPeriodo.filter(l => l.frente === f)
     const receitas = itens.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s, l) => s + l.valor, 0)
     const despesas = itens.filter(l => l.tipo === 'despesa' && l.status === 'pago').reduce((s, l) => s + l.valor, 0)

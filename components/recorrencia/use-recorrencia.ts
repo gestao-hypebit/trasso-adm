@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO } from '@/lib/financeiro'
-import { montarLinha, assinaturasSemCliente, ativa, type ClienteRec, type Dados, type LancRec, type LinhaRec } from '@/lib/recorrencia'
+import { montarLinha, assinaturasSemCliente, ativa, LINHAS_REC, type ClienteRec, type Dados, type LancRec, type LinhaRec, type ResultadoLinha } from '@/lib/recorrencia'
 import { valorMensal, type AssinaturaAsaas } from '@/lib/asaas/rotulos'
 
 export type Categoria = { id: string; nome: string; recorrente: boolean }
@@ -15,7 +15,7 @@ const chaveServico = (linha: LinhaRec, chave: string) => `${linha}:${chave}`
 const CATEGORIA_MENSALIDADE_RE = /mensal|assinatura|cat[aá]logo|recorr|saas|plano|retainer|fee/i
 
 // Carrega tudo o que a tela de MRR precisa (uma vez para as três abas):
-// clientes, receitas das duas linhas, categorias recorrentes e assinaturas do Asaas.
+// clientes, receitas das linhas, categorias recorrentes e assinaturas do Asaas.
 export function useRecorrencia() {
   const [clientes, setClientes] = useState<ClienteRec[]>([])
   const [lancamentos, setLancamentos] = useState<LancRec[]>([])
@@ -32,13 +32,14 @@ export function useRecorrencia() {
 
   const carregar = useCallback(async () => {
     const db = createClient() as any
-    const campos = 'id, nome, empresa, whatsapp, telefone, status, created_at, tipo'
+    // O produto diz qual SaaS o cliente assina (Catálogo Place ou Clubelly).
+    const campos = 'id, nome, empresa, whatsapp, telefone, status, created_at, tipo, produto:produtos(nome)'
     const [resClientes, resLanc, resCats, resServicos] = await Promise.all([
       db.from('clientes').select(`${campos}, asaas_customer_id`).order('nome'),
       db.from('lancamentos')
         .select('valor, data, status, descricao, cliente_id, categoria_id, frente, asaas_payment_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
         .eq('tipo', 'receita')
-        .in('frente', ['catalogo_place', 'agencia']),
+        .in('frente', LINHAS_REC),
       db.from('categorias_financeiras').select('id, nome, recorrente').eq('tipo', 'receita').order('nome'),
       db.from('assinatura_servicos').select('chave, linha, descricao'),
     ])
@@ -52,7 +53,7 @@ export function useRecorrencia() {
       const r = await db.from('lancamentos')
         .select('valor, data, status, descricao, cliente_id, categoria_id, frente, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
         .eq('tipo', 'receita')
-        .in('frente', ['catalogo_place', 'agencia'])
+        .in('frente', LINHAS_REC)
       lancs = r.data
       if (r.error) setErro('Não foi possível carregar as mensalidades. A migration de frentes (20261007000000_frentes.sql) já foi aplicada no Supabase?')
     }
@@ -132,10 +133,22 @@ export function useRecorrencia() {
       hoje,
     }
     const semCliente = assinaturasSemCliente(dados).filter(ativa)
+    const linhas = LINHAS_REC.map((l) => montarLinha(l, dados))
+    const porLinha = Object.fromEntries(linhas.map((l) => [l.linha, l])) as Record<LinhaRec, ResultadoLinha>
+    const soma = (f: (l: ResultadoLinha) => number) => linhas.reduce((t, l) => t + f(l), 0)
     return {
       dados,
-      catalogo: montarLinha('catalogo_place', dados),
-      servicos: montarLinha('agencia', dados),
+      // Catálogo Place, Clubelly e Serviços, nessa ordem.
+      linhas,
+      porLinha,
+      total: {
+        mrrBruto: soma((l) => l.mrrBruto),
+        mrrLiquido: soma((l) => l.mrr.mrr),
+        ativas: soma((l) => l.ativas),
+        assinaturas: soma((l) => l.totalAssinaturas),
+        inadimplentes: soma((l) => l.inadimplentes),
+        atraso: soma((l) => l.totalAtraso),
+      },
       semCliente: { qtd: semCliente.length, valor: semCliente.reduce((t, s) => t + valorMensal(s), 0) },
     }
   }, [clientes, lancamentos, categorias, asaas, erroAsaas, hoje])
