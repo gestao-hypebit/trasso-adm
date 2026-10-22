@@ -1,8 +1,9 @@
 import { timingSafeEqual } from 'node:crypto'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { inicioIntegracao, processarCobranca } from '@/lib/asaas/processar'
 import { buscarCobranca, type AsaasPayment } from '@/lib/asaas/api'
+import { acompanharAssinaturas } from '@/lib/automacoes/assinaturas'
 
 // Avisos do Asaas (cadastre esta URL em Integrações → Webhooks, com o mesmo
 // token de ASAAS_WEBHOOK_TOKEN). O Asaas pode mandar o mesmo aviso mais de
@@ -11,6 +12,13 @@ import { buscarCobranca, type AsaasPayment } from '@/lib/asaas/api'
 // Sempre responde 200 depois de registrar o evento. Se o processamento falhar,
 // o erro fica salvo e o botão "Sincronizar" na tela do Asaas corrige depois —
 // responder erro faria o Asaas pausar a fila após 15 falhas.
+//
+// Pagamento de assinatura e eventos de assinatura (SUBSCRIPTION_*, se ligados no
+// webhook do Asaas) também atualizam Metas e avisos, depois de responder.
+
+export const maxDuration = 60
+
+const EVENTOS_DE_ASSINATURA = /^(SUBSCRIPTION_|PAYMENT_(RECEIVED|CONFIRMED)$)/
 
 function autorizado(req: NextRequest) {
   const esperado = process.env.ASAAS_WEBHOOK_TOKEN
@@ -44,6 +52,10 @@ export async function POST(req: NextRequest) {
   if (errEvento) {
     console.error('[asaas] gravar evento', errEvento)
     return NextResponse.json({ error: 'Falha ao registrar evento.' }, { status: 500 })
+  }
+
+  if (EVENTOS_DE_ASSINATURA.test(corpo.event)) {
+    after(() => acompanharAssinaturas(supabase).catch((e) => console.error('[asaas] acompanhar assinaturas', e)))
   }
 
   if (!corpo.event.startsWith('PAYMENT_') || !corpo.payment) {

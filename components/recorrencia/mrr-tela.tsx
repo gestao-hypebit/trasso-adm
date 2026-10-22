@@ -27,7 +27,7 @@ const ABAS: { key: AbaMrr; label: string; cor?: string }[] = [
   ...(Object.entries(LINHA_DA_ABA) as [AbaMrr, LinhaRec][]).map(([key, l]) => ({ key, label: nomeLinha[l], cor: LINHA_CORES[l] })),
 ]
 
-export function MrrTela({ abaInicial }: { abaInicial: AbaMrr }) {
+export function MrrTela({ abaInicial, focoCobranca }: { abaInicial: AbaMrr; focoCobranca?: boolean }) {
   const pathname = usePathname()
   const r = useRecorrencia()
   const [aba, setAbaState] = useState<AbaMrr>(abaInicial)
@@ -130,7 +130,7 @@ export function MrrTela({ abaInicial }: { abaInicial: AbaMrr }) {
         {r.loading ? (
           <div className="flex items-center justify-center py-20 text-sm text-brand-lavanda/40">Carregando...</div>
         ) : aba === 'geral' ? (
-          <VisaoGeral r={r} onAbrir={(l) => setAba(abaDaLinha(l))} />
+          <VisaoGeral r={r} onAbrir={(l) => setAba(abaDaLinha(l))} focoCobranca={focoCobranca} />
         ) : (
           <AssinantesLinha key={aba} r={r} linha={LINHA_DA_ABA[aba]} />
         )}

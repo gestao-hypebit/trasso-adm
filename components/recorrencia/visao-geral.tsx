@@ -10,6 +10,7 @@ import { LINHA_CORES } from '@/lib/financeiro/linhas'
 import { nomeLinha, type LinhaRec, type ResultadoLinha } from '@/lib/recorrencia'
 import { cn, formatCurrency } from '@/lib/utils'
 import type { Recorrencia } from '@/components/recorrencia/use-recorrencia'
+import { ParaCobrar } from '@/components/recorrencia/para-cobrar'
 
 const mesLabel = (mesKey: string, fmt = 'MMM/yy') => {
   const l = format(parseISO(mesKey + '-01'), fmt, { locale: ptBR })
@@ -32,7 +33,7 @@ function TooltipSerie({ active, payload, label }: any) {
   )
 }
 
-export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: LinhaRec) => void }) {
+export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbrir: (linha: LinhaRec) => void; focoCobranca?: boolean }) {
   const linhas: ResultadoLinha[] = r.linhas
   const { mrrBruto: bruto, mrrLiquido: liquido, ativas, emDia, assinaturas, inadimplentes, atraso } = r.total
 
@@ -101,6 +102,8 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
       </div>
 
       {/* Por linha */}
+      <ParaCobrar r={r} foco={focoCobranca} />
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">MRR por linha</CardTitle>

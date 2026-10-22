@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AssinantePainel } from '@/components/catalogo/assinante-painel'
 import { baixarCSV } from '@/lib/financeiro'
+import { mensagemCobranca } from '@/lib/automacoes/regras'
 import { cicloLabel, formaLabel } from '@/lib/asaas/rotulos'
 import { artigoLinha, ativa, nomeLinha, saasDoCliente, type AbaLista, type Assinante, type LinhaRec } from '@/lib/recorrencia'
 import { cn, formatCurrency, formatDate, whatsappUrl } from '@/lib/utils'
@@ -221,7 +222,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
                   <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-brand-lavanda/40">Nenhum assinante nesta lista.</td></tr>
                 ) : visiveis.map((l) => {
                   const cobranca = l.atraso > 0
-                    ? `Oi ${l.nome.split(' ')[0]}! Tudo bem? Identificamos ${formatCurrency(l.atraso)} em aberto da sua mensalidade${produto}. Consegue verificar?`
+                    ? mensagemCobranca(l.nome, formatCurrency(l.atraso), l.diasAtraso, produto)
                     : `Oi ${l.nome.split(' ')[0]}! Passando para lembrar da mensalidade${produto} deste mês.`
                   const wa = !l.soNoAsaas && (!l.pagoEsteMes || l.atraso > 0) && l.ativo ? whatsappUrl(l.whatsapp, cobranca) : null
                   const sub = assinaturaAtiva(l)

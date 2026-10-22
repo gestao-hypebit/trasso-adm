@@ -319,7 +319,10 @@ export default function MetasPage() {
                       <tr key={m.id} className="group border-b border-white/[0.04] hover:bg-white/[0.02]">
                         <td className="px-6 py-3 text-brand-lavanda/60 whitespace-nowrap">{formatDate(m.data, 'dd/MM')}</td>
                         <td className="px-3 py-3">
-                          <p className="font-medium text-brand-lavanda">{m.cliente_nome}</p>
+                          <p className="flex items-center gap-1.5 font-medium text-brand-lavanda">
+                            {m.cliente_nome}
+                            {m.origem === 'asaas' && <span className="rounded border border-white/[0.1] px-1 text-[10px] font-normal text-brand-lavanda/50" title="Registrado sozinho a partir do Asaas">Asaas</span>}
+                          </p>
                           {m.observacoes && <p className="text-[11px] text-brand-lavanda/40 truncate max-w-xs">{m.observacoes}</p>}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
@@ -332,7 +335,9 @@ export default function MetasPage() {
                             ? <span className="inline-flex items-center gap-1 rounded-md bg-brand-lima/10 px-2 py-0.5 text-[11px] font-medium text-brand-lima"><UserPlus className="h-3 w-3" /> Novo</span>
                             : <span className="inline-flex items-center gap-1 rounded-md bg-brand-rosa/10 px-2 py-0.5 text-[11px] font-medium text-brand-rosa"><UserMinus className="h-3 w-3" /> Cancelou</span>}
                         </td>
-                        <td className="px-3 py-3 text-brand-lavanda/60">{m.tipo === 'novo' ? labelCanal(m.canal) : m.motivo || '—'}</td>
+                        <td className="px-3 py-3 text-brand-lavanda/60">
+                          {m.tipo === 'novo' ? (m.canal ? labelCanal(m.canal) : <span className="text-yellow-400/80">Completar canal</span>) : m.motivo || (m.origem === 'asaas' ? <span className="text-yellow-400/80">Anotar motivo</span> : '—')}
+                        </td>
                         <td className={cn('px-3 py-3 text-right whitespace-nowrap', m.tipo === 'novo' ? 'text-brand-lavanda/80' : 'text-brand-lavanda/50')}>
                           {m.valor ? `${m.tipo === 'cancelamento' ? '−' : ''}${formatCurrency(m.valor)}` : '—'}
                         </td>

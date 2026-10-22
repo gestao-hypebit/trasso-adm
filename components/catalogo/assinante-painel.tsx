@@ -16,6 +16,7 @@ import {
   type CobrancaAsaas,
 } from '@/lib/asaas/rotulos'
 import { artigoLinha, nomeLinha, type Assinante, type LinhaRec } from '@/lib/recorrencia'
+import { linhaDoProduto } from '@/lib/financeiro/linhas'
 
 export type { Assinante }
 
@@ -59,8 +60,23 @@ export function AssinantePainel({
   const [salvandoServico, setSalvandoServico] = useState(false)
   const [erroServico, setErroServico] = useState<string | null>(null)
 
+  // Criar o cliente a partir do Asaas: grupo e produto já vêm da linha da lista.
+  const [produtos, setProdutos] = useState<{ id: string; nome: string }[]>([])
+  const [novoTipo, setNovoTipo] = useState(linha === 'agencia' ? 'agencia' : 'saas')
+  const [novoProduto, setNovoProduto] = useState('')
+
   const customerId = assinante?.asaasCustomerId ?? null
   const chave = assinante?.chave ?? null
+
+  useEffect(() => {
+    (createClient() as any).from('produtos').select('id, nome').eq('tipo', 'saas').eq('ativo', true)
+      .then(({ data }: { data: { id: string; nome: string }[] | null }) => setProdutos(data ?? []))
+  }, [])
+
+  useEffect(() => {
+    setNovoTipo(linha === 'agencia' ? 'agencia' : 'saas')
+    setNovoProduto(linha === 'agencia' ? '' : produtos.find((p) => linhaDoProduto(p.nome) === linha)?.id ?? '')
+  }, [linha, produtos, chave])
 
   // Trocou de assinante: some o aviso e qualquer ação aberta.
   useEffect(() => {
@@ -96,21 +112,34 @@ export function AssinantePainel({
     } catch {}
   }
 
-  // Liga o cliente do sistema ao cliente do Asaas (nos dois sentidos da tela).
-  async function vincular() {
-    if (!assinante || !vinculo) return
+  // Liga ao cliente do Asaas (nos dois sentidos da tela) ou cria o cliente com os
+  // dados dele. Nos dois casos as cobranças passam pela integração e as pendências somem.
+  async function ligar(corpo: { clienteId?: string; tipo?: string; produtoId?: string }, asaasId: string | null) {
+    if (!asaasId) return
     setSalvando(true)
     setErroVinculo(null)
-    const clienteId = assinante.soNoAsaas ? vinculo : assinante.clienteId
-    const asaasId = assinante.soNoAsaas ? assinante.asaasCustomerId : vinculo
-    const { error } = await (createClient() as any).from('clientes').update({ asaas_customer_id: asaasId }).eq('id', clienteId)
+    const r = await fetch(`/api/asaas/clientes/${encodeURIComponent(asaasId)}/ligar`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+    })
+    const json = await r.json().catch(() => ({}))
     setSalvando(false)
-    if (error) {
-      setErroVinculo(error.code === '23505' ? 'Esse cliente do Asaas já está ligado a outro cliente.' : error.message)
+    if (!r.ok) {
+      setErroVinculo(json.error ?? `Erro ${r.status}`)
       return
     }
     onAlterado()
     onClose()
+  }
+
+  function vincular() {
+    if (!assinante || !vinculo) return
+    const clienteId = assinante.soNoAsaas ? vinculo : assinante.clienteId!
+    ligar({ clienteId }, assinante.soNoAsaas ? assinante.asaasCustomerId : vinculo)
+  }
+
+  function criarCliente() {
+    if (!assinante) return
+    ligar({ tipo: novoTipo, produtoId: novoTipo === 'agencia' ? undefined : novoProduto }, assinante.asaasCustomerId)
   }
 
   async function salvarServico() {
@@ -381,9 +410,42 @@ export function AssinantePainel({
                   ? 'Esta assinatura existe no Asaas, mas nenhum cliente do sistema está ligado a ela.'
                   : 'Este cliente ainda não está ligado a um cliente do Asaas, por isso as faturas não aparecem.'}
               </p>
+              {a.soNoAsaas && (
+                <div className="mt-3 space-y-2 rounded-lg bg-white/[0.02] p-3">
+                  <p className="text-xs font-medium text-brand-lavanda">Criar o cliente com os dados do Asaas</p>
+                  <p className="text-[11px] text-brand-lavanda/40">Nome, e-mail, telefone e CPF/CNPJ vêm do Asaas; as cobranças dele já entram no financeiro.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      value={novoTipo}
+                      onChange={(e) => setNovoTipo(e.target.value)}
+                      className="h-9 rounded-md border border-white/[0.1] bg-transparent px-3 text-sm text-brand-lavanda outline-none"
+                      aria-label="Grupo"
+                    >
+                      <option value="saas" className="bg-brand-noite">SaaS</option>
+                      <option value="ambos" className="bg-brand-noite">Agência + SaaS</option>
+                      <option value="agencia" className="bg-brand-noite">Agência</option>
+                    </select>
+                    {novoTipo !== 'agencia' && (
+                      <select
+                        value={novoProduto}
+                        onChange={(e) => setNovoProduto(e.target.value)}
+                        className="h-9 min-w-0 flex-1 rounded-md border border-white/[0.1] bg-transparent px-3 text-sm text-brand-lavanda outline-none"
+                        aria-label="Produto SaaS"
+                      >
+                        <option value="" className="bg-brand-noite">Produto...</option>
+                        {produtos.map((p) => <option key={p.id} value={p.id} className="bg-brand-noite">{p.nome}</option>)}
+                      </select>
+                    )}
+                    <Button size="sm" onClick={criarCliente} disabled={salvando || (novoTipo !== 'agencia' && !novoProduto)}>
+                      {salvando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><UserRound className="h-3.5 w-3.5" /> Criar cliente</>}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {a.soNoAsaas && <p className="mt-3 text-[11px] uppercase tracking-wide text-brand-lavanda/30">ou ligar a um que já existe</p>}
               {opcoesVinculo.length === 0 ? (
                 <p className="mt-3 text-xs text-brand-lavanda/40">
-                  {a.soNoAsaas ? 'Nenhum cliente livre para ligar. Cadastre o cliente primeiro.' : 'Nenhuma assinatura do Asaas sem cliente.'}
+                  {a.soNoAsaas ? 'Nenhum cliente livre para ligar.' : 'Nenhuma assinatura do Asaas sem cliente.'}
                 </p>
               ) : (
                 <div className="mt-3 flex gap-2">

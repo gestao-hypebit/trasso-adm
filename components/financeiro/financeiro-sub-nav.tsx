@@ -10,6 +10,7 @@ export const financeiroSubNav = [
   { href: '/financeiro/categorias', label: 'Receitas por categoria' },
   { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
   { href: '/financeiro/mrr', label: 'MRR e assinaturas' },
+  { href: '/financeiro/saas', label: 'SaaS' },
 ]
 
 export function FinanceiroSubNav({ pathname }: { pathname: string }) {

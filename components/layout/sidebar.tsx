@@ -39,6 +39,7 @@ const navItems: NavItem[] = [
       { href: '/financeiro/despesas',      label: 'Contas a Pagar' },
       { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
       { href: '/financeiro/mrr',            label: 'MRR e assinaturas' },
+      { href: '/financeiro/saas',           label: 'SaaS' },
     ],
   },
   { href: '/propostas',     icon: FileText,        label: 'Propostas' },

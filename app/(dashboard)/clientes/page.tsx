@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Plus, Search, Building2, Mail, Phone, MoreHorizontal, Users, LayoutGrid, List, Download, Upload,
-  ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, CalendarClock, X,
+  ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, CalendarClock, X, HeartPulse,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
@@ -308,6 +308,9 @@ export default function ClientesPage() {
           description={`${filtered.length} clientes encontrados${followUpsAtrasados > 0 ? ` • ${followUpsAtrasados} follow-up(s) atrasado(s)` : ''}`}
         >
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/clientes/saude" className="gap-1.5"><HeartPulse className="h-3.5 w-3.5" /> Saúde do cadastro</Link>
+            </Button>
             <div className="flex rounded-lg border border-white/[0.1] p-0.5">
               <Button variant={visao === 'cards' ? 'violeta' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => mudarVisao('cards')} title="Cards">
                 <LayoutGrid className="h-3.5 w-3.5" />

@@ -65,6 +65,15 @@ export function TaxasAsaas() {
     return m
   }, new Map<string, { qtd: number; cobrado: number; taxa: number }>())].sort((a, b) => b[1].taxa - a[1].taxa)
 
+  // Quanto teria saído mais barato se o que não foi PIX tivesse sido PIX
+  // (pela taxa média por pagamento de PIX no próprio período).
+  const pix = porForma.find(([f]) => f === 'pix')?.[1]
+  const naoPix = porForma.filter(([f]) => f !== 'pix')
+  const qtdNaoPix = naoPix.reduce((s, [, f]) => s + f.qtd, 0)
+  const economia = pix && qtdNaoPix
+    ? naoPix.reduce((s, [, f]) => s + f.taxa, 0) - qtdNaoPix * (pix.taxa / pix.qtd)
+    : 0
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -105,6 +114,14 @@ export function TaxasAsaas() {
                   </span>
                 ))}
               </div>
+            )}
+
+            {economia >= 1 && (
+              <p className="rounded-lg border border-brand-lima/20 bg-brand-lima/[0.05] px-3 py-2 text-xs text-brand-lavanda/80">
+                Se os {qtdNaoPix} pagamento{qtdNaoPix === 1 ? '' : 's'} fora do PIX tivessem sido no PIX, a taxa seria{' '}
+                <b className="text-brand-lima">{formatCurrency(economia)} menor</b> neste período
+                {!periodo.tudo && <> (cerca de {formatCurrency(economia * 12)} por ano)</>}. Vale oferecer PIX como forma padrão nas assinaturas.
+              </p>
             )}
 
             <div className="overflow-x-auto">

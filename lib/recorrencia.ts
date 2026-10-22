@@ -30,7 +30,7 @@ export type ClienteRec = {
 }
 
 // Qual SaaS o cliente assina pelo cadastro (nulo = cliente só da agência).
-export const saasDoCliente = (c: ClienteRec): LinhaSaas | null => (temSaas(c.tipo) ? linhaDoProduto(c.produto?.nome) : null)
+export const saasDoCliente = (c: Pick<ClienteRec, 'tipo' | 'produto'>): LinhaSaas | null => (temSaas(c.tipo) ? linhaDoProduto(c.produto?.nome) : null)
 
 export type LancRec = LancamentoMrr & { categoria_id: string | null; asaas_payment_id?: string | null; frente: string }
 
@@ -86,7 +86,11 @@ export const ativa = (s: AssinaturaAsaas) => s.status === 'ACTIVE'
 //     (inclusive Serviços: vale mais que a descrição, que pode ter sido copiada);
 //   - senão, a descrição ("Catálogo" ou "Clubelly");
 //   - senão, Serviços.
-export function linhaDaAssinatura(s: AssinaturaAsaas, cliente: ClienteRec, faturas: Map<string, LinhaRec>): LinhaRec {
+export function linhaDaAssinatura(
+  s: Pick<AssinaturaAsaas, 'cobrancasRecentes' | 'descricao'>,
+  cliente: Pick<ClienteRec, 'tipo' | 'produto'>,
+  faturas: Map<string, LinhaRec>,
+): LinhaRec {
   if (cliente.tipo === 'saas') return saasDoCliente(cliente)!
   const pelaFatura = s.cobrancasRecentes.map((id) => faturas.get(id)).find(Boolean)
   return pelaFatura ?? linhaPelaDescricao(s.descricao) ?? 'agencia'
@@ -94,10 +98,10 @@ export function linhaDaAssinatura(s: AssinaturaAsaas, cliente: ClienteRec, fatur
 
 // Assinatura sem cliente ligado: só dá para ir pela descrição. Na dúvida, Catálogo
 // (onde está a maioria), para aparecer numa lista e você ligar ao cliente certo.
-export const linhaSemCliente = (s: AssinaturaAsaas): LinhaSaas => linhaPelaDescricao(s.descricao) ?? 'catalogo_place'
+export const linhaSemCliente = (s: Pick<AssinaturaAsaas, 'descricao'>): LinhaSaas => linhaPelaDescricao(s.descricao) ?? 'catalogo_place'
 
 // Fatura do Asaas → linha do lançamento ligado a ela.
-export const faturasDasLinhas = (lancamentos: LancRec[]) =>
+export const faturasDasLinhas = (lancamentos: Pick<LancRec, 'frente' | 'asaas_payment_id'>[]) =>
   new Map(lancamentos
     .filter((l) => (ehLinhaSaas(l.frente) || l.frente === 'agencia') && l.asaas_payment_id)
     .map((l) => [l.asaas_payment_id!, l.frente as LinhaRec]))

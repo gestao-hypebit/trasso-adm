@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TaxasAsaas } from '@/components/financeiro/taxas-asaas'
+import { AutomacoesAsaas } from '@/components/financeiro/automacoes-asaas'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, toISODateLocal } from '@/lib/utils'
 
@@ -344,6 +345,8 @@ export default function AsaasPage() {
             })}
           </CardContent>
         </Card>
+
+        <AutomacoesAsaas />
 
         <TaxasAsaas />
 

@@ -13,6 +13,8 @@ export type Movimentacao = {
   valor: number
   motivo: string | null
   observacoes: string | null
+  // 'asaas' = registrada sozinha pela integração (falta completar canal/motivo).
+  origem?: string
 }
 
 export type MetaMensal = {

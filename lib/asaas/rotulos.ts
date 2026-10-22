@@ -53,7 +53,7 @@ export const cicloLabel: Record<string, string> = {
 const porMes: Record<string, number> = {
   WEEKLY: 52 / 12, BIWEEKLY: 26 / 12, MONTHLY: 1, BIMONTHLY: 1 / 2, QUARTERLY: 1 / 3, SEMIANNUALLY: 1 / 6, YEARLY: 1 / 12,
 }
-export const valorMensal = (a: AssinaturaAsaas) => a.valor * (porMes[a.ciclo] ?? 1)
+export const valorMensal = (a: Pick<AssinaturaAsaas, 'valor' | 'ciclo'>) => a.valor * (porMes[a.ciclo] ?? 1)
 
 export const formaLabel: Record<string, string> = {
   PIX: 'PIX', BOLETO: 'Boleto', CREDIT_CARD: 'Cartão de crédito', DEBIT_CARD: 'Cartão de débito', UNDEFINED: 'Cliente escolhe',
