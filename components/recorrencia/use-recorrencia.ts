@@ -146,7 +146,7 @@ export function useRecorrencia() {
       porLinha,
       total: {
         mrrBruto: soma((l) => l.mrrBruto),
-        mrrLiquido: soma((l) => l.mrr.mrr),
+        mrrLiquido: soma((l) => l.mrrLiquido),
         ativas: soma((l) => l.ativas),
         emDia: soma((l) => l.emDia),
         assinaturas: soma((l) => l.totalAssinaturas),

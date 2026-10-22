@@ -41,6 +41,9 @@ export type Assinante = {
   empresa: string | null
   whatsapp: string | null
   mensalidade: number
+  // O que cai na conta por mês: a última mensalidade lançada (já sem a taxa do
+  // Asaas). Sem lançamento ainda (ex.: 1ª fatura não venceu) = a mensalidade.
+  liquido: number
   desde: string | null
   mesesPagos: number
   pagoEsteMes: boolean
@@ -77,14 +80,15 @@ export type Dados = {
 
 export const ativa = (s: AssinaturaAsaas) => s.status === 'ACTIVE'
 
-// Uma assinatura do Asaas é de um SaaS (Catálogo Place ou Clubelly) quando:
-//   - o cliente é do tipo "saas" (só tem SaaS): vale o produto do cadastro; ou
-//   - alguma fatura dela está ligada a um lançamento desse SaaS no financeiro; ou
-//   - a descrição dela fala em "Catálogo" ou "Clubelly".
-// Senão, é de Serviços.
-export function linhaDaAssinatura(s: AssinaturaAsaas, cliente: ClienteRec, faturasSaas: Map<string, LinhaSaas>): LinhaRec {
+// Linha de uma assinatura do Asaas:
+//   - cliente do tipo "saas" (só tem SaaS): o produto do cadastro;
+//   - senão, a linha do lançamento ligado a alguma fatura dela no financeiro
+//     (inclusive Serviços: vale mais que a descrição, que pode ter sido copiada);
+//   - senão, a descrição ("Catálogo" ou "Clubelly");
+//   - senão, Serviços.
+export function linhaDaAssinatura(s: AssinaturaAsaas, cliente: ClienteRec, faturas: Map<string, LinhaRec>): LinhaRec {
   if (cliente.tipo === 'saas') return saasDoCliente(cliente)!
-  const pelaFatura = s.cobrancasRecentes.map((id) => faturasSaas.get(id)).find(Boolean)
+  const pelaFatura = s.cobrancasRecentes.map((id) => faturas.get(id)).find(Boolean)
   return pelaFatura ?? linhaPelaDescricao(s.descricao) ?? 'agencia'
 }
 
@@ -92,9 +96,11 @@ export function linhaDaAssinatura(s: AssinaturaAsaas, cliente: ClienteRec, fatur
 // (onde está a maioria), para aparecer numa lista e você ligar ao cliente certo.
 export const linhaSemCliente = (s: AssinaturaAsaas): LinhaSaas => linhaPelaDescricao(s.descricao) ?? 'catalogo_place'
 
-// Fatura do Asaas → linha SaaS do lançamento ligado a ela.
-export const faturasDosSaas = (lancamentos: LancRec[]) =>
-  new Map(lancamentos.filter((l) => ehLinhaSaas(l.frente) && l.asaas_payment_id).map((l) => [l.asaas_payment_id!, l.frente as LinhaSaas]))
+// Fatura do Asaas → linha do lançamento ligado a ela.
+export const faturasDasLinhas = (lancamentos: LancRec[]) =>
+  new Map(lancamentos
+    .filter((l) => (ehLinhaSaas(l.frente) || l.frente === 'agencia') && l.asaas_payment_id)
+    .map((l) => [l.asaas_payment_id!, l.frente as LinhaRec]))
 
 // Assinaturas do Asaas de clientes que não estão ligados a ninguém no sistema
 // (as removidas ficam de fora: não há o que ligar).
@@ -110,12 +116,12 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
   const mensalidades = daLinha.filter(recorrente)
   const mrr = calcularMrr(mensalidades, hoje)
   const ehSaas = linha !== 'agencia'
-  const faturasSaas = faturasDosSaas(dados.lancamentos)
+  const faturas = faturasDasLinhas(dados.lancamentos)
 
   // Assinaturas do cliente: as desta linha primeiro, ativas antes das canceladas.
   const assinaturasDo = (c: ClienteRec) => {
     if (!c.asaas_customer_id) return { todas: [] as AssinaturaAsaas[], daLinha: [] as AssinaturaAsaas[] }
-    const ehDaLinha = (s: AssinaturaAsaas) => linhaDaAssinatura(s, c, faturasSaas) === linha
+    const ehDaLinha = (s: AssinaturaAsaas) => linhaDaAssinatura(s, c, faturas) === linha
     const peso = (s: AssinaturaAsaas) => Number(ehDaLinha(s)) * 2 + Number(ativa(s))
     const todas = assinaturas.filter((s) => s.customerId === c.asaas_customer_id).sort((a, b) => peso(b) - peso(a))
     return { todas, daLinha: todas.filter(ehDaLinha) }
@@ -185,6 +191,7 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     return {
       chave: c.id, clienteId: c.id, nome: c.nome.trim(), empresa: c.empresa, whatsapp: c.whatsapp ?? c.telefone,
       mensalidade: peloAsaas ? ativas.reduce((t, s) => t + valorMensal(s), 0) : a?.valorMensal ?? 0,
+      liquido: a?.valorMensal ?? (peloAsaas ? ativas.reduce((t, s) => t + valorMensal(s), 0) : 0),
       desde: a?.desde ?? null, mesesPagos: a?.mesesPagos ?? 0,
       pagoEsteMes: (a?.pagoEsteMes ?? false) || (peloAsaas && subs.daLinha.some((s) => s.cobrancasRecentes.some((id) => faturasPagasMes.has(id)))),
       ativo: peloAsaas ? ativas.length > 0 : !cancelada && !!a,
@@ -202,7 +209,7 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     if (base.some((c) => c.id === a.chave)) continue
     linhas.push({
       chave: a.chave, clienteId: a.chave.startsWith('d:') ? null : a.chave, nome: a.nome, empresa: null, whatsapp: a.whatsapp,
-      mensalidade: a.valorMensal, desde: a.desde, mesesPagos: a.mesesPagos, pagoEsteMes: a.pagoEsteMes, ativo: true,
+      mensalidade: a.valorMensal, liquido: a.valorMensal, desde: a.desde, mesesPagos: a.mesesPagos, pagoEsteMes: a.pagoEsteMes, ativo: true,
       atraso: 0, diasAtraso: 0, status: null, asaasCustomerId: null, assinaturas: [], idsDaLinha: [], fonte: 'financeiro',
       historico: [], soNoAsaas: false, cancelada: false, pagamentos: a.mesesPagos, ultimoPagamento: null,
     })
@@ -219,7 +226,7 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       linhas.push({
         chave: `a:${customerId}`, clienteId: null, nome: s0.customerNome ?? 'Cliente do Asaas', empresa: s0.customerEmail,
         whatsapp: s0.customerTelefone,
-        mensalidade: subs.filter(ativa).reduce((t, s) => t + valorMensal(s), 0), desde: null, mesesPagos: 0,
+        mensalidade: subs.filter(ativa).reduce((t, s) => t + valorMensal(s), 0), liquido: 0, desde: null, mesesPagos: 0,
         pagoEsteMes: false, ativo: subs.some(ativa), atraso: 0, diasAtraso: 0, status: null,
         asaasCustomerId: customerId, assinaturas: subs.sort((a, b) => Number(ativa(b)) - Number(ativa(a))),
         idsDaLinha: subs.map((s) => s.id), fonte: 'asaas', historico: [], soNoAsaas: true,
@@ -235,11 +242,14 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
   // da contagem (tem a própria aba), mas segue no MRR até cancelar.
   const emDia = ativas.filter((l) => l.atraso === 0)
   const mrrBruto = ativas.reduce((t, l) => t + l.mensalidade, 0)
+  // Líquido das mesmas assinaturas do bruto (quem cancelou não entra em nenhum dos dois).
+  const mrrLiquido = ativas.reduce((t, l) => t + l.liquido, 0)
   return {
     linha,
-    mrr, // calculado pelos lançamentos (líquido, histórico, novos/churn)
+    mrr, // calculado pelos lançamentos (histórico, novos/churn)
     linhas,
     mrrBruto,
+    mrrLiquido,
     viaAsaas: ativas.filter((l) => l.fonte === 'asaas').length,
     viaFinanceiro: ativas.filter((l) => l.fonte === 'financeiro').length,
     totalAtraso: emAtraso.reduce((s, l) => s + l.atraso, 0),

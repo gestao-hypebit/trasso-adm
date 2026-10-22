@@ -27,6 +27,9 @@ type Lancamento = {
   frente: Linha
   categoria_id: string | null
   asaas_criado: boolean
+  // Cobrado e líquido no Asaas (taxa = diferença). Nulo fora do Asaas ou sem a migration das taxas.
+  asaas_valor?: number | null
+  asaas_valor_liquido?: number | null
   categorias_financeiras: { nome: string } | null
   clientes: { nome: string; whatsapp: string | null; telefone: string | null } | null
 }
@@ -74,13 +77,14 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
 
   const load = useCallback(async () => {
     const db = createClient() as any
-    const [{ data }, { data: cats }] = await Promise.all([
-      db.from('lancamentos')
-        .select('id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categoria_id, asaas_criado, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)')
-        .eq('tipo', tipo)
-        .order('data', { ascending: true }),
+    const campos = 'id, descricao, valor, data, status, forma_pagamento, recorrente, frequencia, frente, categoria_id, asaas_criado, categorias_financeiras(nome), clientes(nome, whatsapp, telefone)'
+    const buscar = (c: string) => db.from('lancamentos').select(c).eq('tipo', tipo).order('data', { ascending: true })
+    const [comTaxa, { data: cats }] = await Promise.all([
+      buscar(`${campos}, asaas_valor, asaas_valor_liquido`),
       db.from('categorias_financeiras').select('id, nome, frente').eq('tipo', tipo).order('nome'),
     ])
+    // Sem a migration 20261023000000_asaas_taxas.sql as colunas da taxa não existem.
+    const { data } = comTaxa.error ? await buscar(campos) : comTaxa
     setLancamentos((data as Lancamento[]) ?? [])
     setCategorias(cats ?? [])
     setLoading(false)
@@ -467,6 +471,11 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                             >
                               {formatCurrency(l.valor)}
                             </button>
+                          )}
+                          {l.asaas_valor != null && l.asaas_valor_liquido != null && Number(l.asaas_valor) > Number(l.asaas_valor_liquido) && (
+                            <span className="block text-[11px] text-brand-lavanda/40" title={`Cobrado ${formatCurrency(Number(l.asaas_valor))} · caiu na conta ${formatCurrency(Number(l.asaas_valor_liquido))}`}>
+                              taxa Asaas {formatCurrency(Number(l.asaas_valor) - Number(l.asaas_valor_liquido))}{l.status !== 'recebido' && ' (estimada)'}
+                            </span>
                           )}
                         </td>
                         <td className="px-3 py-3 text-center whitespace-nowrap">

@@ -54,6 +54,18 @@ export type Contexto = {
   assinaturas?: Map<string, boolean>
   // Por que o cliente não foi achado (para a pendência/prévia).
   motivoCliente?: string
+  // Já existem as colunas de taxa (migration 20261023000000_asaas_taxas.sql)?
+  colunasTaxa?: boolean
+}
+
+// Sem a migration das taxas as colunas não existem: grava sem elas, para a
+// integração não parar.
+async function camposTaxa(ctx: Contexto, p: AsaasPayment) {
+  if (ctx.colunasTaxa === undefined) {
+    const { error } = await ctx.supabase.from('lancamentos').select('asaas_valor').limit(1)
+    ctx.colunasTaxa = !error
+  }
+  return ctx.colunasTaxa ? { asaas_valor: Number(p.value), asaas_valor_liquido: liquido(p) } : {}
 }
 
 const so = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '')
@@ -168,7 +180,11 @@ export async function processarCobranca(
   const base = { paymentId: p.id, vencimento: p.dueDate, valorAsaas: Number(p.value), valorLiquido: liquido(p), status: p.status }
   const excluida = opcoes.excluida || p.deleted
   const status = statusDoLancamento(p.status)
-  const camposAsaas = { asaas_status: excluida ? 'DELETED' : p.status, asaas_invoice_url: p.invoiceUrl }
+  const camposAsaas = {
+    asaas_status: excluida ? 'DELETED' : p.status,
+    asaas_invoice_url: p.invoiceUrl,
+    ...(ctx.simular ? {} : await camposTaxa(ctx, p)),
+  }
 
   // 1. Já ligada
   const { data: ligado } = await ctx.supabase

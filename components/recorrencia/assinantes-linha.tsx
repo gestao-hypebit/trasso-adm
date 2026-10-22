@@ -141,7 +141,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
           sub={r.asaasCarregando
             ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> buscando no Asaas…</span>
             : <span title={`Bruto: valor cobrado nas assinaturas ativas (${calc.viaAsaas} pelo Asaas, ${calc.viaFinanceiro} pelo financeiro). Líquido: mensalidades lançadas no financeiro, já sem as taxas do Asaas.`}>
-                Bruto · líquido <span className="text-brand-lavanda/70">{formatCurrency(calc.mrr.mrr)}</span>
+                Bruto · líquido <span className="text-brand-lavanda/70">{formatCurrency(calc.mrrLiquido)}</span>
               </span>}
         />
         <KpiCard
@@ -308,7 +308,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
       <p className="text-[11px] text-brand-lavanda/40">
         Clique num assinante para ver a assinatura e as faturas do Asaas e para descrever o serviço (ex.: social media, software sob demanda).
         MRR bruto = assinaturas ativas no Asaas (valor cobrado, planos não mensais convertidos para mensal); quem não está no Asaas entra pelo valor lançado no financeiro.
-        MRR líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas.
+        MRR líquido = das mesmas assinaturas ativas, pela última mensalidade lançada no financeiro (já sem as taxas do Asaas).
         Ativas = tem assinatura ativa (ou mensalidade lançada neste mês ou no anterior) e nada vencido. Inadimplentes = tem mensalidade vencida e não paga; seguem no MRR até cancelar. Canceladas = a assinatura foi cancelada no Asaas depois de ter tido pagamento e não há pagamento por fora.
         {linha === 'agencia' && ' Aqui entram só clientes com mensalidade de serviço (software, social…); projetos avulsos ficam de fora.'}
         {calc.semCliente > 0 && ` ${calc.semCliente} assinante(s) aparecem só pela descrição do lançamento, sem cliente cadastrado; nos próximos lançamentos, escolha o cliente.`}

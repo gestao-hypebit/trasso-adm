@@ -43,6 +43,8 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
     ...Object.fromEntries(linhas.map((l) => [l.linha, l.mrr.serie[i]?.mrr ?? 0])),
   }))
   const nomeMesPassado = mesLabel(base[10].mesKey, 'MMMM').toLowerCase()
+  // Enquanto o Asaas não responde, os números saem só do financeiro e ainda vão mudar.
+  const carregando = r.asaasCarregando ? <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-brand-lavanda/30" /> : null
   // Serviços embaixo na pilha; os SaaS por cima.
   const naPilha = [...linhas].reverse()
   // Leva para a primeira linha com assinatura sem cliente ligado.
@@ -133,9 +135,9 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
                         {bruto > 0 && <span className="text-xs font-normal text-brand-lavanda/40">{pct(l.mrrBruto / bruto)}</span>}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-brand-lavanda/70">{l.emDia}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-brand-lavanda">{formatCurrency(l.mrrBruto)}</td>
-                    <td className="px-4 py-3 text-right text-brand-lavanda/60">{formatCurrency(l.mrr.mrr)}</td>
+                    <td className="px-4 py-3 text-right text-brand-lavanda/70">{carregando ?? l.emDia}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-brand-lavanda">{carregando ?? formatCurrency(l.mrrBruto)}</td>
+                    <td className="px-4 py-3 text-right text-brand-lavanda/60">{carregando ?? formatCurrency(l.mrrLiquido)}</td>
                     <td className={cn('px-4 py-3 text-right', l.totalAtraso > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/30')}>
                       {l.totalAtraso > 0 ? <>{formatCurrency(l.totalAtraso)} <span className="text-[11px]">({l.inadimplentes})</span></> : '—'}
                     </td>
@@ -144,9 +146,9 @@ export function VisaoGeral({ r, onAbrir }: { r: Recorrencia; onAbrir: (linha: Li
                 ))}
                 <tr className="bg-white/[0.02] font-semibold">
                   <td className="px-6 py-3 text-brand-lavanda">Agência (total)</td>
-                  <td className="px-4 py-3 text-right text-brand-lavanda">{emDia}</td>
-                  <td className="px-4 py-3 text-right text-brand-lima">{formatCurrency(bruto)}</td>
-                  <td className="px-4 py-3 text-right text-brand-lavanda/70">{formatCurrency(liquido)}</td>
+                  <td className="px-4 py-3 text-right text-brand-lavanda">{carregando ?? emDia}</td>
+                  <td className="px-4 py-3 text-right text-brand-lima">{carregando ?? formatCurrency(bruto)}</td>
+                  <td className="px-4 py-3 text-right text-brand-lavanda/70">{carregando ?? formatCurrency(liquido)}</td>
                   <td className={cn('px-4 py-3 text-right', atraso > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/30')}>{atraso > 0 ? formatCurrency(atraso) : '—'}</td>
                   <td />
                 </tr>
