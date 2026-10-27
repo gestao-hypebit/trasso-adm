@@ -9,11 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AnunciosSubNav } from '@/components/anuncios/anuncios-sub-nav'
+import { EditorFunil } from '@/components/anuncios/editor-funil'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { COLUNAS_MARCA, type Marca } from '@/components/anuncios/use-anuncios'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, formatRelative } from '@/lib/utils'
 
 type Conta = { id: string; plataforma: string; account_id: string; nome: string; historico_desde: string | null; backfill_concluido_em: string | null; ultima_sync_em: string | null }
+type Pixel = { pixel_id: string; nome: string; marca_id: string | null; ultimo_disparo: string | null; historico_desde: string | null; erro: string | null }
 type Sync = { id: string; conta_id: string; gatilho: string; status: string; periodo_de: string | null; periodo_ate: string | null; linhas: number; campanhas: number; chamadas: number; mensagem: string | null; iniciado_em: string; finalizado_em: string | null }
 
 const STATUS_SYNC: Record<string, string> = {
@@ -24,6 +27,8 @@ export default function ConfiguracoesAnunciosPage() {
   const [marcas, setMarcas] = useState<Marca[]>([])
   const [contas, setContas] = useState<Conta[]>([])
   const [log, setLog] = useState<Sync[]>([])
+  const [pixels, setPixels] = useState<Pixel[]>([])
+  const [eventosPixel, setEventosPixel] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [recarregar, setRecarregar] = useState(0)
@@ -33,15 +38,20 @@ export default function ConfiguracoesAnunciosPage() {
   useEffect(() => {
     const supabase = createClient() as any
     async function load() {
-      const [m, c, l] = await Promise.all([
+      const [m, c, l, p, ev] = await Promise.all([
         supabase.from('anuncio_marcas').select(COLUNAS_MARCA).order('nome'),
         supabase.from('anuncio_contas').select('id, plataforma, account_id, nome, historico_desde, backfill_concluido_em, ultima_sync_em').order('created_at'),
         supabase.from('anuncio_sincronizacoes').select('*').order('iniciado_em', { ascending: false }).limit(20),
+        supabase.from('anuncio_pixels').select('pixel_id, nome, marca_id, ultimo_disparo, historico_desde, erro').order('nome'),
+        // Eventos já vistos nos pixels (inclui personalizados), para o editor do funil.
+        supabase.from('anuncio_pixel_eventos_diarios').select('evento').order('data', { ascending: false }).limit(1000),
       ])
       if (m.error || c.error) setErro('Não foi possível carregar. A migration de anúncios já foi aplicada no Supabase?')
       setMarcas(m.data ?? [])
       setContas(c.data ?? [])
       setLog(l.data ?? [])
+      setPixels(p.data ?? [])
+      setEventosPixel([...new Set<string>((ev.data ?? []).map((x: { evento: string }) => x.evento))].sort())
       setLoading(false)
     }
     load()
@@ -96,7 +106,42 @@ export default function ConfiguracoesAnunciosPage() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {marcas.map((m) => <MarcaForm key={m.id} marca={m} onSalvo={() => setRecarregar((n) => n + 1)} />)}
+                {marcas.map((m) => <MarcaForm key={m.id} marca={m} eventosPixel={eventosPixel} onSalvo={() => setRecarregar((n) => n + 1)} />)}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Pixels</CardTitle>
+                <p className="text-xs text-brand-lavanda/40">
+                  Descobertos na sincronização. Ligue cada pixel à marca do site em que ele está: é ele que alimenta o funil “Site (todo o tráfego)”.
+                  Guarda até 90 dias de histórico. Se der “sem permissão”, atribua o pixel ao Usuário do Sistema no Business Manager.
+                </p>
+              </CardHeader>
+              <CardContent className="divide-y divide-white/[0.04]">
+                {pixels.length === 0 ? <p className="py-4 text-center text-sm text-brand-lavanda/40">Nenhum pixel ainda. Clique em “Atualizar agora”.</p> : pixels.map((px) => (
+                  <div key={px.pixel_id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="text-brand-lavanda">{px.nome} <span className="text-brand-lavanda/40">· {px.pixel_id}</span></p>
+                      <p className="text-xs text-brand-lavanda/40">
+                        Último disparo: {px.ultimo_disparo ? formatRelative(px.ultimo_disparo) : '—'}
+                        {px.historico_desde && ` · dados desde ${formatDate(px.historico_desde)}`}
+                      </p>
+                      {px.erro && <p className="text-xs text-brand-rosa">{px.erro}</p>}
+                    </div>
+                    <Select value={px.marca_id ?? 'nenhuma'} onValueChange={async (v) => {
+                      const { error } = await (createClient() as any).from('anuncio_pixels').update({ marca_id: v === 'nenhuma' ? null : v }).eq('pixel_id', px.pixel_id)
+                      if (error) setAviso('Não foi possível ligar o pixel à marca.')
+                      else setRecarregar((n) => n + 1)
+                    }}>
+                      <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {marcas.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                        <SelectItem value="nenhuma">Sem marca</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -166,7 +211,7 @@ export default function ConfiguracoesAnunciosPage() {
   )
 }
 
-function MarcaForm({ marca, onSalvo }: { marca: Marca; onSalvo: () => void }) {
+function MarcaForm({ marca, eventosPixel, onSalvo }: { marca: Marca; eventosPixel: string[]; onSalvo: () => void }) {
   const [nome, setNome] = useState(marca.nome)
   const [prefixos, setPrefixos] = useState(marca.prefixos.join(', '))
   const [cor, setCor] = useState(marca.cor)
@@ -238,6 +283,7 @@ function MarcaForm({ marca, onSalvo }: { marca: Marca; onSalvo: () => void }) {
         </div>
       )}
       {msg && <p className="mt-2 text-xs text-brand-lavanda/60">{msg}</p>}
+      <EditorFunil marcaId={marca.id} inicial={marca.funil ?? []} eventosPixel={eventosPixel} />
     </div>
   )
 }

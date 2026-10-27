@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { buscarTudo } from '@/lib/anuncios/consulta'
+import type { Etapa } from '@/lib/anuncios/funil'
 import { clientesDoFunil, diaSP, somarDias, type ClienteFunil, type Evento, type Metrica } from '@/lib/anuncios/regras'
 
-export type Marca = { id: string; nome: string; slug: string; prefixos: string[]; cor: string; ativo: boolean; api_key_criada_em: string | null }
+export type Marca = { id: string; nome: string; slug: string; prefixos: string[]; cor: string; ativo: boolean; api_key_criada_em: string | null; funil: Etapa[] }
 export type Campanha = {
   campaign_id: string; nome: string; status: string | null; effective_status: string | null
   orcamento_diario: number | null; orcamento_total: number | null
@@ -13,7 +14,7 @@ export type Campanha = {
 }
 
 // Colunas explícitas: o hash da chave não é legível pelo navegador.
-export const COLUNAS_MARCA = 'id, nome, slug, prefixos, cor, ativo, api_key_criada_em'
+export const COLUNAS_MARCA = 'id, nome, slug, prefixos, cor, ativo, api_key_criada_em, funil'
 
 export const PERIODOS = [
   { value: '7', label: '7 dias' },

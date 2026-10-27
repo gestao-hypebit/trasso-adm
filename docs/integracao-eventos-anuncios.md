@@ -35,6 +35,30 @@ No Catálogo Place:
   seguintes (ativação, assinatura, cancelamento) reaproveitam os mesmos valores.
   O administrativo também atribui pelo histórico do cliente, mas mandar sempre é mais seguro.
 
+## 2.1. Eventos do Meta Pixel (para o funil)
+
+A aba **Anúncios → Funil** mostra o caminho de quem vê a página até quem assina.
+As etapas do pixel só aparecem se o site disparar os eventos. Use **eventos padrão**:
+nos insights dos anúncios, os personalizados chegam todos juntos, sem nome, e não
+dá para separar um do outro.
+
+| Momento | Chamada no site |
+|---|---|
+| Página carregada | `fbq('track', 'PageView')` (já vem no código base do pixel) |
+| Clicou em "Teste grátis" | `fbq('track', 'InitiateCheckout')` |
+| Concluiu o cadastro | `fbq('track', 'CompleteRegistration')` |
+| Teste iniciado (se for um passo à parte) | `fbq('track', 'StartTrial', { value: 0, currency: 'BRL' })` |
+| Pagou a assinatura | `fbq('track', 'Subscribe', { value: 89.9, currency: 'BRL' })` |
+
+- Dispare cada evento **uma vez por ação** (ex.: no clique do botão, não a cada render).
+- Se o cadastro/assinatura também for enviado pelo servidor (Conversions API), use o
+  mesmo `eventID` no navegador e no servidor para o Meta não contar duas vezes.
+- O pixel precisa estar atribuído ao Usuário do Sistema no Business Manager
+  (Configurações do negócio → Usuários do sistema → Atribuir ativos → Conjuntos de
+  dados/Pixels → "Ver"). Sem isso, o funil "Site (todo o tráfego)" não consegue ler os números.
+- Os eventos do pixel medem o comportamento no site. Os números **reais** de cadastro e
+  assinatura continuam vindo do endpoint abaixo, que é o que conta para CAC e receita.
+
 ## 3. Endpoint
 
 ```

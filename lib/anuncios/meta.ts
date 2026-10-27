@@ -185,3 +185,32 @@ export async function campanhas(ctx: Contexto, accountId: string) {
   }
   return { campanhas: out, limite }
 }
+
+// ---------------------------------------------------------------
+// Pixels (todo o tráfego do site, não só anúncio)
+// ---------------------------------------------------------------
+export type Pixel = { pixel_id: string; nome: string; ultimo_disparo: string | null }
+
+export async function pixels(ctx: Contexto, accountId: string) {
+  const out: Pixel[] = []
+  for await (const p of paginar<{ id: string; name: string; last_fired_time?: string }>(ctx, `${accountId}/adspixels`, { fields: 'id,name,last_fired_time', limit: '100' })) {
+    for (const x of p.itens) out.push({ pixel_id: x.id, nome: x.name, ultimo_disparo: x.last_fired_time ?? null })
+  }
+  return out
+}
+
+type BaldeStats = { start_time: string; data?: { value: string; count: number | string }[] }
+
+// Contagem de eventos do pixel por hora, entre `de` e `ate` (dias de São Paulo, inclusive).
+// O Meta devolve baldes de 1 hora em UTC; quem chama soma por dia no fuso certo.
+export async function* estatisticasPixel(ctx: Contexto, pixelId: string, de: string, ate: string) {
+  const inicio = Math.floor(new Date(`${de}T00:00:00-03:00`).getTime() / 1000)
+  const fim = Math.floor(new Date(`${ate}T23:59:59-03:00`).getTime() / 1000) + 1
+  const params = { aggregation: 'event', start_time: String(inicio), end_time: String(fim), limit: '500' }
+  for await (const p of paginar<BaldeStats>(ctx, `${pixelId}/stats`, params)) {
+    yield {
+      limite: p.limite,
+      baldes: p.itens.map((b) => ({ inicio: b.start_time, eventos: (b.data ?? []).map((e) => ({ evento: e.value, quantidade: Number(e.count) || 0 })) })),
+    }
+  }
+}

@@ -7,6 +7,7 @@ import { PERIODOS } from '@/components/anuncios/use-anuncios'
 
 const itens = [
   { href: '/anuncios', label: 'Visão geral' },
+  { href: '/anuncios/funil', label: 'Funil' },
   { href: '/anuncios/sem-marca', label: 'Campanhas sem marca' },
   { href: '/anuncios/configuracoes', label: 'Configurações' },
 ]
@@ -16,7 +17,7 @@ export function AnunciosSubNav({ semMarca = 0 }: { semMarca?: number }) {
   return (
     <div className="flex gap-1 border-b border-white/[0.06] mb-6 overflow-x-auto">
       {itens.map(({ href, label }) => {
-        const ativo = href === '/anuncios' ? pathname === href || /^\/anuncios\/(?!sem-marca|configuracoes)/.test(pathname) : pathname.startsWith(href)
+        const ativo = href === '/anuncios' ? pathname === href || /^\/anuncios\/(?!sem-marca|configuracoes|funil)/.test(pathname) : pathname.startsWith(href)
         return (
           <Link key={href} href={href} className={cn(
             'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap',

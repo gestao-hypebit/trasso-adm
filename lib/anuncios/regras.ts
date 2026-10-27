@@ -75,8 +75,7 @@ export const janelaRecente = (hoje: string) => ({ de: somarDias(hoje, -(DIAS_REP
 // Próximo bloco da carga do histórico, de trás para frente: termina no dia
 // anterior ao mais antigo já carregado (ou hoje, na primeira vez) e para no
 // limite do Meta. `fim` = este é o último bloco.
-export function janelaHistorico(hoje: string, historicoDesde: string | null, bloco = DIAS_POR_BLOCO) {
-  const limite = inicioHistorico(hoje)
+export function janelaHistorico(hoje: string, historicoDesde: string | null, bloco = DIAS_POR_BLOCO, limite = inicioHistorico(hoje)) {
   const ate = historicoDesde ? somarDias(historicoDesde, -1) : hoje
   const de = somarDias(ate, -(bloco - 1))
   return de <= limite ? { de: limite, ate, fim: true } : { de, ate, fim: false }
@@ -156,6 +155,7 @@ export type ClienteFunil = {
   ad_id: string | null
   campaign_id: string | null
   cadastro: string | null         // dia (SP) do primeiro cadastro
+  primeira_ativacao: string | null
   primeira_assinatura: string | null
   mrr: number                     // valor da assinatura vigente (0 se cancelou depois)
 }
@@ -173,6 +173,7 @@ export function clientesDoFunil(eventos: Evento[]): ClienteFunil[] {
     lista.sort((a, b) => a.ocorrido_em.localeCompare(b.ocorrido_em))
     const origem = lista.find((e) => e.de_anuncio && (e.ad_id || e.campaign_id)) ?? lista.find((e) => e.de_anuncio)
     const cadastro = lista.find((e) => e.tipo === 'cadastro')
+    const ativacao = lista.find((e) => e.tipo === 'ativacao')
     const assinaturas = lista.filter((e) => e.tipo === 'assinatura')
     // Vigente: a última assinatura, se não houve cancelamento depois dela.
     const ultimaAss = assinaturas.at(-1)
@@ -185,6 +186,7 @@ export function clientesDoFunil(eventos: Evento[]): ClienteFunil[] {
       ad_id: origem?.ad_id ?? null,
       campaign_id: origem?.campaign_id ?? null,
       cadastro: cadastro ? diaSP(cadastro.ocorrido_em) : null,
+      primeira_ativacao: ativacao ? diaSP(ativacao.ocorrido_em) : null,
       primeira_assinatura: assinaturas[0] ? diaSP(assinaturas[0].ocorrido_em) : null,
       mrr: vigente ? Number(ultimaAss!.valor ?? 0) : 0,
     })

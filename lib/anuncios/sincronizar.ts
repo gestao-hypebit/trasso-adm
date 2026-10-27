@@ -1,7 +1,8 @@
 import 'server-only'
 import { buscarTudo, emBlocos } from '@/lib/anuncios/consulta'
-import { campanhas as buscarCampanhas, insightsPorAnuncio, MetaErro, type Contexto, type LinhaInsight } from '@/lib/anuncios/meta'
-import { DIAS_POR_BLOCO, DIAS_POR_BLOCO_MENOR, diaSP, janelaHistorico, janelaRecente, limparSegredos, marcaPorPrefixo } from '@/lib/anuncios/regras'
+import { campanhas as buscarCampanhas, estatisticasPixel, insightsPorAnuncio, MetaErro, pixels as buscarPixels, type Contexto, type LinhaInsight } from '@/lib/anuncios/meta'
+import { somarPixelPorDia } from '@/lib/anuncios/funil'
+import { DIAS_POR_BLOCO, DIAS_POR_BLOCO_MENOR, diaSP, janelaHistorico, janelaRecente, limparSegredos, marcaPorPrefixo, somarDias } from '@/lib/anuncios/regras'
 
 // Sincronização Meta → banco. Roda pelo cron diário e pelo botão "Atualizar agora".
 //   1. campanhas (status e orçamento atuais)
@@ -9,8 +10,10 @@ import { DIAS_POR_BLOCO, DIAS_POR_BLOCO_MENOR, diaSP, janelaHistorico, janelaRec
 //      - os últimos 7 dias, em toda rodada (o Meta corrige números para trás);
 //      - o histórico, de trás para frente em blocos de 30 dias, até os 37 meses
 //        que o Meta guarda. Leva algumas rodadas; o mais recente aparece primeiro.
-//   3. campanha → marca pelo prefixo (atribuição manual nunca é tocada)
-//   4. liga eventos de funil às campanhas
+//   3. pixels da conta: contagem de eventos por dia (todo o tráfego do site).
+//      Falha aqui (ex.: pixel sem permissão) não derruba a sincronização dos anúncios.
+//   4. campanha → marca pelo prefixo (atribuição manual nunca é tocada)
+//   5. liga eventos de funil às campanhas
 // Se o tempo da execução ou o limite do Meta acabar no meio, fica "parcial" e
 // a próxima rodada continua de onde parou. Nada é duplicado (upsert por data + ad_id).
 
@@ -133,7 +136,13 @@ async function sincronizarConta(supabase: any, conta: Conta, gatilho: 'cron' | '
       if (error) throw new Error(error.message)
     }
 
-    // 3 e 4. Marcas e eventos
+    // 3. Pixels
+    if (status === 'ok' && Date.now() < prazo - 10_000) {
+      const avisoPixel = await sincronizarPixels(supabase, ctx, conta, hoje)
+      if (avisoPixel) mensagem = mensagem ? `${mensagem} ${avisoPixel}` : avisoPixel
+    }
+
+    // 4 e 5. Marcas e eventos
     await atribuirMarcas(supabase)
     const { error: erroEventos } = await supabase.rpc('anuncio_resolver_eventos')
     if (erroEventos) throw new Error(erroEventos.message)
@@ -192,4 +201,76 @@ export async function atribuirMarcas(supabase: any) {
     if (error) throw new Error(error.message)
   }
   return mudancas.length
+}
+
+// ---------------------------------------------------------------
+// Pixels
+// ---------------------------------------------------------------
+const DIAS_HISTORICO_PIXEL = 90
+const DIAS_BLOCO_PIXEL = 7
+
+// Descobre os pixels da conta, liga à marca pelo nome (se ainda não tiver) e
+// grava a contagem diária: os últimos 7 dias sempre e, enquanto der tempo, mais
+// um pedaço do histórico (até 90 dias). Devolve um aviso para o log, ou null.
+async function sincronizarPixels(supabase: any, ctx: Contexto, conta: Conta, hoje: string): Promise<string | null> {
+  let lista
+  try {
+    lista = await buscarPixels(ctx, conta.account_id)
+  } catch (e) {
+    return `Pixels: não foi possível listar (${e instanceof Error ? e.message : String(e)}).`
+  }
+  if (!lista.length) return null
+
+  const agora = new Date().toISOString()
+  const { error: e1 } = await supabase.from('anuncio_pixels')
+    .upsert(lista.map((p) => ({ ...p, conta_id: conta.id, atualizado_em: agora })), { onConflict: 'pixel_id' })
+  if (e1) throw new Error(e1.message)
+
+  const [{ data: salvos, error: e2 }, { data: marcas, error: e3 }] = await Promise.all([
+    supabase.from('anuncio_pixels').select('pixel_id, nome, marca_id, historico_desde').in('pixel_id', lista.map((p) => p.pixel_id)),
+    supabase.from('anuncio_marcas').select('id, prefixos'),
+  ])
+  if (e2 || e3) throw new Error((e2 ?? e3).message)
+
+  const limite = somarDias(hoje, -(DIAS_HISTORICO_PIXEL - 1))
+  const falhas: string[] = []
+  for (const px of salvos as { pixel_id: string; nome: string; marca_id: string | null; historico_desde: string | null }[]) {
+    if (!px.marca_id) {
+      const marca = marcaPorPrefixo(px.nome, marcas ?? [])
+      if (marca) await supabase.from('anuncio_pixels').update({ marca_id: marca }).eq('pixel_id', px.pixel_id)
+    }
+    try {
+      const recente = janelaRecente(hoje)
+      await gravarPixel(supabase, ctx, px.pixel_id, recente)
+      let desde = px.historico_desde ?? recente.de
+      // Histórico (até 90 dias), pedaço por pedaço enquanto sobra tempo.
+      while (desde > limite && Date.now() < ctx.prazo - 8_000) {
+        const j = janelaHistorico(hoje, desde, DIAS_BLOCO_PIXEL, limite)
+        await gravarPixel(supabase, ctx, px.pixel_id, j)
+        desde = j.de
+      }
+      await supabase.from('anuncio_pixels').update({ historico_desde: desde, erro: null }).eq('pixel_id', px.pixel_id)
+    } catch (e) {
+      const msg = limparSegredos(e instanceof Error ? e.message : String(e), [process.env.META_ACCESS_TOKEN])
+      await supabase.from('anuncio_pixels').update({ erro: msg }).eq('pixel_id', px.pixel_id)
+      falhas.push(px.nome)
+    }
+  }
+  return falhas.length ? `Pixels sem leitura: ${falhas.join(', ')} (veja em Configurações).` : null
+}
+
+async function gravarPixel(supabase: any, ctx: Contexto, pixelId: string, j: { de: string; ate: string }) {
+  const inicio = new Date().toISOString()
+  const baldes = []
+  for await (const p of estatisticasPixel(ctx, pixelId, j.de, j.ate)) baldes.push(...p.baldes)
+  const linhas = somarPixelPorDia(baldes, diaSP)
+    .filter((l) => l.data >= j.de && l.data <= j.ate)
+    .map((l) => ({ ...l, pixel_id: pixelId, sincronizado_em: new Date().toISOString() }))
+  for (const bloco of emBlocos(linhas)) {
+    const { error } = await supabase.from('anuncio_pixel_eventos_diarios').upsert(bloco, { onConflict: 'pixel_id,data,evento' })
+    if (error) throw new Error(error.message)
+  }
+  const { error } = await supabase.from('anuncio_pixel_eventos_diarios')
+    .delete().eq('pixel_id', pixelId).gte('data', j.de).lte('data', j.ate).lt('sincronizado_em', inicio)
+  if (error) throw new Error(error.message)
 }

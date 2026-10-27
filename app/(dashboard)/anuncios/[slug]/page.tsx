@@ -1,11 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { BadgeDollarSign, Megaphone, Repeat, UserPlus, Wallet } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { KpiCard } from '@/components/dashboard/kpi-card'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AnunciosSubNav, SeletorPeriodo } from '@/components/anuncios/anuncios-sub-nav'
 import { GraficoGasto } from '@/components/anuncios/grafico-gasto'
@@ -52,6 +54,7 @@ export default function MarcaAnunciosPage() {
       <main className="flex-1 p-4 md:p-6">
         <AnunciosSubNav />
         <PageHeader title={marca?.nome ?? 'Marca'} description={`${periodo === 'tudo' ? 'Desde o início: ' : ''}${formatDate(de)} a ${formatDate(ate)} · horário de Brasília`}>
+          {marca && <Button asChild size="sm" variant="outline"><Link href={`/anuncios/funil?marca=${marca.slug}`}>Ver funil</Link></Button>}
           <SeletorPeriodo value={periodo} onChange={setPeriodo} />
         </PageHeader>
 
