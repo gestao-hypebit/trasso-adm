@@ -1,18 +1,20 @@
 import 'server-only'
 import { buscarTudo, emBlocos } from '@/lib/anuncios/consulta'
 import { campanhas as buscarCampanhas, insightsPorAnuncio, MetaErro, type Contexto, type LinhaInsight } from '@/lib/anuncios/meta'
-import { diaSP, limparSegredos, marcaPorPrefixo, proximaJanela, somarDias } from '@/lib/anuncios/regras'
+import { DIAS_POR_BLOCO, DIAS_POR_BLOCO_MENOR, diaSP, janelaHistorico, janelaRecente, limparSegredos, marcaPorPrefixo } from '@/lib/anuncios/regras'
 
 // Sincronização Meta → banco. Roda pelo cron diário e pelo botão "Atualizar agora".
 //   1. campanhas (status e orçamento atuais)
-//   2. insights por anúncio e dia: primeira carga de 90 dias em blocos de 10;
-//      depois, sempre os últimos 7 dias (o Meta corrige números para trás)
+//   2. insights por anúncio e dia:
+//      - os últimos 7 dias, em toda rodada (o Meta corrige números para trás);
+//      - o histórico, de trás para frente em blocos de 30 dias, até os 37 meses
+//        que o Meta guarda. Leva algumas rodadas; o mais recente aparece primeiro.
 //   3. campanha → marca pelo prefixo (atribuição manual nunca é tocada)
 //   4. liga eventos de funil às campanhas
 // Se o tempo da execução ou o limite do Meta acabar no meio, fica "parcial" e
 // a próxima rodada continua de onde parou. Nada é duplicado (upsert por data + ad_id).
 
-type Conta = { id: string; account_id: string; plataforma: string; backfill_proximo: string | null; backfill_concluido_em: string | null }
+type Conta = { id: string; account_id: string; plataforma: string; historico_desde: string | null; backfill_concluido_em: string | null }
 
 export type ResultadoSync = {
   conta: string
@@ -30,7 +32,7 @@ export async function sincronizarTudo(supabase: any, gatilho: 'cron' | 'manual',
   const prazo = Date.now() + duracaoMs - MARGEM_MS
   const { data: contas, error } = await supabase
     .from('anuncio_contas')
-    .select('id, account_id, plataforma, backfill_proximo, backfill_concluido_em')
+    .select('id, account_id, plataforma, historico_desde, backfill_concluido_em')
     .eq('ativo', true)
     .eq('plataforma', 'meta') // Google Ads: ainda não implementado
   if (error) throw new Error(error.message)
@@ -77,39 +79,58 @@ async function sincronizarConta(supabase: any, conta: Conta, gatilho: 'cron' | '
     r.campanhas = c.campanhas.length
     if (c.limite) status = 'parcial'
 
-    // 2. Insights, janela por janela
+    // 2. Insights
     const hoje = diaSP(new Date())
-    let proximo = conta.backfill_proximo
-    let concluido = !!conta.backfill_concluido_em
-    while (status === 'ok') {
-      const j = proximaJanela(hoje, proximo, concluido)
+    const marcarPeriodo = (j: { de: string; ate: string }) => {
+      if (!r.de || j.de < r.de) r.de = j.de
+      if (!r.ate || j.ate > r.ate) r.ate = j.ate
+    }
+    // Busca uma janela inteira; false = parou no limite do Meta (a janela fica para a próxima).
+    const rodarJanela = async (j: { de: string; ate: string }) => {
       const inicioJanela = new Date().toISOString()
-      let limite = false
       for await (const pagina of insightsPorAnuncio(ctx, conta.account_id, j.de, j.ate)) {
         await gravarPagina(supabase, conta.id, pagina.linhas)
         r.linhas += pagina.linhas.length
-        if (pagina.limite) { limite = true; break }
+        if (pagina.limite) return false
       }
-      if (limite) { status = 'parcial'; mensagem = 'Limite de chamadas do Meta perto do fim; o resto vai na próxima rodada.'; break }
-
       // Janela completa: o que ficou com data dela e não veio de novo foi zerado
       // ou apagado no Meta.
-      const { error: erroLimpa } = await supabase.from('anuncio_metricas_diarias')
+      const { error } = await supabase.from('anuncio_metricas_diarias')
         .delete().eq('conta_id', conta.id).gte('data', j.de).lte('data', j.ate).lt('sincronizado_em', inicioJanela)
-      if (erroLimpa) throw new Error(erroLimpa.message)
-
-      r.de ??= j.de
-      r.ate = j.ate
-      if (!j.carga) break
-
-      proximo = somarDias(j.ate, 1)
-      concluido = proximo > hoje
-      const { error } = await supabase.from('anuncio_contas').update(
-        concluido ? { backfill_proximo: null, backfill_concluido_em: new Date().toISOString() } : { backfill_proximo: proximo },
-      ).eq('id', conta.id)
       if (error) throw new Error(error.message)
-      if (concluido) break
-      if (Date.now() > prazo - 10_000) { status = 'parcial'; mensagem = 'Primeira carga em andamento; continua na próxima rodada.'; break }
+      marcarPeriodo(j)
+      return true
+    }
+    const LIMITE = 'Limite de chamadas do Meta perto do fim; o resto vai na próxima rodada.'
+
+    let desde = conta.historico_desde
+    let concluido = !!conta.backfill_concluido_em
+    if (status === 'ok' && desde && !(await rodarJanela(janelaRecente(hoje)))) { status = 'parcial'; mensagem = LIMITE }
+
+    let bloco = DIAS_POR_BLOCO
+    while (status === 'ok' && !concluido) {
+      if (Date.now() > prazo - 15_000) {
+        status = 'parcial'
+        mensagem = `Carregando o histórico${desde ? ` (já desde ${desde.split('-').reverse().join('/')})` : ''}; continua na próxima rodada.`
+        break
+      }
+      const j = janelaHistorico(hoje, desde, bloco)
+      let completa: boolean
+      try {
+        completa = await rodarJanela(j)
+      } catch (e) {
+        // Bloco pesado demais para o Meta: tenta de novo com 7 dias.
+        if (e instanceof MetaErro && e.muitoDado && bloco > DIAS_POR_BLOCO_MENOR) { bloco = DIAS_POR_BLOCO_MENOR; continue }
+        throw e
+      }
+      if (!completa) { status = 'parcial'; mensagem = LIMITE; break }
+
+      desde = j.de
+      concluido = j.fim
+      const { error } = await supabase.from('anuncio_contas')
+        .update({ historico_desde: desde, backfill_concluido_em: concluido ? new Date().toISOString() : null })
+        .eq('id', conta.id)
+      if (error) throw new Error(error.message)
     }
 
     // 3 e 4. Marcas e eventos

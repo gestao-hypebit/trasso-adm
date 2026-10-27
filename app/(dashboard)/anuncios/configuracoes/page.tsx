@@ -13,7 +13,7 @@ import { COLUNAS_MARCA, type Marca } from '@/components/anuncios/use-anuncios'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, formatRelative } from '@/lib/utils'
 
-type Conta = { id: string; plataforma: string; account_id: string; nome: string; backfill_proximo: string | null; backfill_concluido_em: string | null; ultima_sync_em: string | null }
+type Conta = { id: string; plataforma: string; account_id: string; nome: string; historico_desde: string | null; backfill_concluido_em: string | null; ultima_sync_em: string | null }
 type Sync = { id: string; conta_id: string; gatilho: string; status: string; periodo_de: string | null; periodo_ate: string | null; linhas: number; campanhas: number; chamadas: number; mensagem: string | null; iniciado_em: string; finalizado_em: string | null }
 
 const STATUS_SYNC: Record<string, string> = {
@@ -35,7 +35,7 @@ export default function ConfiguracoesAnunciosPage() {
     async function load() {
       const [m, c, l] = await Promise.all([
         supabase.from('anuncio_marcas').select(COLUNAS_MARCA).order('nome'),
-        supabase.from('anuncio_contas').select('id, plataforma, account_id, nome, backfill_proximo, backfill_concluido_em, ultima_sync_em').order('created_at'),
+        supabase.from('anuncio_contas').select('id, plataforma, account_id, nome, historico_desde, backfill_concluido_em, ultima_sync_em').order('created_at'),
         supabase.from('anuncio_sincronizacoes').select('*').order('iniciado_em', { ascending: false }).limit(20),
       ])
       if (m.error || c.error) setErro('Não foi possível carregar. A migration de anúncios já foi aplicada no Supabase?')
@@ -109,8 +109,10 @@ export default function ConfiguracoesAnunciosPage() {
                       <p className="text-brand-lavanda">{c.nome} <span className="text-brand-lavanda/40">· {c.plataforma === 'meta' ? 'Meta' : 'Google Ads (em breve)'} · {c.account_id}</span></p>
                       <p className="text-xs text-brand-lavanda/40">
                         {c.backfill_concluido_em
-                          ? 'Primeira carga (90 dias) concluída'
-                          : c.backfill_proximo ? `Primeira carga em andamento: próximo dia ${formatDate(c.backfill_proximo)}` : 'Primeira carga ainda não feita'}
+                          ? `Histórico completo carregado (desde ${formatDate(c.historico_desde)}, limite de 37 meses do Meta)`
+                          : c.historico_desde
+                            ? `Carregando o histórico: já desde ${formatDate(c.historico_desde)}. Continua a cada sincronização (ou clique em “Atualizar agora”).`
+                            : 'Histórico ainda não carregado'}
                       </p>
                     </div>
                     <p className="text-xs text-brand-lavanda/50">Última sincronização: {c.ultima_sync_em ? formatRelative(c.ultima_sync_em) : 'nunca'}</p>
@@ -122,7 +124,7 @@ export default function ConfiguracoesAnunciosPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Sincronizações</CardTitle>
-                <p className="text-xs text-brand-lavanda/40">Todo dia às 06:00 (horário de Brasília) e pelo botão “Atualizar agora”. Sempre reprocessa os últimos 7 dias.</p>
+                <p className="text-xs text-brand-lavanda/40">Todo dia às 06:00 (horário de Brasília) e pelo botão “Atualizar agora”. Sempre reprocessa os últimos 7 dias; o histórico (até 37 meses) vai sendo completado de trás para frente.</p>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 {log.length === 0 ? <p className="py-6 text-center text-sm text-brand-lavanda/40">Nenhuma sincronização ainda.</p> : (

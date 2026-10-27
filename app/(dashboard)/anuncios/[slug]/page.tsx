@@ -19,8 +19,10 @@ const moeda = (v: number | null) => (v === null ? '—' : formatCurrency(v))
 export default function MarcaAnunciosPage() {
   const { slug } = useParams<{ slug: string }>()
   const [periodo, setPeriodo] = useState('30')
-  const { de, ate } = useMemo(() => intervalo(periodo), [periodo])
-  const a = useAnuncios(de, ate)
+  const busca = useMemo(() => intervalo(periodo), [periodo])
+  const a = useAnuncios(busca.de, busca.ate)
+  const ate = busca.ate
+  const de = periodo === 'tudo' ? a.inicio ?? ate : busca.de
   const marca = a.marcas.find((m) => m.slug === slug)
 
   const r = useMemo(() => {
@@ -49,7 +51,7 @@ export default function MarcaAnunciosPage() {
 
       <main className="flex-1 p-4 md:p-6">
         <AnunciosSubNav />
-        <PageHeader title={marca?.nome ?? 'Marca'} description={`${formatDate(de)} a ${formatDate(ate)} · horário de Brasília`}>
+        <PageHeader title={marca?.nome ?? 'Marca'} description={`${periodo === 'tudo' ? 'Desde o início: ' : ''}${formatDate(de)} a ${formatDate(ate)} · horário de Brasília`}>
           <SeletorPeriodo value={periodo} onChange={setPeriodo} />
         </PageHeader>
 

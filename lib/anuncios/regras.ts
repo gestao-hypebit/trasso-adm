@@ -57,17 +57,29 @@ export function marcaPorPrefixo(nomeCampanha: string, marcas: MarcaPrefixos[]): 
 // ---------------------------------------------------------------
 // Janelas de sincronização
 // ---------------------------------------------------------------
-export const DIAS_PRIMEIRA_CARGA = 90
+export const MESES_HISTORICO = 37 // o máximo que o Meta guarda de insights
 export const DIAS_REPROCESSO = 7
-export const DIAS_POR_BLOCO = 10
+export const DIAS_POR_BLOCO = 30
+export const DIAS_POR_BLOCO_MENOR = 7 // quando o Meta reclama de dados demais num bloco
 
-// Próximo bloco a buscar. Na primeira carga anda de `backfillProximo`
-// (ou hoje − 89) até hoje em blocos de 10 dias; depois, sempre os últimos 7 dias.
-export function proximaJanela(hoje: string, backfillProximo: string | null, concluido: boolean) {
-  if (concluido) return { de: somarDias(hoje, -(DIAS_REPROCESSO - 1)), ate: hoje, carga: false }
-  const de = backfillProximo ?? somarDias(hoje, -(DIAS_PRIMEIRA_CARGA - 1))
-  const fimBloco = somarDias(de, DIAS_POR_BLOCO - 1)
-  return { de, ate: fimBloco < hoje ? fimBloco : hoje, carga: true }
+// Dia mais antigo que o Meta ainda devolve (com 1 dia de folga).
+export function inicioHistorico(hoje: string) {
+  const [a, m, d] = hoje.split('-').map(Number)
+  const alvo = new Date(Date.UTC(a, m - 1 - MESES_HISTORICO, d))
+  return somarDias(alvo.toISOString().slice(0, 10), 1)
+}
+
+// Os últimos 7 dias: reprocessados em toda rodada (o Meta corrige números para trás).
+export const janelaRecente = (hoje: string) => ({ de: somarDias(hoje, -(DIAS_REPROCESSO - 1)), ate: hoje })
+
+// Próximo bloco da carga do histórico, de trás para frente: termina no dia
+// anterior ao mais antigo já carregado (ou hoje, na primeira vez) e para no
+// limite do Meta. `fim` = este é o último bloco.
+export function janelaHistorico(hoje: string, historicoDesde: string | null, bloco = DIAS_POR_BLOCO) {
+  const limite = inicioHistorico(hoje)
+  const ate = historicoDesde ? somarDias(historicoDesde, -1) : hoje
+  const de = somarDias(ate, -(bloco - 1))
+  return de <= limite ? { de: limite, ate, fim: true } : { de, ate, fim: false }
 }
 
 // ---------------------------------------------------------------

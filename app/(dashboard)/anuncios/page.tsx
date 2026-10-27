@@ -20,8 +20,10 @@ const moeda = (v: number | null) => (v === null ? '—' : formatCurrency(v))
 export default function AnunciosPage() {
   const [periodo, setPeriodo] = useState('30')
   const [filtro, setFiltro] = useState('todas')
-  const { de, ate } = useMemo(() => intervalo(periodo), [periodo])
-  const a = useAnuncios(de, ate)
+  const busca = useMemo(() => intervalo(periodo), [periodo])
+  const a = useAnuncios(busca.de, busca.ate)
+  const ate = busca.ate
+  const de = periodo === 'tudo' ? a.inicio ?? ate : busca.de
 
   const r = useMemo(() => {
     const gastoDe = (ms: Metrica[]) => ms.reduce((s, m) => s + Number(m.spend), 0)
@@ -58,7 +60,7 @@ export default function AnunciosPage() {
 
       <main className="flex-1 p-4 md:p-6">
         <AnunciosSubNav semMarca={r.semMarca} />
-        <PageHeader title="Visão geral" description={`${formatDate(de)} a ${formatDate(ate)} · horário de Brasília`}>
+        <PageHeader title="Visão geral" description={`${periodo === 'tudo' ? 'Desde o início: ' : ''}${formatDate(de)} a ${formatDate(ate)} · horário de Brasília`}>
           <Select value={filtro} onValueChange={setFiltro}>
             <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
             <SelectContent>

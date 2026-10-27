@@ -16,10 +16,13 @@ export const metaConfigurado = () => !!token()
 const CODIGOS_TEMPORARIOS = new Set([1, 2, 4, 17, 32, 341, 613, 80000, 80001, 80002, 80003, 80004, 80005, 80006, 80008, 80009, 80014])
 
 export class MetaErro extends Error {
-  constructor(mensagem: string, public temporario = false) {
+  // muitoDado: o Meta recusou o intervalo por volume; vale tentar com um bloco menor.
+  constructor(mensagem: string, public temporario = false, public muitoDado = false) {
     super(limparSegredos(mensagem, [token()]))
   }
 }
+
+const MUITO_DADO = /reduce the amount of data/i
 
 // Uso do limite informado pelo Meta nos headers (0–100). Passou de 90: paramos
 // antes de levar bloqueio e o resto fica para a próxima rodada.
@@ -69,6 +72,9 @@ async function get<T>(ctx: Contexto, caminho: string, params: Record<string, str
     }
 
     const codigo = corpo?.error?.code
+    if (corpo?.error?.error_subcode === 1487534 || MUITO_DADO.test(corpo?.error?.message ?? '')) {
+      throw new MetaErro(`Meta ${res.status}: ${corpo?.error?.message ?? 'dados demais no intervalo'}`, false, true)
+    }
     const temporario = res.status >= 500 || (codigo !== undefined && CODIGOS_TEMPORARIOS.has(codigo))
     const espera = 2000 * 2 ** tentativa // 2s, 4s, 8s, 16s
     if (temporario && tentativa < 4 && Date.now() + espera < ctx.prazo) {

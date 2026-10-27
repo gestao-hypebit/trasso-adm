@@ -21,7 +21,11 @@ export const PERIODOS = [
   { value: '90', label: '90 dias' },
   { value: 'mes', label: 'Este mês' },
   { value: 'mes_anterior', label: 'Mês passado' },
+  { value: 'tudo', label: 'Desde o início' },
 ]
+
+// "Desde o início": busca tudo a partir desta data; a tela usa o 1º dia com dado.
+export const INICIO_TUDO = '2000-01-01'
 
 // Período em dias de São Paulo, sempre terminando hoje (ou no fim do mês passado).
 export function intervalo(periodo: string) {
@@ -31,6 +35,7 @@ export function intervalo(periodo: string) {
     const fim = somarDias(`${hoje.slice(0, 7)}-01`, -1)
     return { de: `${fim.slice(0, 7)}-01`, ate: fim }
   }
+  if (periodo === 'tudo') return { de: INICIO_TUDO, ate: hoje }
   return { de: somarDias(hoje, -(Number(periodo) - 1)), ate: hoje }
 }
 
@@ -84,11 +89,17 @@ export function useAnuncios(de: string, ate: string, recarregar = 0) {
   const marcaDaCampanha = useMemo(() => new Map(campanhas.map((c) => [c.campaign_id, c.marca_id])), [campanhas])
   const clientes = useMemo<ClienteFunil[]>(() => clientesDoFunil(eventos), [eventos])
 
+  // Primeiro dia com gasto ou evento (para "Desde o início"). Métricas vêm ordenadas por data.
+  const inicio = useMemo(() => {
+    const dias = [metricas[0]?.data, eventos[0] && diaSP(eventos[0].ocorrido_em)].filter(Boolean) as string[]
+    return dias.length ? dias.sort()[0] : null
+  }, [metricas, eventos])
+
   // Recorte por marca (null = campanhas sem marca; o funil delas fica vazio).
   const daMarca = useCallback((marcaId: string | null) => ({
     metricas: metricas.filter((m) => (marcaDaCampanha.get(m.campaign_id) ?? null) === marcaId),
     clientes: marcaId ? clientes.filter((c) => c.marca_id === marcaId) : [],
   }), [metricas, clientes, marcaDaCampanha])
 
-  return { marcas, campanhas, metricas, clientes, loading, erro, daMarca, marcaDaCampanha }
+  return { marcas, campanhas, metricas, clientes, inicio, loading, erro, daMarca, marcaDaCampanha }
 }

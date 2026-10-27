@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  acoesParaMapa, clientesDoFunil, conversoesMeta, diaSP, limparSegredos, marcaPorPrefixo, porGrupo, proximaJanela, resumir,
+  acoesParaMapa, clientesDoFunil, conversoesMeta, diaSP, inicioHistorico, janelaHistorico, janelaRecente, limparSegredos, marcaPorPrefixo, porGrupo, resumir,
   type Evento, type Metrica,
 } from '@/lib/anuncios/regras'
 import { instante, paraLinha, eventoSchema, hashChave } from '@/lib/anuncios/eventos'
@@ -34,14 +34,20 @@ describe('campanha → marca pelo prefixo', () => {
 })
 
 describe('janelas de sincronização', () => {
-  it('primeira carga começa 89 dias atrás em blocos de 10', () => {
-    expect(proximaJanela('2026-10-27', null, false)).toEqual({ de: '2026-07-30', ate: '2026-08-08', carga: true })
+  it('histórico vai até 37 meses atrás', () => {
+    expect(inicioHistorico('2026-10-27')).toBe('2023-09-28')
+    expect(inicioHistorico('2026-03-31')).toBe('2023-03-04') // 31/02 inexistente "transborda" para março; folga continua
   })
-  it('continua de onde parou e para em hoje', () => {
-    expect(proximaJanela('2026-10-27', '2026-10-21', false)).toEqual({ de: '2026-10-21', ate: '2026-10-27', carga: true })
+  it('primeira carga começa por hoje, em blocos de 30 dias para trás', () => {
+    expect(janelaHistorico('2026-10-27', null)).toEqual({ de: '2026-09-28', ate: '2026-10-27', fim: false })
+    expect(janelaHistorico('2026-10-27', '2026-09-28')).toEqual({ de: '2026-08-29', ate: '2026-09-27', fim: false })
+    expect(janelaHistorico('2026-10-27', '2026-09-28', 7)).toEqual({ de: '2026-09-21', ate: '2026-09-27', fim: false })
   })
-  it('depois da carga, sempre os últimos 7 dias', () => {
-    expect(proximaJanela('2026-10-27', null, true)).toEqual({ de: '2026-10-21', ate: '2026-10-27', carga: false })
+  it('último bloco para no limite do Meta', () => {
+    expect(janelaHistorico('2026-10-27', '2023-10-10')).toEqual({ de: '2023-09-28', ate: '2023-10-09', fim: true })
+  })
+  it('reprocesso: últimos 7 dias', () => {
+    expect(janelaRecente('2026-10-27')).toEqual({ de: '2026-10-21', ate: '2026-10-27' })
   })
 })
 
