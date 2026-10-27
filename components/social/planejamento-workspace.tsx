@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, CalendarDays, Check, Copy, ExternalLink, Eye, List, Loader2, Mail, MessageCircle, Pencil, Plus, Send, Trash2, Wand2,
+  ArrowLeft, CalendarDays, Check, ClipboardList, Copy, ExternalLink, Eye, List, Loader2, Mail, MessageCircle, Pencil, Plus, Send, Trash2, Wand2,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Badge } from '@/components/ui/badge'
@@ -156,6 +156,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
           </span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" asChild><Link href={`/social/clientes/${plano.cliente_id}`}><ClipboardList className="h-3.5 w-3.5" /> Briefing</Link></Button>
           <Button size="sm" variant="ghost" onClick={() => setSugerir(true)}><Wand2 className="h-3.5 w-3.5" /> Sugerir pauta</Button>
           <Button size="sm" variant="outline" onClick={() => setEditando({ post: null, data: plano.mes })}><Plus className="h-3.5 w-3.5" /> Post</Button>
           <PdfBotao cliente={nomeCliente} mes={plano.mes} fim={plano.data_fim} objetivo={plano.objetivo} posts={posts} logoUrl={agencia.logo_url} agenciaNome={agencia.nome} comAprovacao={plano.status !== 'rascunho'} />

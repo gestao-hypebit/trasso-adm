@@ -1,6 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
 import { createServiceClient } from '@/lib/supabase/service'
+import { isModelo, type ModeloBriefing, type StatusBriefing } from '@/lib/social/briefing'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -20,6 +21,25 @@ export const getPlanejamentoPorToken = cache(async (token: string) => {
     fim: data.data_fim as string | null,
     objetivo: data.objetivo as string | null,
     status: data.status as string,
+    clienteNome: (data.clientes?.empresa || data.clientes?.nome || 'Cliente') as string,
+    contatoNome: (data.clientes?.nome ?? '') as string,
+  }
+})
+
+// Briefing aberto pelo link do cliente (/briefing/<token>). Só o que o formulário precisa.
+export const getBriefingPorToken = cache(async (token: string) => {
+  if (!UUID_RE.test(token)) return null
+  const supabase = createServiceClient() as any
+  const { data } = await supabase
+    .from('social_briefings')
+    .select('id, modelo, status, clientes(nome, empresa)')
+    .eq('token', token)
+    .maybeSingle()
+  if (!data || !isModelo(data.modelo)) return null
+  return {
+    id: data.id as string,
+    modelo: data.modelo as ModeloBriefing,
+    status: data.status as StatusBriefing,
     clienteNome: (data.clientes?.empresa || data.clientes?.nome || 'Cliente') as string,
     contatoNome: (data.clientes?.nome ?? '') as string,
   }
