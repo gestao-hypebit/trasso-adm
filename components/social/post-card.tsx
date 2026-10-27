@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Image as ImageIcon, Layers } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { APROVACAO, FORMATOS, PRODUCAO, REDES, type Post } from '@/lib/social/tipos'
+import { TIPOS_CONTEUDO, type TipoConteudo } from '@/lib/social/artes'
 import { cn, formatDate } from '@/lib/utils'
 
 export const ehVideo = (url: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url)
@@ -83,6 +84,7 @@ export function Redes({ redes }: { redes: string[] }) {
 export function PostCard({ post, interno = false, acoes }: { post: Post; interno?: boolean; acoes?: React.ReactNode }) {
   const formato = FORMATOS[post.formato]
   const aprov = APROVACAO[post.aprovacao]
+  const tipo = post.tipo ? TIPOS_CONTEUDO[post.tipo as TipoConteudo] : null
   return (
     <article id={`post-${post.id}`} className="scroll-mt-24 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] md:grid md:grid-cols-[280px_1fr]">
       <Midias urls={post.midias} carrossel={post.formato === 'carrossel'} className="md:self-start" />
@@ -90,6 +92,7 @@ export function PostCard({ post, interno = false, acoes }: { post: Post; interno
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold capitalize text-brand-lavanda">{formatDate(post.data, "EEEE, dd/MM")}{post.horario && ` · ${post.horario}`}</span>
           <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-brand-noite" style={{ background: formato?.cor }}>{formato?.label}</span>
+          {interno && tipo && <span className="rounded border px-1.5 py-0.5 text-[10px] font-semibold" style={{ borderColor: tipo.cor, color: tipo.cor }}>{tipo.label}</span>}
           <Redes redes={post.redes} />
           <span className="ml-auto flex gap-1.5">
             {interno && <Badge variant={PRODUCAO[post.producao]?.variant}>{PRODUCAO[post.producao]?.label}</Badge>}

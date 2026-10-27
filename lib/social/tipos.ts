@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { BadgeProps } from '@/components/ui/badge'
+import type { Lamina } from '@/lib/social/artes'
 
 type Variante = NonNullable<BadgeProps['variant']>
 
@@ -58,6 +59,8 @@ export type Post = {
   roteiro: string | null
   cta: string | null
   midias: string[]
+  tipo: string | null           // tipo de conteúdo (TIPOS_CONTEUDO)
+  artes: Lamina[]               // lâminas do gerador de artes
   producao: Producao
   aprovacao: Aprovacao
   comentario_cliente: string | null
@@ -85,7 +88,7 @@ export type Planejamento = {
 
 export const POST_VAZIO = {
   horario: '18:00', redes: ['instagram'] as Rede[], formato: 'feed' as Formato, titulo: '', legenda: '',
-  hashtags: '', roteiro: '', cta: '', midias: [] as string[], producao: 'ideia' as Producao,
+  hashtags: '', roteiro: '', cta: '', midias: [] as string[], producao: 'ideia' as Producao, tipo: '',
 }
 
 export const ERRO_MIGRATION = 'Rode a migration 20261016000000_social_media.sql no Supabase antes de usar.'

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, CalendarDays, Check, ClipboardList, Copy, ExternalLink, Eye, List, Loader2, Mail, MessageCircle, Pencil, Plus, Send, Trash2, Wand2,
+  ArrowLeft, CalendarDays, Check, ClipboardList, Copy, ExternalLink, Eye, List, Loader2, Mail, MessageCircle, Pencil, Plus, Send, Sparkles, Trash2, Wand2,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,7 @@ import { PostCard } from '@/components/social/post-card'
 import { PostDialog } from '@/components/social/post-dialog'
 import { SugerirDialog } from '@/components/social/sugerir-dialog'
 import { PdfBotao } from '@/components/social/pdf-botao'
+import { ArtesEditor } from '@/components/social/artes/artes-editor'
 import { createClient } from '@/lib/supabase/client'
 import { ERRO_MIGRATION, ERRO_MIGRATION_PERIODO, PRODUCAO, STATUS_PLANEJAMENTO, fimDoPeriodo, nomePeriodo, ordenarPosts, statusPelosPosts, type Planejamento, type Post } from '@/lib/social/tipos'
 import { cn, formatDate, whatsappUrl } from '@/lib/utils'
@@ -36,6 +37,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
   const [visao, setVisao] = useState<'calendario' | 'lista'>('calendario')
   const [editando, setEditando] = useState<{ post: Post | null; data: string | null } | null>(null)
   const [sugerir, setSugerir] = useState(false)
+  const [artesDe, setArtesDe] = useState<Post | null>(null)
   const [enviar, setEnviar] = useState(false)
   const [mensagem, setMensagem] = useState('')
   const [copiado, setCopiado] = useState(false)
@@ -208,7 +210,10 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
             <div className="space-y-4">
               {posts.map((p) => (
                 <PostCard key={p.id} post={p} interno acoes={
-                  <Button size="sm" variant="outline" onClick={() => setEditando({ post: p, data: null })}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => setEditando({ post: p, data: null })}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
+                    <Button size="sm" variant="outline" onClick={() => setArtesDe(p)}><Sparkles className="h-3.5 w-3.5" /> Artes{p.artes?.length ? ` (${p.artes.length})` : ''}</Button>
+                  </>
                 } />
               ))}
             </div>
@@ -306,7 +311,9 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
         mes={plano.mes}
         fim={plano.data_fim}
         onSalvo={carregar}
+        onArtes={() => { setArtesDe(editando?.post ?? null); setEditando(null) }}
       />
+      <ArtesEditor aberto={!!artesDe} onClose={() => setArtesDe(null)} post={artesDe} planejamentoId={id} clienteId={plano.cliente_id} onSalvo={carregar} />
       <SugerirDialog aberto={sugerir} onClose={() => setSugerir(false)} planejamentoId={id} onAdicionados={carregar} />
 
       <Dialog open={enviar} onOpenChange={setEnviar}>

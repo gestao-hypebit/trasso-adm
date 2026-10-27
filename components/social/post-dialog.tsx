@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Copy, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Copy, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ehVideo } from '@/components/social/post-card'
 import { createClient } from '@/lib/supabase/client'
+import { ERRO_MIGRATION_ARTES, TIPOS_CONTEUDO } from '@/lib/social/artes'
 import { APROVACAO, FORMATOS, POST_VAZIO, PRODUCAO, REDES, fimDoPeriodo, type Formato, type Post, type Producao, type Rede } from '@/lib/social/tipos'
 import { cn } from '@/lib/utils'
 
@@ -19,7 +20,7 @@ const LIMITE_LEGENDA = 2200 // Instagram
 const campo = 'h-9 w-full rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 text-sm text-brand-lavanda outline-none'
 
 // Cria ou edita um post. `post` nulo + `data` = post novo naquele dia.
-export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, fim, onSalvo }: {
+export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, fim, onSalvo, onArtes }: {
   aberto: boolean
   onClose: () => void
   planejamentoId: string
@@ -28,6 +29,7 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
   mes: string
   fim: string | null
   onSalvo: () => void
+  onArtes?: () => void
 }) {
   const [form, setForm] = useState<Form>({ ...POST_VAZIO, data: mes })
   const [salvando, setSalvando] = useState(false)
@@ -44,7 +46,7 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
       ? {
           data: post.data, horario: post.horario ?? '', redes: post.redes, formato: post.formato, titulo: post.titulo,
           legenda: post.legenda ?? '', hashtags: post.hashtags ?? '', roteiro: post.roteiro ?? '', cta: post.cta ?? '',
-          midias: post.midias ?? [], producao: post.producao,
+          midias: post.midias ?? [], producao: post.producao, tipo: post.tipo ?? '',
         }
       : { ...POST_VAZIO, data: data ?? mes })
   }, [aberto, post, data, mes])
@@ -95,19 +97,20 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
       cta: form.cta.trim() || null,
       midias: form.midias,
       producao: form.producao,
+      tipo: form.tipo || null,
       updated_at: new Date().toISOString(),
     }
     // Mudou o conteúdo de um post que o cliente já respondeu: volta a aguardar.
     const conteudoMudou = post && (['titulo', 'legenda', 'hashtags', 'roteiro', 'cta', 'data', 'formato'] as const)
       .some((k) => (post[k] ?? null) !== linha[k]) || (post && JSON.stringify(post.midias) !== JSON.stringify(linha.midias))
     const { error } = duplicar || !post
-      ? await db.from('social_posts').insert({ ...linha, planejamento_id: planejamentoId, ...(duplicar && { titulo: `${linha.titulo} (cópia)` }) })
+      ? await db.from('social_posts').insert({ ...linha, planejamento_id: planejamentoId, ...(duplicar && { titulo: `${linha.titulo} (cópia)`, artes: post?.artes ?? [] }) })
       : await db.from('social_posts').update({
           ...linha,
           ...(conteudoMudou && post.aprovacao !== 'pendente' && { aprovacao: 'pendente' }),
         }).eq('id', post.id)
     setSalvando(false)
-    if (error) { setErro(error.message); return }
+    if (error) { setErro(/'(tipo|artes)'/.test(error.message) ? ERRO_MIGRATION_ARTES : error.message); return }
     onSalvo()
     onClose()
   }
@@ -165,6 +168,22 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
         </div>
 
         <div className="space-y-1.5">
+          <Label>Tipo de conteúdo</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(TIPOS_CONTEUDO).map(([k, t]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => set('tipo', form.tipo === k ? '' : k)}
+                className={cn('flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors', form.tipo === k ? 'border-brand-lima/50 bg-brand-lima/10 text-brand-lima' : 'border-white/[0.1] text-brand-lavanda/60 hover:text-brand-lavanda')}
+              >
+                <span className="h-2 w-2 rounded-full" style={{ background: t.cor }} /> {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
           <Label>Redes</Label>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(REDES).map(([k, r]) => {
@@ -214,7 +233,10 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
         </div>
 
         <div className="space-y-1.5">
-          <Label>Artes e vídeos</Label>
+          <div className="flex items-end justify-between">
+            <Label>Artes e vídeos</Label>
+            {post && onArtes && <Button size="sm" variant="ghost" className="h-7" onClick={onArtes}><Sparkles className="h-3.5 w-3.5" /> Gerador de artes{post.artes?.length ? ` (${post.artes.length})` : ''}</Button>}
+          </div>
           <div className="flex flex-wrap gap-2">
             {form.midias.map((url, i) => (
               <div key={url} className="group relative h-24 w-20 overflow-hidden rounded-lg border border-white/[0.1] bg-black">
