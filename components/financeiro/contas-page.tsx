@@ -149,7 +149,10 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   }
 
   // Filtro de linha (só em Contas a Receber): vale para a página toda.
-  const daLinha = useMemo(() => linha === 'todas' ? lancamentos : lancamentos.filter(l => l.frente === linha), [lancamentos, linha])
+  // A receber não mostra os cancelados (faturas de assinaturas canceladas no Asaas).
+  const daLinha = useMemo(() => lancamentos
+    .filter(l => !ehReceber || l.status !== 'cancelado')
+    .filter(l => linha === 'todas' || l.frente === linha), [lancamentos, linha, ehReceber])
   const abertos = useMemo(() => daLinha.filter(l => l.status === 'pendente'), [daLinha])
   const vencidos = abertos.filter(l => l.data < hoje)
   const em7 = abertos.filter(l => l.data >= hoje && diasEntre(hoje, l.data) <= 7)
@@ -246,7 +249,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     { key: 'vencidas', label: 'Vencidas' },
     { key: 'semana', label: 'Próx. 7 dias' },
     { key: 'liquidadas', label: t.liquidadas },
-    { key: 'canceladas', label: 'Canceladas' },
+    ...(ehReceber ? [] : [{ key: 'canceladas' as Aba, label: 'Canceladas' }]),
     { key: 'todas', label: 'Todas' },
   ]
 

@@ -56,6 +56,12 @@ describe('linha da assinatura do Asaas', () => {
     expect(linhaDaAssinatura(s, c, new Map([['pay1', 'agencia']]))).toBe('agencia')
   })
 
+  it('uma fatura lançada na linha errada não leva a assinatura junto', () => {
+    const c = cliente('w', 'ambos')
+    const s = sub('s', 'cus_w', 49.9, { cobrancasRecentes: ['out', 'nov', 'dez'] })
+    expect(linhaDaAssinatura(s, c, new Map([['out', 'catalogo_place'], ['nov', 'catalogo_place'], ['dez', 'agencia']]))).toBe('catalogo_place')
+  })
+
   it('sem fatura ligada, cai na descrição e depois em Serviços', () => {
     const c = cliente('w', 'ambos')
     expect(linhaDaAssinatura(sub('s', 'cus_w', 49.9, { descricao: 'Catálogo' }), c, new Map())).toBe('catalogo_place')

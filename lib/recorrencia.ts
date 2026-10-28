@@ -82,8 +82,9 @@ export const ativa = (s: AssinaturaAsaas) => s.status === 'ACTIVE'
 
 // Linha de uma assinatura do Asaas:
 //   - cliente do tipo "saas" (só tem SaaS): o produto do cadastro;
-//   - senão, a linha do lançamento ligado a alguma fatura dela no financeiro
-//     (inclusive Serviços: vale mais que a descrição, que pode ter sido copiada);
+//   - senão, a linha da maioria dos lançamentos ligados às faturas dela no financeiro
+//     (inclusive Serviços: vale mais que a descrição, que pode ter sido copiada;
+//     uma fatura lançada na linha errada não arrasta a assinatura);
 //   - senão, a descrição ("Catálogo" ou "Clubelly");
 //   - senão, Serviços.
 export function linhaDaAssinatura(
@@ -92,7 +93,12 @@ export function linhaDaAssinatura(
   faturas: Map<string, LinhaRec>,
 ): LinhaRec {
   if (cliente.tipo === 'saas') return saasDoCliente(cliente)!
-  const pelaFatura = s.cobrancasRecentes.map((id) => faturas.get(id)).find(Boolean)
+  const votos = new Map<LinhaRec, number>()
+  for (const id of s.cobrancasRecentes) {
+    const l = faturas.get(id)
+    if (l) votos.set(l, (votos.get(l) ?? 0) + 1)
+  }
+  const pelaFatura = [...votos].sort((a, b) => b[1] - a[1])[0]?.[0]
   return pelaFatura ?? linhaPelaDescricao(s.descricao) ?? 'agencia'
 }
 

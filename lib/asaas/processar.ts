@@ -1,6 +1,6 @@
 import 'server-only'
-import { buscarAssinatura, buscarClienteAsaas, type AsaasPayment } from '@/lib/asaas/api'
-import { labelLinha, linhaDoProduto, linhaPelaDescricao, type LinhaSaas } from '@/lib/financeiro/linhas'
+import { buscarAssinatura, buscarClienteAsaas, cobrancasDaAssinatura, type AsaasPayment } from '@/lib/asaas/api'
+import { ehLinhaSaas, labelLinha, linhaDoProduto, linhaPelaDescricao, type LinhaSaas } from '@/lib/financeiro/linhas'
 
 // Transforma uma cobrança do Asaas em lançamento, sem nunca duplicar:
 //
@@ -39,6 +39,19 @@ type ClienteRow = {
 // de SaaS segue o produto do cadastro.
 function saasDaCobranca(p: AsaasPayment, cliente: ClienteRow): LinhaSaas | null {
   return linhaPelaDescricao(p.description) ?? (cliente.tipo === 'saas' ? linhaDoProduto(cliente.produto?.nome) : null)
+}
+
+// Fatura de assinatura sem SaaS na descrição (cliente "ambos"): segue a linha
+// das outras faturas da mesma assinatura já lançadas. Senão a fatura nova do
+// Catálogo cai em Serviços e leva a assinatura inteira junto.
+async function saasDaAssinatura(ctx: Contexto, p: AsaasPayment): Promise<LinhaSaas | null> {
+  if (!p.subscription) return null
+  const outras = (await cobrancasDaAssinatura(p.subscription).catch(() => [])).map((c) => c.id).filter((id) => id !== p.id)
+  if (!outras.length) return null
+  const { data } = await ctx.supabase.from('lancamentos').select('frente').in('asaas_payment_id', outras).neq('status', 'cancelado')
+    .order('data', { ascending: false }).limit(1)
+  const frente = data?.[0]?.frente
+  return ehLinhaSaas(frente) ? frente : null
 }
 
 export type Contexto = {
@@ -283,7 +296,7 @@ export async function processarCobranca(
   const resultado = { ...base, acao: 'criado' as const, cliente: cliente.nome, valorSistema: liquido(p) }
   if (ctx.simular) return resultado
   // A categoria de cada SaaS tem o nome dele ("Catálogo Place", "Clubelly").
-  const saas = saasDaCobranca(p, cliente)
+  const saas = saasDaCobranca(p, cliente) ?? (await saasDaAssinatura(ctx, p))
   const categoria = saas
     ? await categoriaId(ctx, labelLinha(saas), 'receita')
     : await categoriaId(ctx, p.subscription ? 'Mensalidade de Software' : 'Serviços prestados', 'receita')
