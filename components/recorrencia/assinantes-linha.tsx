@@ -101,7 +101,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
 
   function exportar() {
     baixarCSV(
-      `mrr-${linha === 'agencia' ? 'servicos' : linha.replace('_', '-')}-${r.dados.hoje}.csv`,
+      `mrr-${linha === 'agencia' ? 'servicos' : linha.replace('_', '-')}-${r.hoje}.csv`,
       ['Cliente', 'Empresa', 'Serviço', 'Mensalidade', 'Desde', 'Meses pagos', 'Pago este mês', 'Em atraso', 'Próxima cobrança (Asaas)'],
       visiveis.map((l) => {
         const s = assinaturaAtiva(l)

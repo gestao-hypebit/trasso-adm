@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
@@ -11,8 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { useRecorrencia } from '@/components/recorrencia/use-recorrencia'
 import { createClient } from '@/lib/supabase/client'
-import { LINHA_CORES, LINHAS_SAAS, labelLinha, type LinhaSaas } from '@/lib/financeiro/linhas'
-import { CUSTO_AQUISICAO_RE, MARCOS_RETENCAO, safras, unitario, type Safra } from '@/lib/saas/metricas'
+import { LINHA_CORES, LINHAS_SAAS, labelLinha } from '@/lib/financeiro/linhas'
+import { CUSTO_AQUISICAO_RE, MARCOS_RETENCAO, unitario } from '@/lib/saas/metricas'
 import { addMonthsISO, cn, formatCurrency, toISODateLocal } from '@/lib/utils'
 
 type Lanc = { tipo: string; valor: number; status: string; frente: string; categorias_financeiras: { nome: string } | null }
@@ -50,13 +50,8 @@ export default function SaasPage() {
     })
   }, [de, ate])
 
-  // Mensalidades de cada SaaS (para as safras): receitas da linha em categorias de mensalidade.
-  const safrasPorLinha = useMemo(() => Object.fromEntries(LINHAS_SAAS.map((l) => [l, safras(
-    r.dados.lancamentos
-      .filter((x) => x.frente === l && !!x.categoria_id && r.dados.recorrentes.includes(x.categoria_id))
-      .map((x) => ({ chave: x.cliente_id ?? `d:${x.descricao}`, data: x.data, status: x.status })),
-    r.dados.hoje,
-  )])) as Record<LinhaSaas, Safra[]>, [r.dados])
+  // Retenção por safra de cada SaaS (calculada no servidor, pelas mensalidades da linha).
+  const safrasPorLinha = r.safras
 
   const carregando = r.loading || r.asaasCarregando || lancs === null
 

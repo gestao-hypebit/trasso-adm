@@ -1,14 +1,16 @@
 'use client'
 
-import { Repeat, CalendarRange, Users, Receipt, AlertTriangle, ArrowUpRight, ArrowDownRight, ChevronRight, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { Repeat, CalendarRange, Users, Receipt, AlertTriangle, ArrowUpRight, ArrowDownRight, ChevronRight, Loader2, UserMinus, Percent } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LINHA_CORES } from '@/lib/financeiro/linhas'
-import { nomeLinha, type LinhaRec, type ResultadoLinha } from '@/lib/recorrencia'
-import { cn, formatCurrency } from '@/lib/utils'
+import { DIAS_CHURN_RECENTE, nomeLinha, type LinhaRec, type ResultadoLinha } from '@/lib/recorrencia'
+import { diasEntre } from '@/lib/financeiro'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import type { Recorrencia } from '@/components/recorrencia/use-recorrencia'
 import { ParaCobrar } from '@/components/recorrencia/para-cobrar'
 
@@ -50,6 +52,8 @@ export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbr
   const naPilha = [...linhas].reverse()
   // Leva para a primeira linha com assinatura sem cliente ligado.
   const linhaSemCliente = linhas.find((l) => l.contagem.so_asaas > 0)?.linha ?? 'catalogo_place'
+  // Cancelamentos com último pagamento nos últimos 30 dias: viram aviso no topo.
+  const recentes = r.churn.cancelamentos.filter((c) => c.ultimoPagamento && diasEntre(c.ultimoPagamento, r.hoje) <= 30)
 
   return (
     <div className="space-y-6">
@@ -70,6 +74,19 @@ export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbr
         <p className="text-xs text-brand-lavanda/40">
           {r.semCliente.aguardandoPagamento} assinatura(s) nova(s) no Asaas ainda sem o 1º pagamento e sem cliente cadastrado. Quando pagar, cadastre o cliente e ligue em &quot;Só no Asaas&quot;.
         </p>
+      )}
+
+      {!r.asaasCarregando && recentes.length > 0 && (
+        <a
+          href="#cancelamentos"
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-brand-rosa/25 bg-brand-rosa/[0.06] px-4 py-2.5 text-sm text-brand-lavanda/80 transition-colors hover:bg-brand-rosa/[0.1]"
+        >
+          <span>
+            <UserMinus className="mr-1.5 inline h-4 w-4 text-brand-rosa" />
+            {recentes.length} assinatura(s) cancelada(s) nos últimos 30 dias: <b className="text-brand-rosa">-{formatCurrency(recentes.reduce((t, c) => t + c.valor, 0))}/mês</b> no MRR.
+          </span>
+          <span className="shrink-0 text-xs text-brand-rosa">Ver quem →</span>
+        </a>
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -103,6 +120,11 @@ export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbr
 
       {/* Por linha */}
       <ParaCobrar r={r} foco={focoCobranca} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Cancelamentos r={r} />
+        <CustoAsaas r={r} />
+      </div>
 
       <Card>
         <CardHeader className="pb-2">
@@ -229,5 +251,111 @@ export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbr
         Uma assinatura é do Catálogo Place ou da Clubelly quando o cliente é só desse SaaS (pelo produto do cadastro), quando as faturas dela estão ligadas a lançamentos dessa linha ou quando a descrição fala em &quot;Catálogo&quot; ou &quot;Clubelly&quot;; as demais são de Serviços.
       </p>
     </div>
+  )
+}
+
+const mesesEntre = (de: string, ate: string) => Math.max(1, Math.round(diasEntre(de, ate) / 30.4) + 1)
+
+// Assinaturas canceladas no Asaas depois de ter pago, pela data do último pagamento
+// (o Asaas não diz quando cancelou).
+function Cancelamentos({ r }: { r: Recorrencia }) {
+  const { cancelamentos, valor } = r.churn
+  return (
+    <Card id="cancelamentos" className="scroll-mt-6 lg:col-span-2">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base"><UserMinus className="h-4 w-4 text-brand-rosa" /> Cancelamentos recentes</CardTitle>
+          {cancelamentos.length > 0 && (
+            <span className="text-sm font-semibold text-brand-rosa" style={{ fontFamily: 'var(--font-space-grotesk)' }}>-{formatCurrency(valor)}/mês</span>
+          )}
+        </div>
+        <p className="text-xs text-brand-lavanda/40">
+          Assinaturas canceladas no Asaas com último pagamento nos últimos {DIAS_CHURN_RECENTE} dias. Vale um contato para entender o motivo ou tentar trazer de volta.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {r.asaasCarregando ? (
+          <p className="flex items-center gap-2 px-6 pb-6 text-sm text-brand-lavanda/40"><Loader2 className="h-4 w-4 animate-spin" /> Buscando no Asaas…</p>
+        ) : !r.asaasLigado ? (
+          <p className="px-6 pb-6 text-sm text-brand-lavanda/40">Precisa do Asaas configurado para saber quem cancelou.</p>
+        ) : cancelamentos.length === 0 ? (
+          <p className="px-6 pb-6 text-sm text-brand-lavanda/40">Nenhum cancelamento nos últimos {DIAS_CHURN_RECENTE} dias.</p>
+        ) : (
+          <div className="max-h-80 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-[#141318]">
+                <tr className="border-b border-white/[0.06]">
+                  <th className="px-6 py-2 text-left text-xs font-medium text-brand-lavanda/50">Cliente</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-brand-lavanda/50">Foi cliente</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-brand-lavanda/50">Último pagamento</th>
+                  <th className="px-6 py-2 text-right text-xs font-medium text-brand-lavanda/50">Perdido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cancelamentos.map((c) => {
+                  const meses = c.primeiroPagamento && c.ultimoPagamento ? mesesEntre(c.primeiroPagamento, c.ultimoPagamento) : null
+                  const nome = (
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: LINHA_CORES[c.linha] }} title={nomeLinha[c.linha]} />
+                      {c.nome}
+                    </span>
+                  )
+                  return (
+                    <tr key={c.chave} className="border-b border-white/[0.04]">
+                      <td className="px-6 py-2.5 text-brand-lavanda">
+                        {c.clienteId ? <Link href={`/clientes/${c.clienteId}`} className="hover:text-brand-lima">{nome}</Link> : nome}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-brand-lavanda/60">
+                        {meses ? `${meses} ${meses === 1 ? 'mês' : 'meses'}` : '—'}
+                        <span className="text-[11px] text-brand-lavanda/40"> · {c.pagamentos} pgto{c.pagamentos === 1 ? '' : 's'}</span>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-brand-lavanda/60">{c.ultimoPagamento ? formatDate(c.ultimoPagamento) : '—'}</td>
+                      <td className="px-6 py-2.5 text-right whitespace-nowrap font-medium text-brand-rosa">-{formatCurrency(c.valor)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Quanto o Asaas ficou de taxa (cobrado − o que caiu na conta), neste mês e no passado.
+function CustoAsaas({ r }: { r: Recorrencia }) {
+  const t = r.taxas
+  const pctDe = (taxa: number, cobrado: number) => (cobrado > 0 ? `${((taxa / cobrado) * 100).toFixed(1).replace('.', ',')}%` : '—')
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base"><Percent className="h-4 w-4 text-brand-rosa" /> Custo do Asaas</CardTitle>
+        <p className="text-xs text-brand-lavanda/40">Taxas dos pagamentos recebidos: o que foi cobrado menos o que caiu na conta.</p>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        {!t ? (
+          <p className="text-brand-lavanda/40">Rode a migration <code>20261023000000_asaas_taxas.sql</code> e sincronize o Asaas para ver as taxas.</p>
+        ) : (
+          <>
+            {[t.mesAtual, t.mesPassado].map((m, i) => (
+              <div key={m.mes} className="space-y-0.5">
+                <p className="text-xs text-brand-lavanda/50">{mesLabel(m.mes, 'MMMM')}{i === 0 && ' (até hoje)'}</p>
+                <p className="text-xl font-semibold text-brand-rosa" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{formatCurrency(m.taxa)}</p>
+                <p className="text-[11px] text-brand-lavanda/40">
+                  {m.pagamentos} pagamento{m.pagamentos === 1 ? '' : 's'} · {pctDe(m.taxa, m.cobrado)} de {formatCurrency(m.cobrado)}
+                </p>
+              </div>
+            ))}
+            {t.mesPassado.taxa > 0 && (
+              <p className="border-t border-white/[0.06] pt-3 text-xs text-brand-lavanda/60">
+                No ritmo de {mesLabel(t.mesPassado.mes, 'MMMM').toLowerCase()}: cerca de <b className="text-brand-lavanda">{formatCurrency(t.mesPassado.taxa * 12)}</b> por ano.
+              </p>
+            )}
+            <Link href="/catalogo/asaas" className="block text-xs text-brand-lima hover:underline">Ver taxa por pagamento e por forma →</Link>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { linhaDaAssinatura, montarLinha, type ClienteRec, type Dados, type LancRec } from '@/lib/recorrencia'
+import { linhaDaAssinatura, montarLinha, resumirRecorrencia, type ClienteRec, type Dados, type LancRec } from '@/lib/recorrencia'
 import { linhaDoProduto, linhaPelaDescricao } from '@/lib/financeiro/linhas'
 import type { AssinaturaAsaas } from '@/lib/asaas/rotulos'
 
@@ -144,5 +144,26 @@ describe('ativas, canceladas e inadimplentes', () => {
     const r = montarLinha('catalogo_place', d)
     expect(r.mrrLiquido).toBeLessThanOrEqual(r.mrrBruto)
     expect(r.mrrLiquido).toBe(47.91)
+  })
+})
+
+describe('cancelamentos recentes', () => {
+  it('lista quem cancelou com último pagamento nos últimos 90 dias, com o valor perdido', () => {
+    const d = dados({
+      clientes: [
+        cliente('recente', 'saas', { produto: { nome: 'Catálogo Place' } }),
+        cliente('antigo', 'saas', { produto: { nome: 'Catálogo Place' } }),
+      ],
+      assinaturas: [sub('s1', 'cus_recente', 49.9, { status: 'INACTIVE' }), sub('s2', 'cus_antigo', 49.9, { status: 'INACTIVE' })],
+      lancamentos: [
+        lanc('recente', 'catalogo_place', '2026-06-11', 47.91, { asaas_payment_id: 'p1' }),
+        lanc('recente', 'catalogo_place', '2026-09-11', 47.91, { asaas_payment_id: 'p2' }),
+        lanc('antigo', 'catalogo_place', '2026-05-11', 47.91, { asaas_payment_id: 'p3' }),
+      ],
+    })
+    const { churn } = resumirRecorrencia(d)
+    expect(churn.cancelamentos.map((c) => c.nome)).toEqual(['recente'])
+    expect(churn.cancelamentos[0]).toMatchObject({ valor: 49.9, primeiroPagamento: '2026-06-11', ultimoPagamento: '2026-09-11', pagamentos: 2 })
+    expect(churn.valor).toBe(49.9)
   })
 })

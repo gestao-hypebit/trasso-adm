@@ -1,105 +1,87 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO } from '@/lib/financeiro'
-import { montarLinha, assinaturasSemCliente, ativa, LINHAS_REC, type ClienteRec, type Dados, type LancRec, type LinhaRec, type ResultadoLinha } from '@/lib/recorrencia'
-import { valorMensal, type AssinaturaAsaas } from '@/lib/asaas/rotulos'
+import { resumirRecorrencia, type LinhaRec, type ResultadoLinha } from '@/lib/recorrencia'
+import type { Categoria, RespostaRecorrencia } from '@/app/api/recorrencia/route'
 
-export type Categoria = { id: string; nome: string; recorrente: boolean }
+export type { Categoria }
 
 // Descrição do serviço por assinante: chave `${linha}:${chave do assinante}`.
 const chaveServico = (linha: LinhaRec, chave: string) => `${linha}:${chave}`
 
-// Usado só enquanto a migration 20261001000000_categorias_mrr.sql não foi aplicada.
-const CATEGORIA_MENSALIDADE_RE = /mensal|assinatura|cat[aá]logo|recorr|saas|plano|retainer|fee/i
+// Enquanto a 1ª resposta não chega: tudo zerado, no mesmo formato.
+const vazio = (hoje: string) => resumirRecorrencia({ clientes: [], lancamentos: [], recorrentes: [], assinaturas: [], asaasCarregado: false, hoje })
 
-// Carrega tudo o que a tela de MRR precisa (uma vez para as três abas):
-// clientes, receitas das linhas, categorias recorrentes e assinaturas do Asaas.
+// MRR e assinaturas (uma vez para as três abas). O cálculo é feito no servidor
+// (/api/recorrencia): a tela recebe só o resultado. Primeiro vem sem o Asaas
+// (rápido), depois com as assinaturas dele.
 export function useRecorrencia() {
-  const [clientes, setClientes] = useState<ClienteRec[]>([])
-  const [lancamentos, setLancamentos] = useState<LancRec[]>([])
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [semMigration, setSemMigration] = useState(false)
-  const [servicos, setServicos] = useState<Map<string, string>>(new Map())
-  // Sem a migration 20261020000000_assinatura_servicos.sql não dá para guardar a descrição.
-  const [semTabelaServicos, setSemTabelaServicos] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const [asaas, setAsaas] = useState<{ configurado: boolean; assinaturas: AssinaturaAsaas[] } | null>(null)
-  const [erroAsaas, setErroAsaas] = useState<string | null>(null)
   const hoje = hojeISO()
+  const [resp, setResp] = useState<RespostaRecorrencia | null>(null)
+  const [servicos, setServicos] = useState<Map<string, string>>(new Map())
+  const [loading, setLoading] = useState(true)
+  const [erroRede, setErroRede] = useState<string | null>(null)
+  const [asaasCarregando, setAsaasCarregando] = useState(true)
+  const [erroAsaas, setErroAsaas] = useState<string | null>(null)
+  // Ignora respostas de pedidos antigos (ex.: recarregou no meio).
+  const pedido = useRef(0)
 
-  const carregar = useCallback(async () => {
-    const db = createClient() as any
-    // O produto diz qual SaaS o cliente assina (Catálogo Place ou Clubelly).
-    const campos = 'id, nome, empresa, whatsapp, telefone, status, created_at, tipo, produto:produtos(nome)'
-    const [resClientes, resLanc, resCats, resServicos] = await Promise.all([
-      db.from('clientes').select(`${campos}, asaas_customer_id`).order('nome'),
-      db.from('lancamentos')
-        .select('valor, data, status, descricao, cliente_id, categoria_id, frente, asaas_payment_id, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
-        .eq('tipo', 'receita')
-        .in('frente', LINHAS_REC),
-      db.from('categorias_financeiras').select('id, nome, recorrente').eq('tipo', 'receita').order('nome'),
-      db.from('assinatura_servicos').select('chave, linha, descricao'),
-    ])
+  const buscar = useCallback(async (comAsaas: boolean): Promise<RespostaRecorrencia> => {
+    const r = await fetch(`/api/recorrencia?hoje=${hoje}${comAsaas ? '&asaas=1' : ''}`)
+    const json = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(json.error ?? `Erro ${r.status}`)
+    return json
+  }, [hoje])
 
-    // Sem a migration do Asaas a coluna não existe: carrega sem ela.
-    let cls = resClientes.data
-    if (resClientes.error) cls = (await db.from('clientes').select(campos).order('nome')).data
-
-    let lancs = resLanc.data
-    if (resLanc.error) {
-      const r = await db.from('lancamentos')
-        .select('valor, data, status, descricao, cliente_id, categoria_id, frente, clientes(nome, whatsapp, telefone), categorias_financeiras(nome)')
-        .eq('tipo', 'receita')
-        .in('frente', LINHAS_REC)
-      lancs = r.data
-      if (r.error) setErro('Não foi possível carregar as mensalidades. A migration de frentes (20261007000000_frentes.sql) já foi aplicada no Supabase?')
-    }
-
-    let cats: Categoria[]
-    if (resCats.error) {
-      // Coluna `recorrente` ainda não existe: cai no palpite pelo nome.
-      const r = await db.from('categorias_financeiras').select('id, nome').eq('tipo', 'receita').order('nome')
-      cats = ((r.data ?? []) as { id: string; nome: string }[]).map((c) => ({ ...c, recorrente: CATEGORIA_MENSALIDADE_RE.test(c.nome) }))
-      setSemMigration(true)
-    } else {
-      cats = resCats.data ?? []
-      setSemMigration(false)
-    }
-
-    setSemTabelaServicos(!!resServicos.error)
-    setServicos(new Map(((resServicos.data ?? []) as { chave: string; linha: LinhaRec; descricao: string }[])
-      .map((s) => [chaveServico(s.linha, s.chave), s.descricao])))
-    setClientes(cls ?? [])
-    setLancamentos(lancs ?? [])
-    setCategorias(cats)
-    setLoading(false)
+  const aplicar = useCallback((r: RespostaRecorrencia) => {
+    setResp(r)
+    setServicos(new Map(r.servicos.map((s) => [chaveServico(s.linha, s.chave), s.descricao])))
   }, [])
 
-  // O Asaas é mais lento: carrega à parte para a tela não esperar por ele.
   const carregarAsaas = useCallback(async () => {
+    const meu = pedido.current
+    setAsaasCarregando(true)
     setErroAsaas(null)
     try {
-      const r = await fetch('/api/asaas/assinaturas')
-      const json = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(json.error ?? `Erro ${r.status}`)
-      setAsaas(json)
+      const r = await buscar(true)
+      if (meu !== pedido.current) return
+      aplicar(r)
+      setErroAsaas(r.asaas.erro)
     } catch (e) {
-      setErroAsaas(e instanceof Error ? e.message : 'Falha ao falar com o Asaas.')
-      setAsaas({ configurado: true, assinaturas: [] })
+      if (meu === pedido.current) setErroAsaas(e instanceof Error ? e.message : 'Falha ao falar com o Asaas.')
+    } finally {
+      if (meu === pedido.current) setAsaasCarregando(false)
     }
-  }, [])
+  }, [buscar, aplicar])
 
-  useEffect(() => { carregar(); carregarAsaas() }, [carregar, carregarAsaas])
+  const recarregarTudo = useCallback(async () => {
+    const meu = ++pedido.current
+    setErroRede(null)
+    try {
+      const r = await buscar(false)
+      if (meu !== pedido.current) return
+      aplicar(r)
+      setLoading(false)
+      if (r.asaas.configurado) await carregarAsaas()
+      else setAsaasCarregando(false)
+    } catch (e) {
+      if (meu !== pedido.current) return
+      setErroRede(e instanceof Error ? e.message : 'Falha ao carregar o MRR.')
+      setLoading(false)
+      setAsaasCarregando(false)
+    }
+  }, [buscar, aplicar, carregarAsaas])
 
-  const recarregarTudo = useCallback(() => { carregar(); carregarAsaas() }, [carregar, carregarAsaas])
+  useEffect(() => { recarregarTudo() }, [recarregarTudo])
+
+  const semMigration = resp?.semMigration ?? false
 
   async function alternarCategoria(c: Categoria) {
     if (semMigration) return
     const { error } = await (createClient() as any).from('categorias_financeiras').update({ recorrente: !c.recorrente }).eq('id', c.id)
-    if (!error) await carregar()
+    if (!error) await recarregarTudo()
   }
 
   const servicoDe = useCallback((linha: LinhaRec, chave: string) => servicos.get(chaveServico(linha, chave)) ?? null, [servicos])
@@ -123,50 +105,26 @@ export function useRecorrencia() {
     return null
   }
 
-  const resultado = useMemo(() => {
-    const dados: Dados = {
-      clientes,
-      lancamentos,
-      recorrentes: categorias.filter((c) => c.recorrente).map((c) => c.id),
-      assinaturas: asaas?.assinaturas ?? [],
-      asaasCarregado: !!asaas?.configurado && !erroAsaas && (asaas?.assinaturas.length ?? 0) > 0,
-      hoje,
-    }
-    // Sem cliente ligado: só as que já pagaram pedem atenção; as que esperam o
-    // 1º pagamento (cliente ainda não cadastrado de propósito) só são contadas.
-    const ativasSemCliente = assinaturasSemCliente(dados).filter(ativa)
-    const semCliente = ativasSemCliente.filter((s) => s.jaPagou !== false)
-    const linhas = LINHAS_REC.map((l) => montarLinha(l, dados))
-    const porLinha = Object.fromEntries(linhas.map((l) => [l.linha, l])) as Record<LinhaRec, ResultadoLinha>
-    const soma = (f: (l: ResultadoLinha) => number) => linhas.reduce((t, l) => t + f(l), 0)
-    return {
-      dados,
-      // Catálogo Place, Clubelly e Serviços, nessa ordem.
-      linhas,
-      porLinha,
-      total: {
-        mrrBruto: soma((l) => l.mrrBruto),
-        mrrLiquido: soma((l) => l.mrrLiquido),
-        ativas: soma((l) => l.ativas),
-        emDia: soma((l) => l.emDia),
-        assinaturas: soma((l) => l.totalAssinaturas),
-        inadimplentes: soma((l) => l.inadimplentes),
-        atraso: soma((l) => l.totalAtraso),
-      },
-      semCliente: {
-        qtd: semCliente.length,
-        valor: semCliente.reduce((t, s) => t + valorMensal(s), 0),
-        aguardandoPagamento: ativasSemCliente.length - semCliente.length,
-      },
-    }
-  }, [clientes, lancamentos, categorias, asaas, erroAsaas, hoje])
+  const inicial = useMemo(() => vazio(hoje), [hoje])
+  const resumo = resp ?? inicial
+  const porLinha = useMemo(() => Object.fromEntries(resumo.linhas.map((l) => [l.linha, l])) as Record<LinhaRec, ResultadoLinha>, [resumo.linhas])
 
   return {
-    ...resultado,
-    loading, erro, categorias, semMigration, alternarCategoria,
-    servicoDe, salvarServico, semTabelaServicos,
-    asaasCarregando: asaas === null,
-    asaasLigado: !!asaas?.configurado,
+    hoje: resumo.hoje,
+    linhas: resumo.linhas,
+    porLinha,
+    total: resumo.total,
+    semCliente: resumo.semCliente,
+    churn: resumo.churn,
+    safras: resumo.safras,
+    taxas: resp?.taxas ?? null,
+    loading,
+    erro: erroRede ?? resp?.erro ?? null,
+    categorias: resp?.categorias ?? [],
+    semMigration, alternarCategoria,
+    servicoDe, salvarServico, semTabelaServicos: resp?.semTabelaServicos ?? false,
+    asaasCarregando,
+    asaasLigado: resp?.asaas.configurado ?? false,
     erroAsaas,
     carregarAsaas,
     recarregarTudo,

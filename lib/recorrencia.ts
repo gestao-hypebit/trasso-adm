@@ -10,6 +10,7 @@
 import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
 import { diasEntre } from '@/lib/financeiro'
 import { formatCurrency } from '@/lib/utils'
+import { safras, type Safra } from '@/lib/saas/metricas'
 import { cicloLabel, valorMensal, type AssinaturaAsaas } from '@/lib/asaas/rotulos'
 import { ehLinhaSaas, linhaDoProduto, linhaPelaDescricao, temSaas, LINHAS_SAAS, type LinhaSaas } from '@/lib/financeiro/linhas'
 
@@ -64,7 +65,10 @@ export type Assinante = {
   // Assinatura desta linha cancelada no Asaas (nenhuma ativa) depois de ter tido pagamento.
   cancelada: boolean
   pagamentos: number
+  primeiroPagamento: string | null
   ultimoPagamento: string | null
+  // Cancelada: quanto ela representava por mês (o que saiu do MRR).
+  valorCancelado: number
 }
 
 export type AbaLista = 'ativos' | 'aguardando' | 'atraso' | 'canceladas' | 'sem_mensalidade' | 'so_asaas' | 'todos'
@@ -211,7 +215,10 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       historico: historico(c.id), soNoAsaas: false,
       cancelada,
       pagamentos: pagamentos.length,
+      primeiroPagamento: pagamentos.reduce<string | null>((m, h) => (!m || h.data < m ? h.data : m), null),
       ultimoPagamento: pagamentos.reduce<string | null>((m, h) => (!m || h.data > m ? h.data : m), null),
+      valorCancelado: !cancelada ? 0 : subs.daLinha[0] ? valorMensal(subs.daLinha[0])
+        : [...pagamentos].sort((x, y) => y.data.localeCompare(x.data))[0]?.valor ?? 0,
     }
   })
   // Mensalidades lançadas sem cliente vinculado (identificadas pela descrição).
@@ -221,7 +228,8 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
       chave: a.chave, clienteId: a.chave.startsWith('d:') ? null : a.chave, nome: a.nome, empresa: null, whatsapp: a.whatsapp,
       mensalidade: a.valorMensal, liquido: a.valorMensal, desde: a.desde, mesesPagos: a.mesesPagos, pagoEsteMes: a.pagoEsteMes, ativo: true,
       atraso: 0, diasAtraso: 0, status: null, asaasCustomerId: null, assinaturas: [], idsDaLinha: [], fonte: 'financeiro',
-      historico: [], soNoAsaas: false, cancelada: false, pagamentos: a.mesesPagos, ultimoPagamento: null,
+      historico: [], soNoAsaas: false, cancelada: false, pagamentos: a.mesesPagos,
+      primeiroPagamento: null, ultimoPagamento: null, valorCancelado: 0,
     })
   }
   // Assinaturas do Asaas sem cliente ligado: a linha sai da descrição (ver
@@ -240,7 +248,7 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
         pagoEsteMes: false, ativo: subs.some(ativa), atraso: 0, diasAtraso: 0, status: null,
         asaasCustomerId: customerId, assinaturas: subs.sort((a, b) => Number(ativa(b)) - Number(ativa(a))),
         idsDaLinha: subs.map((s) => s.id), fonte: 'asaas', historico: [], soNoAsaas: true,
-        cancelada: false, pagamentos: 0, ultimoPagamento: null,
+        cancelada: false, pagamentos: 0, primeiroPagamento: null, ultimoPagamento: null, valorCancelado: 0,
       })
     }
   }
@@ -289,3 +297,70 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
 }
 
 export type ResultadoLinha = ReturnType<typeof montarLinha>
+
+// Janela dos cancelamentos recentes: o Asaas não diz quando a assinatura foi
+// cancelada, então vale a data do último pagamento.
+export const DIAS_CHURN_RECENTE = 90
+
+export type Cancelamento = {
+  chave: string; clienteId: string | null; nome: string; linha: LinhaRec
+  valor: number; primeiroPagamento: string | null; ultimoPagamento: string | null; pagamentos: number
+}
+
+// Tudo o que as telas de MRR usam, calculado de uma vez (roda no servidor).
+export function resumirRecorrencia(dados: Dados) {
+  const { hoje } = dados
+  // Sem cliente ligado: só as que já pagaram pedem atenção; as que esperam o
+  // 1º pagamento (cliente ainda não cadastrado de propósito) só são contadas.
+  const ativasSemCliente = assinaturasSemCliente(dados).filter(ativa)
+  const semCliente = ativasSemCliente.filter((s) => s.jaPagou !== false)
+  const linhas = LINHAS_REC.map((l) => montarLinha(l, dados))
+  const porLinha = Object.fromEntries(linhas.map((l) => [l.linha, l])) as Record<LinhaRec, ResultadoLinha>
+  const soma = (f: (l: ResultadoLinha) => number) => linhas.reduce((t, l) => t + f(l), 0)
+
+  const cancelamentos: Cancelamento[] = linhas
+    .flatMap((l) => l.linhas
+      .filter((a) => a.cancelada && !!a.ultimoPagamento && diasEntre(a.ultimoPagamento, hoje) <= DIAS_CHURN_RECENTE)
+      .map((a) => ({
+        chave: `${l.linha}:${a.chave}`, clienteId: a.clienteId, nome: a.nome, linha: l.linha, valor: a.valorCancelado,
+        primeiroPagamento: a.primeiroPagamento, ultimoPagamento: a.ultimoPagamento, pagamentos: a.pagamentos,
+      })))
+    .sort((a, b) => (b.ultimoPagamento ?? '').localeCompare(a.ultimoPagamento ?? ''))
+
+  // Mensalidades de cada SaaS (retenção por safra na tela de SaaS).
+  const recorrente = (l: LancRec) => !!l.categoria_id && dados.recorrentes.includes(l.categoria_id)
+  const safrasPorLinha = Object.fromEntries(LINHAS_SAAS.map((linha) => [linha, safras(
+    dados.lancamentos
+      .filter((x) => x.frente === linha && recorrente(x))
+      .map((x) => ({ chave: x.cliente_id ?? `d:${x.descricao}`, data: x.data, status: x.status })),
+    hoje,
+  )])) as Record<LinhaSaas, Safra[]>
+
+  return {
+    hoje,
+    // Catálogo Place, Clubelly e Serviços, nessa ordem.
+    linhas,
+    porLinha,
+    total: {
+      mrrBruto: soma((l) => l.mrrBruto),
+      mrrLiquido: soma((l) => l.mrrLiquido),
+      ativas: soma((l) => l.ativas),
+      emDia: soma((l) => l.emDia),
+      assinaturas: soma((l) => l.totalAssinaturas),
+      inadimplentes: soma((l) => l.inadimplentes),
+      atraso: soma((l) => l.totalAtraso),
+    },
+    semCliente: {
+      qtd: semCliente.length,
+      valor: semCliente.reduce((t, s) => t + valorMensal(s), 0),
+      aguardandoPagamento: ativasSemCliente.length - semCliente.length,
+    },
+    churn: {
+      cancelamentos,
+      valor: cancelamentos.reduce((t, c) => t + c.valor, 0),
+    },
+    safras: safrasPorLinha,
+  }
+}
+
+export type ResumoRecorrencia = ReturnType<typeof resumirRecorrencia>
