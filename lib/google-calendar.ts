@@ -9,11 +9,12 @@ export function createOAuth2Client() {
   )
 }
 
-export function getAuthUrl() {
+export function getAuthUrl(state: string) {
   const oauth2 = createOAuth2Client()
   return oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    state,
     scope: [
       'https://www.googleapis.com/auth/calendar.events',
       'https://www.googleapis.com/auth/calendar.readonly',
