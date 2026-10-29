@@ -19,6 +19,8 @@ import { frenteLeadOpcoes, labelFrenteLead } from '@/lib/leads/frente'
 import { comTemperatura, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
 import { normalizarUtm } from '@/lib/leads/utm'
 import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
+import { LeadContatos } from '@/components/leads/lead-contatos'
+import type { LeadContato } from '@/lib/leads/contatos'
 
 export type Lead = {
   id: string
@@ -36,13 +38,14 @@ export type Lead = {
   observacoes: string | null
   valor_estimado: number | null
   motivo_perda: string | null
+  proximo_contato: string | null
   etapa_desde: string
   created_at: string
   formularios: { nome: string } | null
 }
 
 export const LEAD_SELECT =
-  'id, nome, email, telefone, empresa, respostas, status, origem, frente, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, etapa_desde, created_at, formularios(nome)'
+  'id, nome, email, telefone, empresa, respostas, status, origem, frente, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, proximo_contato, etapa_desde, created_at, formularios(nome)'
 
 // Respostas que já aparecem no cabeçalho (ou no selo de temperatura) não se repetem na lista.
 const CHAVES_CABECALHO = ['nome', 'email', 'telefone', 'empresa', 'classificacao', 'pontuacao']
@@ -61,25 +64,40 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onChange: (lead: Lead) => void
   onDelete: (id: string) => void
+  onContato?: (contato: LeadContato) => void
 }
 
-export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Props) {
+export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onContato }: Props) {
   const router = useRouter()
   const [observacoes, setObservacoes] = useState('')
   const [valor, setValor] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
+  const [obsSalva, setObsSalva] = useState(false)
 
   useEffect(() => {
     setObservacoes(lead?.observacoes ?? '')
     setValor(lead?.valor_estimado != null ? String(lead.valor_estimado) : '')
     setErro(null)
     setConfirmarExclusao(false)
+    setObsSalva(false)
   }, [lead?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!lead) return null
   const atual = lead
+  const obsAlterada = observacoes !== (atual.observacoes ?? '')
+
+  async function salvarObservacoes() {
+    if (!obsAlterada) return
+    if (await atualizar({ observacoes: observacoes || null })) setObsSalva(true)
+  }
+
+  // Fechar o lead com a anotação ainda no campo também salva.
+  function fechar(open: boolean) {
+    if (!open) salvarObservacoes()
+    onOpenChange(open)
+  }
 
   async function atualizar(campos: Partial<Lead>) {
     setErro(null)
@@ -156,7 +174,7 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
   const temperatura = temperaturaDoLead(atual)
 
   return (
-    <Dialog open={!!lead} onOpenChange={onOpenChange}>
+    <Dialog open={!!lead} onOpenChange={fechar}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -245,6 +263,13 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
                 if (novo !== atual.valor_estimado) atualizar({ valor_estimado: novo })
               }}
             />
+            <Label htmlFor="lead-proximo" className="block pt-2">Próximo contato</Label>
+            <Input
+              id="lead-proximo"
+              type="date"
+              value={atual.proximo_contato ?? ''}
+              onChange={(e) => atualizar({ proximo_contato: e.target.value || null })}
+            />
             <Label className="block pt-2">Negócio</Label>
             <Select value={atual.frente} onValueChange={(frente) => atualizar({ frente })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -266,12 +291,20 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
               id="lead-obs"
               rows={9}
               value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-              onBlur={() => observacoes !== (atual.observacoes ?? '') && atualizar({ observacoes: observacoes || null })}
+              onChange={(e) => { setObservacoes(e.target.value); setObsSalva(false) }}
+              onBlur={salvarObservacoes}
               placeholder="Ex.: liguei dia 12, pediu proposta até sexta"
             />
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-[11px] text-brand-lavanda/40">
+                {obsAlterada ? 'Alterações não salvas' : obsSalva ? 'Salvo' : ''}
+              </span>
+              <Button size="sm" variant="outline" onClick={salvarObservacoes} disabled={!obsAlterada}>Salvar anotação</Button>
+            </div>
           </div>
         </div>
+
+        <LeadContatos lead={atual} atualizar={atualizar} onRegistrado={onContato} />
 
         {(atual.pagina || utm.length > 0) && (
           <p className="mt-4 text-[11px] text-brand-lavanda/40">

@@ -14,6 +14,7 @@ import { origemOpcoes } from '@/lib/crm/opcoes'
 import { LEAD_SELECT, type Lead } from '@/components/leads/lead-detalhe-dialog'
 import { comTemperatura, TEMPERATURAS, temperaturaConfig, type Temperatura } from '@/lib/leads/trafego'
 import { frenteLeadOpcoes, MARCA_DA_FRENTE, type FrenteLead } from '@/lib/leads/frente'
+import { ehCaptacaoAtiva } from '@/lib/leads/contatos'
 
 type CampanhaOpcao = { campaign_id: string; nome: string; status: string | null }
 
@@ -35,7 +36,7 @@ async function carregarCampanhas(frente: FrenteLead): Promise<CampanhaOpcao[]> {
   return ((data ?? []) as CampanhaOpcao[]).sort((a, b) => Number(b.status === 'ACTIVE') - Number(a.status === 'ACTIVE') || a.nome.localeCompare(b.nome))
 }
 
-const VAZIO = { nome: '', telefone: '', email: '', empresa: '', frente: 'agencia' as FrenteLead, origem: 'whatsapp', valor_estimado: '', observacoes: '', temperatura: '', campanha: '' }
+const VAZIO = { nome: '', telefone: '', email: '', empresa: '', frente: 'agencia' as FrenteLead, origem: 'whatsapp', valor_estimado: '', observacoes: '', temperatura: '', campanha: '', proximo_contato: '' }
 
 // Lead que chegou fora do site: WhatsApp, indicação, Instagram, evento...
 export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
@@ -66,6 +67,9 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
         empresa: form.empresa.trim() || null,
         frente: form.frente,
         origem: form.origem,
+        // Captação ativa: a gente já foi atrás, então não é um "novo" esperando resposta.
+        status: ehCaptacaoAtiva(form.origem) ? 'em_contato' : 'novo',
+        proximo_contato: form.proximo_contato || null,
         valor_estimado: form.valor_estimado ? Number(form.valor_estimado) : null,
         observacoes: form.observacoes.trim() || null,
         respostas: comTemperatura([], (form.temperatura || null) as Temperatura | null),
@@ -98,7 +102,7 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Novo lead</DialogTitle>
-          <DialogDescription>Contato que chegou por fora do site.</DialogDescription>
+          <DialogDescription>Contato que chegou por fora do site, ou que você foi atrás (captação ativa).</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 pt-2">
           <div className="space-y-1.5">
@@ -180,6 +184,10 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
                 )}
               </div>
             )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Próximo contato</Label>
+            <Input type="date" value={form.proximo_contato} onChange={set('proximo_contato')} />
           </div>
           <div className="space-y-1.5">
             <Label>Anotações</Label>

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency } from '@/lib/utils'
 import { ETAPAS_FUNIL, etapaLabel, resumoFunil, taxa, type Historico, type LeadFunil } from '@/lib/leads/funil'
-import type { LeadTrafego } from '@/lib/leads/trafego'
+import { mediana, type LeadTrafego } from '@/lib/leads/trafego'
 import { PainelTrafego } from '@/components/leads/painel-trafego'
 import { frenteLeadOpcoes, type FrenteLead } from '@/lib/leads/frente'
 
@@ -27,6 +27,7 @@ export default function ConversaoPage() {
   // Respostas vêm junto para o painel de tráfego pago (temperatura do lead).
   const [leads, setLeads] = useState<(LeadFunil & Pick<LeadTrafego, 'respostas'> & { frente: string })[]>([])
   const [historico, setHistorico] = useState<Historico[]>([])
+  const [toques, setToques] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [periodo, setPeriodo] = useState(90)
@@ -35,13 +36,17 @@ export default function ConversaoPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient() as any
-      const [{ data: l, error }, { data: h }] = await Promise.all([
+      const [{ data: l, error }, { data: h }, { data: c }] = await Promise.all([
         supabase.from('leads').select('id, status, origem, frente, utm, respostas, valor_estimado, motivo_perda, created_at, formularios(nome)'),
         supabase.from('lead_historico').select('lead_id, de, para, created_at'),
+        supabase.from('lead_contatos').select('lead_id'),
       ])
       if (error) setErro('Não foi possível carregar. A migration do funil já foi aplicada no Supabase?')
       setLeads(l ?? [])
       setHistorico((h as Historico[]) ?? [])
+      const contagem = new Map<string, number>()
+      for (const x of (c ?? []) as { lead_id: string }[]) contagem.set(x.lead_id, (contagem.get(x.lead_id) ?? 0) + 1)
+      setToques(contagem)
       setLoading(false)
     }
     load()
@@ -54,8 +59,16 @@ export default function ConversaoPage() {
     const corte = periodo ? Date.now() - periodo * 86_400_000 : 0
     const noPeriodo = daFrente.filter((l) => new Date(l.created_at).getTime() >= corte)
     const ids = new Set(noPeriodo.map((l) => l.id))
-    return resumoFunil(noPeriodo, historico.filter((h) => ids.has(h.lead_id)))
-  }, [daFrente, historico, periodo])
+    // Toques até fechar: só vendas com pelo menos um contato registrado (o registro começou agora).
+    const toquesVendas = noPeriodo
+      .filter((l) => l.status === 'convertido' && toques.has(l.id))
+      .map((l) => toques.get(l.id)!)
+    return {
+      ...resumoFunil(noPeriodo, historico.filter((h) => ids.has(h.lead_id))),
+      toquesAteFechar: mediana(toquesVendas),
+      amostraToques: toquesVendas.length,
+    }
+  }, [daFrente, historico, toques, periodo])
 
   const t = r.total
   const iFechado = ETAPAS_FUNIL.indexOf('convertido')
@@ -99,7 +112,14 @@ export default function ConversaoPage() {
               <KpiCard title="Leads" value={String(t.leads)} icon={Inbox} />
               <KpiCard title="Taxa de fechamento" value={`${taxa(t.porEtapa[iFechado], t.leads)}%`} icon={Target} iconColor="text-brand-lima" />
               <KpiCard title="Propostas que fecham" value={`${taxa(t.porEtapa[iFechado], t.porEtapa[iProposta])}%`} icon={FileText} />
-              <KpiCard title="Ciclo médio de venda" value={fmtDias(r.cicloMedioDias)} icon={Clock} />
+              <KpiCard
+                title="Ciclo médio de venda"
+                value={fmtDias(r.cicloMedioDias)}
+                icon={Clock}
+                sub={r.toquesAteFechar !== null
+                  ? `${String(r.toquesAteFechar).replace('.', ',')} toques até fechar (${r.amostraToques} venda${r.amostraToques === 1 ? '' : 's'})`
+                  : undefined}
+              />
             </div>
 
             <PainelTrafego leads={daFrente} historico={historico} periodo={periodo} frente={frente} />

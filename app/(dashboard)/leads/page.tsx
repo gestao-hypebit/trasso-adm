@@ -8,7 +8,7 @@ import {
   useDroppable, useDraggable,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Search, Inbox, Plus, Columns3, List, Clock } from 'lucide-react'
+import { Search, Inbox, Plus, Columns3, List, Clock, CalendarClock, PhoneCall } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,8 +22,10 @@ import { LeadDetalheDialog, LEAD_SELECT, type Lead } from '@/components/leads/le
 import { NovoLeadDialog } from '@/components/leads/novo-lead-dialog'
 import { LeadsSubNav } from '@/components/leads/leads-sub-nav'
 import { corFrenteLead, frenteLeadOpcoes, labelFrenteLead, type FrenteLead } from '@/lib/leads/frente'
+import { contatoPendente, situacaoContato } from '@/lib/leads/contatos'
+import { diaSP } from '@/lib/anuncios/regras'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatCurrency, formatRelative } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, formatRelative } from '@/lib/utils'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
 import { canalDoLead, motivoPerdaOpcoes, taxa } from '@/lib/leads/funil'
 import { ehTrafegoPago, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
@@ -61,6 +63,21 @@ const DIAS_PARADO = 7
 
 const diasDesde = (iso: string) => (Date.now() - new Date(iso).getTime()) / 86_400_000
 
+// Selo do próximo contato no card e na lista.
+function ProximoContato({ dia, hoje }: { dia: string | null; hoje: string }) {
+  const s = situacaoContato(dia, hoje)
+  if (!s || !dia) return null
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 text-[11px]',
+      s === 'atrasado' ? 'text-brand-rosa' : s === 'hoje' ? 'text-brand-lima' : 'text-brand-lavanda/50'
+    )}>
+      <CalendarClock className="h-3 w-3" />
+      {s === 'hoje' ? 'Hoje' : s === 'atrasado' ? `Atrasado · ${formatDate(dia, 'dd/MM')}` : formatDate(dia, 'dd/MM')}
+    </span>
+  )
+}
+
 function ColunaDroppable({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
@@ -70,8 +87,9 @@ function ColunaDroppable({ id, children }: { id: string; children: React.ReactNo
   )
 }
 
-function LeadCard({ lead, onAbrir, fantasma = false }: { lead: Lead; onAbrir?: () => void; fantasma?: boolean }) {
-  const parado = !FECHADAS.includes(lead.status) && diasDesde(lead.etapa_desde) > DIAS_PARADO
+function LeadCard({ lead, toques = 0, hoje, onAbrir, fantasma = false }: { lead: Lead; toques?: number; hoje: string; onAbrir?: () => void; fantasma?: boolean }) {
+  const aberto = !FECHADAS.includes(lead.status)
+  const parado = aberto && diasDesde(lead.etapa_desde) > DIAS_PARADO
   return (
     <Card className={cn('cursor-pointer hover:border-white/[0.15] transition-colors', fantasma && 'rotate-2 shadow-2xl')} onClick={onAbrir}>
       <CardContent className="p-3 space-y-1.5">
@@ -90,6 +108,16 @@ function LeadCard({ lead, onAbrir, fantasma = false }: { lead: Lead; onAbrir?: (
         {lead.status === 'descartado' && lead.motivo_perda && (
           <p className="text-[11px] text-brand-rosa/70 truncate">{lead.motivo_perda}</p>
         )}
+        {(aberto && lead.proximo_contato || toques > 0) && (
+          <div className="flex items-center gap-2.5">
+            {aberto && <ProximoContato dia={lead.proximo_contato} hoje={hoje} />}
+            {toques > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-brand-lavanda/40">
+                <PhoneCall className="h-3 w-3" /> {toques}
+              </span>
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <span className={cn('flex items-center gap-1 text-[11px]', parado ? 'text-yellow-400' : 'text-brand-lavanda/40')}>
             <Clock className="h-3 w-3" /> {formatRelative(lead.etapa_desde)}
@@ -103,7 +131,7 @@ function LeadCard({ lead, onAbrir, fantasma = false }: { lead: Lead; onAbrir?: (
   )
 }
 
-function LeadArrastavel({ lead, onAbrir }: { lead: Lead; onAbrir: () => void }) {
+function LeadArrastavel({ lead, toques, hoje, onAbrir }: { lead: Lead; toques: number; hoje: string; onAbrir: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
   return (
     <div
@@ -113,7 +141,7 @@ function LeadArrastavel({ lead, onAbrir }: { lead: Lead; onAbrir: () => void }) 
       {...attributes}
       {...listeners}
     >
-      <LeadCard lead={lead} onAbrir={onAbrir} />
+      <LeadCard lead={lead} toques={toques} hoje={hoje} onAbrir={onAbrir} />
     </div>
   )
 }
@@ -130,6 +158,10 @@ function LeadsConteudo() {
   const [filtroTemperatura, setFiltroTemperatura] = useState<Temperatura | 'todas'>('todas')
   const [soTrafegoPago, setSoTrafegoPago] = useState(false)
   const [filtroFrente, setFiltroFrente] = useState<FrenteLead | 'todas'>('todas')
+  const [soParaHoje, setSoParaHoje] = useState(false)
+  // Quantos contatos (toques) cada lead já recebeu.
+  const [toques, setToques] = useState<Map<string, number>>(new Map())
+  const hoje = diaSP(new Date())
   const [abertoId, setAbertoId] = useState<string | null>(searchParams.get('lead'))
   const [novoAberto, setNovoAberto] = useState(false)
   const [arrastando, setArrastando] = useState<Lead | null>(null)
@@ -145,12 +177,16 @@ function LeadsConteudo() {
       if (salva === 'funil' || salva === 'lista') setVisao(salva)
     } catch {}
     async function load() {
-      const { data, error } = await (createClient() as any)
-        .from('leads')
-        .select(LEAD_SELECT)
-        .order('created_at', { ascending: false })
-      if (error) setErro('Não foi possível carregar os leads. A migration do funil já foi aplicada no Supabase?')
+      const supabase = createClient() as any
+      const [{ data, error }, { data: contatos }] = await Promise.all([
+        supabase.from('leads').select(LEAD_SELECT).order('created_at', { ascending: false }),
+        supabase.from('lead_contatos').select('lead_id'),
+      ])
+      if (error) setErro('Não foi possível carregar os leads. As migrations do funil já foram aplicadas no Supabase?')
       setLeads((data as Lead[]) ?? [])
+      const contagem = new Map<string, number>()
+      for (const c of (contatos ?? []) as { lead_id: string }[]) contagem.set(c.lead_id, (contagem.get(c.lead_id) ?? 0) + 1)
+      setToques(contagem)
       setLoading(false)
     }
     load()
@@ -203,8 +239,10 @@ function LeadsConteudo() {
   const buscados = daFrente.filter((l) =>
     (!termo || [l.nome, l.email, l.telefone, l.empresa].some((v) => v?.toLowerCase().includes(termo))) &&
     (filtroTemperatura === 'todas' || temperaturaDoLead(l) === filtroTemperatura) &&
-    (!soTrafegoPago || ehTrafegoPago(l))
+    (!soTrafegoPago || ehTrafegoPago(l)) &&
+    (!soParaHoje || (!FECHADAS.includes(l.status) && contatoPendente(l.proximo_contato, hoje)))
   )
+  const paraHoje = daFrente.filter((l) => !FECHADAS.includes(l.status) && contatoPendente(l.proximo_contato, hoje)).length
   const filtrados = buscados.filter((l) =>
     filtroStatus === 'todos' ||
     (filtroStatus === 'ativos' ? !FECHADAS.includes(l.status) : l.status === filtroStatus)
@@ -323,6 +361,20 @@ function LeadsConteudo() {
               Só tráfego pago
               <span className="rounded-full bg-white/[0.02] px-1.5">{daFrente.filter(ehTrafegoPago).length}</span>
             </button>
+            <button
+              onClick={() => setSoParaHoje((v) => !v)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                soParaHoje
+                  ? 'border-brand-lima bg-brand-lima/20 text-brand-lima'
+                  : paraHoje > 0
+                    ? 'border-brand-rosa/40 bg-brand-rosa/10 text-brand-lavanda hover:border-brand-rosa/60'
+                    : 'border-white/[0.1] bg-white/[0.04] text-brand-lavanda/70 hover:border-white/[0.2] hover:text-brand-lavanda'
+              )}
+            >
+              <CalendarClock className="h-3 w-3" /> Falar hoje
+              <span className="rounded-full bg-white/[0.02] px-1.5">{paraHoje}</span>
+            </button>
           </div>
         )}
 
@@ -339,7 +391,10 @@ function LeadsConteudo() {
               {colunas.map((col) => {
                 const naColuna = buscados
                   .filter((l) => l.status === col.key && (!FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO))
-                  .sort((a, b) => ordemTemperatura(a) - ordemTemperatura(b))
+                  // Contato vencido ou de hoje no topo; depois os mais quentes.
+                  .sort((a, b) =>
+                    Number(contatoPendente(b.proximo_contato, hoje)) - Number(contatoPendente(a.proximo_contato, hoje)) ||
+                    ordemTemperatura(a) - ordemTemperatura(b))
                 const soma = naColuna.reduce((s, l) => s + Number(l.valor_estimado ?? 0), 0)
                 return (
                   <div key={col.key} className={cn('w-64 shrink-0 rounded-xl border-t-2 bg-brand-noite/30', col.cor)}>
@@ -355,14 +410,14 @@ function LeadsConteudo() {
                     </div>
                     <ColunaDroppable id={col.key}>
                       {naColuna.length === 0 && <p className="text-xs text-brand-lavanda/20 text-center py-6">Vazio</p>}
-                      {naColuna.map((l) => <LeadArrastavel key={l.id} lead={l} onAbrir={() => abrir(l.id)} />)}
+                      {naColuna.map((l) => <LeadArrastavel key={l.id} lead={l} toques={toques.get(l.id) ?? 0} hoje={hoje} onAbrir={() => abrir(l.id)} />)}
                     </ColunaDroppable>
                   </div>
                 )
               })}
             </div>
             <DragOverlay dropAnimation={null}>
-              {arrastando ? <LeadCard lead={arrastando} fantasma /> : null}
+              {arrastando ? <LeadCard lead={arrastando} toques={toques.get(arrastando.id) ?? 0} hoje={hoje} fantasma /> : null}
             </DragOverlay>
           </DndContext>
         ) : (
@@ -377,13 +432,14 @@ function LeadsConteudo() {
                       <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Origem</th>
                       <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Interesse</th>
                       <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Recebido</th>
+                      <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Próximo contato</th>
                       <th className="text-left text-xs text-brand-lavanda/50 font-medium px-4 py-3">Etapa</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtrados.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-16 text-center">
+                        <td colSpan={7} className="px-6 py-16 text-center">
                           <Inbox className="h-10 w-10 text-brand-lavanda/20 mx-auto mb-3" />
                           <p className="text-brand-lavanda/40 text-sm">
                             {leads.length === 0 ? 'Nenhum lead ainda. Os contatos do formulário do site aparecem aqui.' : 'Nenhum lead encontrado.'}
@@ -421,6 +477,9 @@ function LeadsConteudo() {
                             <p className="truncate max-w-[260px]">{resumo(l) || '—'}</p>
                           </td>
                           <td className="px-4 py-3.5 text-xs text-brand-lavanda/50 whitespace-nowrap">{formatRelative(l.created_at)}</td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            {!FECHADAS.includes(l.status) && l.proximo_contato ? <ProximoContato dia={l.proximo_contato} hoje={hoje} /> : <span className="text-xs text-brand-lavanda/30">—</span>}
+                          </td>
                           <td className="px-4 py-3.5">{sc && <Badge variant={sc.variant}>{sc.label}</Badge>}</td>
                         </tr>
                       )
@@ -437,6 +496,7 @@ function LeadsConteudo() {
         lead={aberto}
         onOpenChange={(open) => !open && abrir(null)}
         onChange={(lead) => setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)))}
+        onContato={(c) => setToques((prev) => new Map(prev).set(c.lead_id, (prev.get(c.lead_id) ?? 0) + 1))}
         onDelete={(id) => {
           setLeads((prev) => prev.filter((l) => l.id !== id))
           abrir(null)

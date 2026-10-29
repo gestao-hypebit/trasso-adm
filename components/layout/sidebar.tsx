@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { useMobileNav } from '@/components/layout/mobile-nav'
+import { ORIGENS_ATIVAS } from '@/lib/leads/contatos'
 
 type NavItem = {
   href: string
@@ -74,7 +75,9 @@ export function Sidebar() {
       const [configRes, userRes, leadsRes] = await Promise.all([
         db.from('configuracoes_agencia').select('logo_url, nome').limit(1).maybeSingle() as Promise<{ data: { logo_url: string | null; nome: string } | null }>,
         supabase.auth.getUser(),
-        db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'novo') as Promise<{ count: number | null }>,
+        // Só quem chegou sozinho e espera resposta; captação ativa não conta.
+        db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'novo')
+          .not('origem', 'in', `(${ORIGENS_ATIVAS.join(',')})`) as Promise<{ count: number | null }>,
       ])
       setLeadsNovos(leadsRes.count ?? 0)
 
