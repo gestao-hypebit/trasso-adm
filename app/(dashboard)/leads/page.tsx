@@ -8,7 +8,7 @@ import {
   useDroppable, useDraggable,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Search, Inbox, Plus, Columns3, List, Clock, CalendarClock, PhoneCall } from 'lucide-react'
+import { Search, Inbox, Plus, Columns3, List, Clock, CalendarClock, PhoneCall, MessageCircle, ArrowRight } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,7 +25,8 @@ import { corFrenteLead, frenteLeadOpcoes, labelFrenteLead, type FrenteLead } fro
 import { contatoPendente, situacaoContato } from '@/lib/leads/contatos'
 import { diaSP } from '@/lib/anuncios/regras'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatCurrency, formatDate, formatRelative } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, formatRelative, whatsappUrl } from '@/lib/utils'
+import { mensagemWhatsapp, proximoPasso } from '@/lib/leads/proximo-passo'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
 import { canalDoLead, motivoPerdaOpcoes, taxa } from '@/lib/leads/funil'
 import { ehTrafegoPago, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
@@ -87,18 +88,34 @@ function ColunaDroppable({ id, children }: { id: string; children: React.ReactNo
   )
 }
 
-function LeadCard({ lead, toques = 0, hoje, onAbrir, fantasma = false }: { lead: Lead; toques?: number; hoje: string; onAbrir?: () => void; fantasma?: boolean }) {
+function LeadCard({ lead, toques = 0, hoje, onAbrir, onWhatsapp, fantasma = false }: { lead: Lead; toques?: number; hoje: string; onAbrir?: () => void; onWhatsapp?: () => void; fantasma?: boolean }) {
   const aberto = !FECHADAS.includes(lead.status)
   const parado = aberto && diasDesde(lead.etapa_desde) > DIAS_PARADO
+  const passo = aberto && proximoPasso(lead.status)
+  const zap = whatsappUrl(lead.telefone, lead.status === 'novo' ? mensagemWhatsapp.primeiroContato(lead.nome, labelFrenteLead(lead.frente)) : undefined)
   return (
     <Card className={cn('cursor-pointer hover:border-white/[0.15] transition-colors', fantasma && 'rotate-2 shadow-2xl')} onClick={onAbrir}>
       <CardContent className="p-3 space-y-1.5">
         <div className="flex items-start gap-2">
           {lead.status === 'novo' && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-rosa" aria-label="Novo" />}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-brand-lavanda leading-snug truncate">{lead.nome}</p>
             {lead.empresa && <p className="text-xs text-brand-lavanda/40 truncate">{lead.empresa}</p>}
           </div>
+          {zap && aberto && !fantasma && (
+            // Atalho direto pro WhatsApp sem abrir o lead (e sem começar a arrastar o card).
+            <a
+              href={zap}
+              target="_blank"
+              rel="noreferrer"
+              title="Chamar no WhatsApp"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onWhatsapp?.() }}
+              className="-mr-1 -mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-brand-lavanda/40 hover:bg-white/[0.06] hover:text-brand-lima"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
         <div className="flex items-center gap-1.5 min-w-0">
           <TemperaturaBadge temperatura={temperaturaDoLead(lead)} />
@@ -126,12 +143,17 @@ function LeadCard({ lead, toques = 0, hoje, onAbrir, fantasma = false }: { lead:
             <span className="text-[11px] font-medium text-brand-lima">{formatCurrency(lead.valor_estimado)}</span>
           )}
         </div>
+        {passo && (
+          <p className="flex items-center gap-1 border-t border-white/[0.04] pt-1.5 text-[11px] text-brand-violeta">
+            <ArrowRight className="h-3 w-3 shrink-0" /> <span className="truncate">{passo}</span>
+          </p>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function LeadArrastavel({ lead, toques, hoje, onAbrir }: { lead: Lead; toques: number; hoje: string; onAbrir: () => void }) {
+function LeadArrastavel({ lead, toques, hoje, onAbrir, onWhatsapp }: { lead: Lead; toques: number; hoje: string; onAbrir: () => void; onWhatsapp: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
   return (
     <div
@@ -141,7 +163,7 @@ function LeadArrastavel({ lead, toques, hoje, onAbrir }: { lead: Lead; toques: n
       {...attributes}
       {...listeners}
     >
-      <LeadCard lead={lead} toques={toques} hoje={hoje} onAbrir={onAbrir} />
+      <LeadCard lead={lead} toques={toques} hoje={hoje} onAbrir={onAbrir} onWhatsapp={onWhatsapp} />
     </div>
   )
 }
@@ -410,7 +432,7 @@ function LeadsConteudo() {
                     </div>
                     <ColunaDroppable id={col.key}>
                       {naColuna.length === 0 && <p className="text-xs text-brand-lavanda/20 text-center py-6">Vazio</p>}
-                      {naColuna.map((l) => <LeadArrastavel key={l.id} lead={l} toques={toques.get(l.id) ?? 0} hoje={hoje} onAbrir={() => abrir(l.id)} />)}
+                      {naColuna.map((l) => <LeadArrastavel key={l.id} lead={l} toques={toques.get(l.id) ?? 0} hoje={hoje} onAbrir={() => abrir(l.id)} onWhatsapp={() => l.status === 'novo' && mover(l, 'em_contato')} />)}
                     </ColunaDroppable>
                   </div>
                 )

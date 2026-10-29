@@ -61,6 +61,14 @@ const horario = (e: Evento) => e.dia_inteiro
   ? 'Dia inteiro'
   : `${format(new Date(e.data_inicio), 'HH:mm')}${e.data_fim ? ` → ${format(new Date(e.data_fim), 'HH:mm')}` : ''}`
 
+function Carregando({ className }: { className?: string }) {
+  return (
+    <p className={cn('flex items-center justify-center gap-2 text-xs text-brand-lavanda/40', className)}>
+      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando agenda…
+    </p>
+  )
+}
+
 export default function AgendaPage() {
   const [eventos, setEventos] = useState<Evento[]>([])
   const [doGoogle, setDoGoogle] = useState<Evento[]>([])
@@ -74,6 +82,8 @@ export default function AgendaPage() {
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [apagando, setApagando] = useState<string | null>(null)
+  const [carregandoSlick, setCarregandoSlick] = useState(true)
+  const [carregandoGoogle, setCarregandoGoogle] = useState(true)
 
   useEffect(() => {
     const supabase = createClient() as any
@@ -84,12 +94,19 @@ export default function AgendaPage() {
       ])
       setEventos((data as Evento[]) ?? [])
       setClientes(cls ?? [])
+      setCarregandoSlick(false)
     }
     load()
     fetch('/api/google-calendar/status')
       .then((r) => r.json())
-      .then((s) => setGoogle({ connected: !!s.connected, email: s.email ?? null }))
-      .catch(() => setGoogle({ connected: false, email: null }))
+      .then((s) => {
+        setGoogle({ connected: !!s.connected, email: s.email ?? null })
+        if (!s.connected) setCarregandoGoogle(false)
+      })
+      .catch(() => {
+        setGoogle({ connected: false, email: null })
+        setCarregandoGoogle(false)
+      })
   }, [])
 
   // Eventos do Google do mês na tela (com folga de uma semana para cada lado).
@@ -97,6 +114,7 @@ export default function AgendaPage() {
     if (!google?.connected) return
     const timeMin = addDays(startOfMonth(mesAtual), -7).toISOString()
     const timeMax = addDays(endOfMonth(mesAtual), 7).toISOString()
+    setCarregandoGoogle(true)
     fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -104,6 +122,7 @@ export default function AgendaPage() {
         setAvisoGoogle(d.error ?? null)
       })
       .catch(() => setAvisoGoogle('Não foi possível ler o Google Agenda.'))
+      .finally(() => setCarregandoGoogle(false))
   }, [google?.connected, mesAtual])
 
   function abrirNovo(open: boolean) {
@@ -190,6 +209,8 @@ export default function AgendaPage() {
   }
 
   const eventosDiaSelecionado = diaSelecionado ? eventosNoDia(diaSelecionado) : []
+  // Enquanto a agenda da Slick ou a do Google não chegou, não dá para dizer "nenhum evento".
+  const carregando = carregandoSlick || carregandoGoogle
 
   const agora = new Date()
   const proximosEventos = todos
@@ -303,8 +324,9 @@ export default function AgendaPage() {
                   <Button variant="ghost" size="icon" onClick={() => setMesAtual(m => subMonths(m, 1))}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <h2 className="text-lg font-bold text-brand-lavanda capitalize" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                  <h2 className="flex items-center gap-2 text-lg font-bold text-brand-lavanda capitalize" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
                     {format(mesAtual, 'MMMM yyyy', { locale: ptBR })}
+                    {carregando && <Loader2 className="h-4 w-4 animate-spin text-brand-lavanda/40" aria-label="Carregando" />}
                   </h2>
                   <Button variant="ghost" size="icon" onClick={() => setMesAtual(m => addMonths(m, 1))}>
                     <ChevronRight className="h-4 w-4" />
@@ -317,7 +339,7 @@ export default function AgendaPage() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-1">
+                <div className={cn('grid grid-cols-7 gap-1 transition-opacity', carregandoSlick && 'opacity-40 animate-pulse pointer-events-none')}>
                   {diasVazios.map((_, i) => <div key={`v${i}`} />)}
                   {diasDoMes.map((dia) => {
                     const evs = eventosNoDia(dia)
@@ -379,7 +401,9 @@ export default function AgendaPage() {
                     <h3 className="text-sm font-semibold text-brand-lavanda mb-3">
                       {format(diaSelecionado, "EEEE, d 'de' MMMM", { locale: ptBR })}
                     </h3>
-                    {eventosDiaSelecionado.length === 0 ? (
+                    {eventosDiaSelecionado.length === 0 && carregando ? (
+                      <Carregando className="justify-start" />
+                    ) : eventosDiaSelecionado.length === 0 ? (
                       <p className="text-xs text-brand-lavanda/40">Nenhum evento neste dia.</p>
                     ) : (
                       <div className="space-y-2">
@@ -438,7 +462,9 @@ export default function AgendaPage() {
                 <h3 className="text-sm font-semibold text-brand-lavanda">Próximos Eventos</h3>
               </div>
               <CardContent className="p-0">
-                {proximosEventos.length === 0 ? (
+                {proximosEventos.length === 0 && carregando ? (
+                  <Carregando className="p-6" />
+                ) : proximosEventos.length === 0 ? (
                   <p className="text-xs text-brand-lavanda/40 p-6 text-center">Nenhum evento próximo.</p>
                 ) : proximosEventos.map((e) => {
                   const tc = configDoTipo(e.tipo)

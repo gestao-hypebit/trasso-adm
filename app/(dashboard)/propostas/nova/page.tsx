@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { diaSP, somarDias } from '@/lib/anuncios/regras'
 
 type ClienteOption = { id: string; nome: string }
 
@@ -89,6 +90,17 @@ export default function NovaPropostaPage() {
       const preSelecionado = new URLSearchParams(window.location.search).get('cliente')
       if (preSelecionado && (data as ClienteOption[] | null)?.some((c) => c.id === preSelecionado)) setValue('cliente_id', preSelecionado)
     })
+
+    // Vindo do "Próximo passo" do lead: já sugere título e validade de 15 dias.
+    const leadId = new URLSearchParams(window.location.search).get('lead')
+    if (leadId) {
+      ;(supabase as any).from('leads').select('nome, empresa').eq('id', leadId).maybeSingle()
+        .then(({ data: lead }: { data: { nome: string; empresa: string | null } | null }) => {
+          if (!lead) return
+          setValue('titulo', `Proposta — ${lead.empresa || lead.nome}`)
+          setValue('validade', somarDias(diaSP(new Date()), 15))
+        })
+    }
   }, [setValue])
 
   async function onSubmit(data: FormData) {

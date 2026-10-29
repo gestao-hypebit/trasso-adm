@@ -20,6 +20,7 @@ import { comTemperatura, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, tempe
 import { normalizarUtm } from '@/lib/leads/utm'
 import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
 import { LeadContatos } from '@/components/leads/lead-contatos'
+import { ProximoPasso } from '@/components/leads/proximo-passo'
 import type { LeadContato } from '@/lib/leads/contatos'
 
 export type Lead = {
@@ -113,7 +114,9 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onCo
     return true
   }
 
-  async function converterEmCliente() {
+  // Cria o cliente a partir do lead (se ainda não tem) e devolve o id.
+  async function garantirCliente(): Promise<string | null> {
+    if (atual.cliente_id) return atual.cliente_id
     setSalvando(true)
     setErro(null)
     const supabase = createClient() as any
@@ -141,13 +144,18 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onCo
     if (error || !cliente) {
       setErro('Não foi possível criar o cliente.')
       setSalvando(false)
-      return
+      return null
     }
     // Virar cliente não é fechar a venda: o lead segue no funil até a proposta ser aprovada.
     const antesDeQualificado = ETAPAS_FUNIL.indexOf(atual.status as LeadStatus) < ETAPAS_FUNIL.indexOf('qualificado')
     await atualizar({ cliente_id: cliente.id, ...(antesDeQualificado && atual.status !== 'descartado' ? { status: 'qualificado' } : {}) })
     setSalvando(false)
-    router.push(`/clientes/${cliente.id}`)
+    return cliente.id as string
+  }
+
+  async function converterEmCliente() {
+    const id = await garantirCliente()
+    if (id) router.push(`/clientes/${id}`)
   }
 
   async function excluir() {
@@ -198,6 +206,8 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onCo
             </Button>
           )}
         </div>
+
+        <ProximoPasso lead={atual} atualizar={atualizar} garantirCliente={garantirCliente} marcarContato={marcarContato} />
 
         {extras.length > 0 && (
           <dl className="mt-5 space-y-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
@@ -326,7 +336,7 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onCo
               </Button>
               {!['convertido', 'descartado'].includes(atual.status) && (
                 <Button size="sm" variant="violeta" asChild>
-                  <Link href={`/propostas/nova?cliente=${atual.cliente_id}`}><FileText className="h-3.5 w-3.5" /> Criar proposta</Link>
+                  <Link href={`/propostas/nova?cliente=${atual.cliente_id}&lead=${atual.id}`}><FileText className="h-3.5 w-3.5" /> Criar proposta</Link>
                 </Button>
               )}
             </div>
