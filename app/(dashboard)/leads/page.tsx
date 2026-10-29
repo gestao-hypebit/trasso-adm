@@ -20,7 +20,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LeadDetalheDialog, LEAD_SELECT, type Lead } from '@/components/leads/lead-detalhe-dialog'
 import { NovoLeadDialog } from '@/components/leads/novo-lead-dialog'
-import { LeadsSubNav } from '@/components/leads/leads-sub-nav'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatRelative } from '@/lib/utils'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
@@ -221,7 +220,6 @@ function LeadsConteudo() {
       <Header title="Leads" description="Funil de vendas" />
 
       <main className="flex-1 p-4 md:p-6">
-        <LeadsSubNav />
         <PageHeader
           title="Funil de vendas"
           description={loading ? 'Carregando…' : `${abertos.length} em aberto • ${formatCurrency(valorPipeline)} no funil • ${taxa(fechados, leads.length)}% fechados`}

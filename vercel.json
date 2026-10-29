@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/diario",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/anuncios",
-      "schedule": "0 9 * * *"
     }
   ]
 }

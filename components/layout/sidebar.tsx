@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   Settings, LogOut,
-  StickyNote, Inbox, Target, Star, ChevronDown, X, Globe, Megaphone, BarChart3,
+  StickyNote, Inbox, Target, Star, ChevronDown, X, Globe, Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -30,7 +30,6 @@ const navItems: NavItem[] = [
   { href: '/leads',         icon: Inbox,           label: 'Leads' },
   { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
   { href: '/social',        icon: Megaphone,       label: 'Social media' },
-  { href: '/anuncios',      icon: BarChart3,       label: 'Anúncios' },
   { href: '/avaliacoes',    icon: Star,            label: 'Avaliações' },
   {
     href: '/financeiro', icon: DollarSign, label: 'Financeiro',
