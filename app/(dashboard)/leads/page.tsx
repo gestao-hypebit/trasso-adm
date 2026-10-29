@@ -23,12 +23,14 @@ import { NovoLeadDialog } from '@/components/leads/novo-lead-dialog'
 import { LeadsSubNav } from '@/components/leads/leads-sub-nav'
 import { corFrenteLead, frenteLeadOpcoes, labelFrenteLead, type FrenteLead } from '@/lib/leads/frente'
 import { contatoPendente, situacaoContato } from '@/lib/leads/contatos'
-import { diaSP } from '@/lib/anuncios/regras'
+import { diaSP, somarDias } from '@/lib/anuncios/regras'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, formatRelative, whatsappUrl } from '@/lib/utils'
 import { mensagemWhatsapp, proximoPasso } from '@/lib/leads/proximo-passo'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
-import { canalDoLead, motivoPerdaOpcoes, taxa } from '@/lib/leads/funil'
+import { canalDoLead, motivoPerdaOpcoes, taxa, type Historico } from '@/lib/leads/funil'
+import { intervaloAnterior, intervaloDoPeriodo, noIntervalo, periodoOpcoes, type PeriodoChave } from '@/lib/leads/periodo'
+import { ResumoLeads } from '@/components/leads/resumo-leads'
 import { ehTrafegoPago, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
 import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
 
@@ -181,6 +183,11 @@ function LeadsConteudo() {
   const [soTrafegoPago, setSoTrafegoPago] = useState(false)
   const [filtroFrente, setFiltroFrente] = useState<FrenteLead | 'todas'>('todas')
   const [soParaHoje, setSoParaHoje] = useState(false)
+  const [periodo, setPeriodo] = useState<PeriodoChave>('tudo')
+  const [periodoCustom, setPeriodoCustom] = useState<{ de: string | null; ate: string | null }>({ de: null, ate: null })
+  // Histórico de etapas (até onde cada lead chegou) e quando foi o primeiro contato de cada um.
+  const [historico, setHistorico] = useState<Map<string, Historico[]>>(new Map())
+  const [primeiroContato, setPrimeiroContato] = useState<Map<string, string>>(new Map())
   // Quantos contatos (toques) cada lead já recebeu.
   const [toques, setToques] = useState<Map<string, number>>(new Map())
   const hoje = diaSP(new Date())
@@ -197,18 +204,30 @@ function LeadsConteudo() {
     try {
       const salva = localStorage.getItem('leads:visao')
       if (salva === 'funil' || salva === 'lista') setVisao(salva)
+      const p = localStorage.getItem('leads:periodo') as PeriodoChave | null
+      if (p && p !== 'personalizado' && periodoOpcoes.some((o) => o.value === p)) setPeriodo(p)
     } catch {}
     async function load() {
       const supabase = createClient() as any
-      const [{ data, error }, { data: contatos }] = await Promise.all([
+      const [{ data, error }, { data: contatos }, { data: hist }] = await Promise.all([
         supabase.from('leads').select(LEAD_SELECT).order('created_at', { ascending: false }),
-        supabase.from('lead_contatos').select('lead_id'),
+        supabase.from('lead_contatos').select('lead_id, created_at'),
+        supabase.from('lead_historico').select('lead_id, de, para, created_at'),
       ])
       if (error) setErro('Não foi possível carregar os leads. As migrations do funil já foram aplicadas no Supabase?')
       setLeads((data as Lead[]) ?? [])
       const contagem = new Map<string, number>()
-      for (const c of (contatos ?? []) as { lead_id: string }[]) contagem.set(c.lead_id, (contagem.get(c.lead_id) ?? 0) + 1)
+      const primeiro = new Map<string, string>()
+      for (const c of (contatos ?? []) as { lead_id: string; created_at: string }[]) {
+        contagem.set(c.lead_id, (contagem.get(c.lead_id) ?? 0) + 1)
+        const atual = primeiro.get(c.lead_id)
+        if (!atual || c.created_at < atual) primeiro.set(c.lead_id, c.created_at)
+      }
       setToques(contagem)
+      setPrimeiroContato(primeiro)
+      const porLead = new Map<string, Historico[]>()
+      for (const h of (hist ?? []) as Historico[]) porLead.set(h.lead_id, [...(porLead.get(h.lead_id) ?? []), h])
+      setHistorico(porLead)
       setLoading(false)
     }
     load()
@@ -217,6 +236,12 @@ function LeadsConteudo() {
   function trocarVisao(v: 'funil' | 'lista') {
     setVisao(v)
     try { localStorage.setItem('leads:visao', v) } catch {}
+  }
+
+  function trocarPeriodo(p: PeriodoChave) {
+    setPeriodo(p)
+    if (p === 'personalizado' && !periodoCustom.de) setPeriodoCustom({ de: somarDias(hoje, -29), ate: hoje })
+    try { localStorage.setItem('leads:periodo', p) } catch {}
   }
 
   function abrir(id: string | null) {
@@ -256,8 +281,14 @@ function LeadsConteudo() {
   }
 
   const termo = busca.toLowerCase()
-  // O negócio escolhido vale para tudo na tela: quadro, lista, contadores e totais.
-  const daFrente = filtroFrente === 'todas' ? leads : leads.filter((l) => l.frente === filtroFrente)
+  // Período (pela data de chegada) e negócio valem para tudo na tela: cards, quadro, lista e contadores.
+  const intervalo = intervaloDoPeriodo(periodo, hoje, periodoCustom)
+  const anterior = intervaloAnterior(intervalo)
+  const filtraPeriodo = periodo !== 'tudo'
+  const doNegocio = (l: Lead) => filtroFrente === 'todas' || l.frente === filtroFrente
+  const noPeriodo = leads.filter((l) => noIntervalo(diaSP(l.created_at), intervalo))
+  const daFrente = noPeriodo.filter(doNegocio)
+  const doPeriodoAnterior = anterior ? leads.filter((l) => doNegocio(l) && noIntervalo(diaSP(l.created_at), anterior)) : []
   const buscados = daFrente.filter((l) =>
     (!termo || [l.nome, l.email, l.telefone, l.empresa].some((v) => v?.toLowerCase().includes(termo))) &&
     (filtroTemperatura === 'todas' || temperaturaDoLead(l) === filtroTemperatura) &&
@@ -306,6 +337,41 @@ function LeadsConteudo() {
 
         {erro && <p className="mb-4 text-sm text-brand-rosa">{erro}</p>}
 
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap rounded-lg border border-white/[0.1] p-0.5">
+            {periodoOpcoes.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => trocarPeriodo(o.value)}
+                className={cn('rounded-md px-2.5 py-1.5 text-xs', periodo === o.value ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/50 hover:text-brand-lavanda/80')}
+              >{o.label}</button>
+            ))}
+          </div>
+          {periodo === 'personalizado' && (
+            <div className="flex items-center gap-2 text-xs text-brand-lavanda/50">
+              <Input type="date" className="h-8 w-[150px]" value={periodoCustom.de ?? ''} onChange={(e) => setPeriodoCustom((c) => ({ ...c, de: e.target.value || null }))} />
+              até
+              <Input type="date" className="h-8 w-[150px]" value={periodoCustom.ate ?? ''} onChange={(e) => setPeriodoCustom((c) => ({ ...c, ate: e.target.value || null }))} />
+            </div>
+          )}
+          {filtraPeriodo && intervalo.de && (
+            <span className="text-[11px] text-brand-lavanda/40">
+              Leads que chegaram {intervalo.de === intervalo.ate ? `em ${formatDate(intervalo.de, 'dd/MM')}` : `de ${formatDate(intervalo.de, 'dd/MM')} a ${formatDate(intervalo.ate ?? hoje, 'dd/MM')}`}
+            </span>
+          )}
+        </div>
+
+        {!loading && (
+          <ResumoLeads
+            leads={daFrente}
+            anteriores={doPeriodoAnterior}
+            historico={historico}
+            primeiroContato={primeiroContato}
+            toques={toques}
+            comparar={!!anterior}
+          />
+        )}
+
         {visao === 'lista' && !loading && leads.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
             {filtros.map(({ key, label, count }) => (
@@ -329,7 +395,7 @@ function LeadsConteudo() {
         {!loading && leads.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mb-3">
             {([{ value: 'todas', label: 'Todos os negócios' }, ...frenteLeadOpcoes] as const).map((o) => {
-              const qtd = o.value === 'todas' ? leads.length : leads.filter((l) => l.frente === o.value).length
+              const qtd = o.value === 'todas' ? noPeriodo.length : noPeriodo.filter((l) => l.frente === o.value).length
               if (o.value !== 'todas' && qtd === 0 && filtroFrente !== o.value) return null
               return (
                 <button
@@ -412,7 +478,7 @@ function LeadsConteudo() {
             <div className="flex gap-3 overflow-x-auto pb-4">
               {colunas.map((col) => {
                 const naColuna = buscados
-                  .filter((l) => l.status === col.key && (!FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO))
+                  .filter((l) => l.status === col.key && (filtraPeriodo || !FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO))
                   // Contato vencido ou de hoje no topo; depois os mais quentes.
                   .sort((a, b) =>
                     Number(contatoPendente(b.proximo_contato, hoje)) - Number(contatoPendente(a.proximo_contato, hoje)) ||
@@ -427,7 +493,7 @@ function LeadsConteudo() {
                       </div>
                       <p className="text-[11px] text-brand-lavanda/40 mt-0.5">
                         {soma > 0 ? formatCurrency(soma) : '—'}
-                        {FECHADAS.includes(col.key) && ` · últimos ${DIAS_NO_QUADRO} dias`}
+                        {FECHADAS.includes(col.key) && !filtraPeriodo && ` · últimos ${DIAS_NO_QUADRO} dias`}
                       </p>
                     </div>
                     <ColunaDroppable id={col.key}>
