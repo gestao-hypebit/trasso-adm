@@ -67,7 +67,7 @@ export default function AgendaPage() {
   const [google, setGoogle] = useState<{ connected: boolean; email: string | null } | null>(null)
   const [avisoGoogle, setAvisoGoogle] = useState<string | null>(null)
   const [mesAtual, setMesAtual] = useState(new Date())
-  const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null)
+  const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(new Date())
   const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([])
   const [novoOpen, setNovoOpen] = useState(false)
   const [form, setForm] = useState(EVENTO_VAZIO)
@@ -328,23 +328,46 @@ export default function AgendaPage() {
                         key={dia.toISOString()}
                         onClick={() => setDiaSelecionado(isSameDay(dia, diaSelecionado!) ? null : dia)}
                         className={cn(
-                          'relative flex flex-col items-center rounded-xl p-1.5 min-h-[56px] text-sm transition-all',
+                          'relative min-w-0 flex flex-col items-center md:items-stretch rounded-xl p-1.5 min-h-[56px] md:min-h-[104px] text-sm text-left transition-all',
+                          'md:border md:border-white/[0.04]',
                           isSelected ? 'bg-white/[0.1] ring-2 ring-brand-violeta' : 'hover:bg-brand-violeta/10',
                           isHoje && !isSelected && 'ring-1 ring-brand-lima/50',
                           !isSameMonth(dia, mesAtual) && 'opacity-30'
                         )}
                       >
                         <span className={cn(
-                          'text-xs font-medium rounded-full w-6 h-6 flex items-center justify-center',
+                          'text-xs font-medium rounded-full w-6 h-6 flex items-center justify-center shrink-0',
                           isHoje ? 'bg-brand-lima text-brand-noite font-bold' : 'text-brand-lavanda/70'
                         )}>
                           {format(dia, 'd')}
                         </span>
-                        <div className="flex flex-wrap gap-0.5 justify-center mt-1">
+
+                        {/* Celular: célula estreita, só as bolinhas. */}
+                        <div className="flex flex-wrap gap-0.5 justify-center mt-1 md:hidden">
                           {evs.slice(0, 3).map((e, i) => (
                             <span key={i} className={cn('h-1.5 w-1.5 rounded-full', configDoTipo(e.tipo).cor)} />
                           ))}
                           {evs.length > 3 && <span className="text-[9px] text-brand-lavanda/40">+{evs.length - 3}</span>}
+                        </div>
+
+                        {/* Telas maiores: etiqueta com horário e título, como no Google Agenda. */}
+                        <div className="hidden md:flex flex-col gap-0.5 mt-1 min-w-0">
+                          {evs.slice(0, 3).map((e) => {
+                            const tc = configDoTipo(e.tipo)
+                            return (
+                              <span
+                                key={e.id}
+                                title={`${horario(e)} · ${e.titulo}`}
+                                className={cn('block truncate rounded px-1.5 py-0.5 text-[11px] leading-tight', tc.cor, tc.text)}
+                              >
+                                {!e.dia_inteiro && <span className="font-semibold mr-1">{format(new Date(e.data_inicio), 'HH:mm')}</span>}
+                                {e.titulo}
+                              </span>
+                            )
+                          })}
+                          {evs.length > 3 && (
+                            <span className="px-1.5 text-[11px] text-brand-lavanda/50">+{evs.length - 3} mais</span>
+                          )}
                         </div>
                       </button>
                     )
