@@ -26,8 +26,7 @@ export const resultadoContato = (v: string) => resultadoMap[v] ?? { value: v, la
 
 export type LeadContato = { id: string; lead_id: string; tipo: string; resultado: string; nota: string | null; created_at: string }
 
-// Origens em que é a gente que vai atrás: o lead já entra "Em contato" e não
-// conta na bolinha de "novos" do menu (essa é para quem chegou sozinho).
+// Origens em que é a gente que vai atrás: o lead já entra "Em contato".
 export const ORIGENS_ATIVAS = ['captacao_ativa', 'representante_comercial']
 export const ehCaptacaoAtiva = (origem: string) => ORIGENS_ATIVAS.includes(origem)
 
