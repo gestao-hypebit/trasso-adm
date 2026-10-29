@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DollarSign, FolderOpen, FileText, Users, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, ChevronDown, Wallet, Activity, MessageCircle, FileCheck, FileSignature, CheckSquare } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { MrrCard } from '@/components/dashboard/mrr-card'
+import { ResumoDoDia } from '@/components/dashboard/resumo-do-dia'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -179,6 +180,8 @@ export default function DashboardPage() {
     <div>
       <Header title="Dashboard" description="Visão geral da Slick" />
       <div className="p-4 md:p-6 space-y-6">
+
+        <ResumoDoDia />
 
         {/* Seletor de mês */}
         <div className="flex flex-wrap items-center gap-3">
