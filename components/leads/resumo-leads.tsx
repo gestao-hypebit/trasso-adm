@@ -38,7 +38,8 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
   comparar: boolean
 }) {
   const max = (l: Lead) => etapaMaxima(l, historico.get(l.id) ?? [])
-  const doSite = leads.filter((l) => l.origem === 'site').length
+  // Do site = chegou por um formulário (site ou landing); o resto foi cadastrado à mão.
+  const doSite = leads.filter((l) => l.formulario_id).length
   const reunioes = leads.filter((l) => max(l) >= I_REUNIAO).length
   const propostas = leads.filter((l) => max(l) >= I_PROPOSTA).length
   const fechados = leads.filter((l) => l.status === 'convertido')

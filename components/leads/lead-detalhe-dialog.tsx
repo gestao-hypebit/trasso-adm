@@ -42,11 +42,12 @@ export type Lead = {
   proximo_contato: string | null
   etapa_desde: string
   created_at: string
+  formulario_id: string | null
   formularios: { nome: string } | null
 }
 
 export const LEAD_SELECT =
-  'id, nome, email, telefone, empresa, respostas, status, origem, frente, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, proximo_contato, etapa_desde, created_at, formularios(nome)'
+  'id, nome, email, telefone, empresa, respostas, status, origem, frente, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, proximo_contato, etapa_desde, created_at, formulario_id, formularios(nome)'
 
 // Respostas que já aparecem no cabeçalho (ou no selo de temperatura) não se repetem na lista.
 const CHAVES_CABECALHO = ['nome', 'email', 'telefone', 'empresa', 'classificacao', 'pontuacao']
