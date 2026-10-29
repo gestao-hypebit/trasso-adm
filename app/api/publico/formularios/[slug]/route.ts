@@ -2,6 +2,8 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { validarRespostas, type Campo } from '@/lib/leads/formulario'
+import { temperaturaDoLead, VALOR_PADRAO_POR_FORMULARIO } from '@/lib/leads/trafego'
+import { normalizarUtm } from '@/lib/leads/utm'
 
 // Rotas chamadas pelo servidor do SITE (nunca pelo navegador do visitante).
 // GET  → definição do formulário para o site renderizar.
@@ -62,16 +64,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     const resultado = validarRespostas(formulario.campos ?? [], body.valores ?? {})
     if (!resultado.ok) return NextResponse.json({ error: 'Confere os campos destacados.', erros: resultado.erros }, { status: 422 })
 
+    const utm = normalizarUtm(body.utm)
+    const temperatura = temperaturaDoLead({ respostas: resultado.respostas })
+
     const { data: lead, error } = await supabase
       .from('leads')
       .insert({
         formulario_id: formulario.id,
         ...resultado.lead,
         respostas: resultado.respostas,
+        // Landing de oferta única: o lead já nasce com o preço da oferta no funil.
+        valor_estimado: VALOR_PADRAO_POR_FORMULARIO[formulario.slug] ?? null,
         // Ex.: "landing-site" para os leads dos anúncios. Só slug simples.
         origem: body.origem?.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 50) || 'site',
         pagina: body.pagina?.slice(0, 500) ?? null,
-        utm: body.utm && Object.keys(body.utm).length > 0 ? body.utm : null,
+        utm: Object.keys(utm).length > 0 ? utm : null,
       })
       .select('id')
       .single()
@@ -81,10 +88,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     try {
       await supabase.from('notificacoes').insert({
         usuario_id: null,
-        titulo: 'Novo lead pelo site 🎯',
+        // Lead quente pede resposta na hora: título próprio e tipo "alerta".
+        titulo: temperatura === 'quente' ? '🔥 Lead quente pelo site' : 'Novo lead pelo site 🎯',
         mensagem: resultado.lead.empresa ? `${resultado.lead.nome} · ${resultado.lead.empresa}` : resultado.lead.nome,
         link: `/leads?lead=${lead.id}`,
-        tipo: 'info',
+        tipo: temperatura === 'quente' ? 'alerta' : 'info',
         lida: false,
       })
     } catch (e) {

@@ -25,12 +25,24 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatRelative } from '@/lib/utils'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
 import { canalDoLead, motivoPerdaOpcoes, taxa } from '@/lib/leads/funil'
+import { ehTrafegoPago, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
+import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
+
+// Respostas que já aparecem em outro lugar da tabela (cabeçalho ou selo de temperatura).
+const CHAVES_FORA_DO_RESUMO = ['nome', 'email', 'telefone', 'empresa', 'classificacao', 'pontuacao']
 
 // Resumo curto do que o lead escreveu/escolheu, para a tabela.
 function resumo(lead: Lead) {
-  const r = lead.respostas.find((r) => Array.isArray(r.valor)) ?? lead.respostas.find((r) => r.chave === 'mensagem')
+  const r =
+    lead.respostas.find((r) => Array.isArray(r.valor)) ??
+    lead.respostas.find((r) => r.chave === 'mensagem') ??
+    lead.respostas.find((r) => !CHAVES_FORA_DO_RESUMO.includes(r.chave))
   return r ? formatarValor(r.valor) : ''
 }
+
+// Quentes primeiro dentro de cada coluna; depois os mais recentes.
+const ORDEM_TEMPERATURA: Record<string, number> = { quente: 0, morno: 1, frio: 2 }
+const ordemTemperatura = (l: Lead) => ORDEM_TEMPERATURA[temperaturaDoLead(l) ?? ''] ?? 3
 
 const colunas: { key: LeadStatus; cor: string }[] = [
   { key: 'novo',        cor: 'border-brand-rosa' },
@@ -69,7 +81,10 @@ function LeadCard({ lead, onAbrir, fantasma = false }: { lead: Lead; onAbrir?: (
             {lead.empresa && <p className="text-xs text-brand-lavanda/40 truncate">{lead.empresa}</p>}
           </div>
         </div>
-        <p className="text-[11px] text-brand-lavanda/50 truncate">{canalDoLead(lead)}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <TemperaturaBadge temperatura={temperaturaDoLead(lead)} />
+          <p className="text-[11px] text-brand-lavanda/50 truncate">{canalDoLead(lead)}</p>
+        </div>
         {lead.status === 'descartado' && lead.motivo_perda && (
           <p className="text-[11px] text-brand-rosa/70 truncate">{lead.motivo_perda}</p>
         )}
@@ -110,6 +125,8 @@ function LeadsConteudo() {
   const [busca, setBusca] = useState('')
   const [visao, setVisao] = useState<'funil' | 'lista'>('funil')
   const [filtroStatus, setFiltroStatus] = useState<string>('ativos')
+  const [filtroTemperatura, setFiltroTemperatura] = useState<Temperatura | 'todas'>('todas')
+  const [soTrafegoPago, setSoTrafegoPago] = useState(false)
   const [abertoId, setAbertoId] = useState<string | null>(searchParams.get('lead'))
   const [novoAberto, setNovoAberto] = useState(false)
   const [arrastando, setArrastando] = useState<Lead | null>(null)
@@ -178,7 +195,11 @@ function LeadsConteudo() {
   }
 
   const termo = busca.toLowerCase()
-  const buscados = leads.filter((l) => !termo || [l.nome, l.email, l.telefone, l.empresa].some((v) => v?.toLowerCase().includes(termo)))
+  const buscados = leads.filter((l) =>
+    (!termo || [l.nome, l.email, l.telefone, l.empresa].some((v) => v?.toLowerCase().includes(termo))) &&
+    (filtroTemperatura === 'todas' || temperaturaDoLead(l) === filtroTemperatura) &&
+    (!soTrafegoPago || ehTrafegoPago(l))
+  )
   const filtrados = buscados.filter((l) =>
     filtroStatus === 'todos' ||
     (filtroStatus === 'ativos' ? !FECHADAS.includes(l.status) : l.status === filtroStatus)
@@ -240,6 +261,41 @@ function LeadsConteudo() {
           </div>
         )}
 
+        {!loading && leads.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {(['todas', ...TEMPERATURAS] as const).map((t) => {
+              const qtd = t === 'todas' ? leads.length : leads.filter((l) => temperaturaDoLead(l) === t).length
+              return (
+                <button
+                  key={t}
+                  onClick={() => setFiltroTemperatura(t)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                    filtroTemperatura === t
+                      ? 'border-brand-lima bg-brand-lima/20 text-brand-lima'
+                      : 'border-white/[0.1] bg-white/[0.04] text-brand-lavanda/70 hover:border-white/[0.2] hover:text-brand-lavanda'
+                  )}
+                >
+                  {t === 'todas' ? 'Todas as temperaturas' : `${temperaturaConfig[t].emoji} ${temperaturaConfig[t].label}`}
+                  <span className="rounded-full bg-white/[0.02] px-1.5">{qtd}</span>
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setSoTrafegoPago((v) => !v)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                soTrafegoPago
+                  ? 'border-brand-lima bg-brand-lima/20 text-brand-lima'
+                  : 'border-white/[0.1] bg-white/[0.04] text-brand-lavanda/70 hover:border-white/[0.2] hover:text-brand-lavanda'
+              )}
+            >
+              Só tráfego pago
+              <span className="rounded-full bg-white/[0.02] px-1.5">{leads.filter(ehTrafegoPago).length}</span>
+            </button>
+          </div>
+        )}
+
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
           <Input className="pl-9" placeholder="Buscar por nome, e-mail, telefone ou empresa..." value={busca} onChange={(e) => setBusca(e.target.value)} />
@@ -251,9 +307,9 @@ function LeadsConteudo() {
           <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="flex gap-3 overflow-x-auto pb-4">
               {colunas.map((col) => {
-                const naColuna = buscados.filter((l) =>
-                  l.status === col.key && (!FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO)
-                )
+                const naColuna = buscados
+                  .filter((l) => l.status === col.key && (!FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO))
+                  .sort((a, b) => ordemTemperatura(a) - ordemTemperatura(b))
                 const soma = naColuna.reduce((s, l) => s + Number(l.valor_estimado ?? 0), 0)
                 return (
                   <div key={col.key} className={cn('w-64 shrink-0 rounded-xl border-t-2 bg-brand-noite/30', col.cor)}>
@@ -312,7 +368,10 @@ function LeadsConteudo() {
                             <div className="flex items-center gap-2">
                               {l.status === 'novo' && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-rosa" aria-label="Novo" />}
                               <div className="min-w-0">
-                                <p className={cn('truncate max-w-[220px] group-hover:text-brand-lima transition-colors', l.status === 'novo' ? 'font-semibold text-brand-lavanda' : 'font-medium text-brand-lavanda/80')}>{l.nome}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className={cn('truncate max-w-[220px] group-hover:text-brand-lima transition-colors', l.status === 'novo' ? 'font-semibold text-brand-lavanda' : 'font-medium text-brand-lavanda/80')}>{l.nome}</p>
+                                  <TemperaturaBadge temperatura={temperaturaDoLead(l)} pontos={pontuacaoDoLead(l)} />
+                                </div>
                                 {l.empresa && <p className="text-xs text-brand-lavanda/40 truncate max-w-[220px]">{l.empresa}</p>}
                               </div>
                             </div>

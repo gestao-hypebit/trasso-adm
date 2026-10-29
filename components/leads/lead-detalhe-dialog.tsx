@@ -15,6 +15,9 @@ import { formatDate, whatsappUrl } from '@/lib/utils'
 import { formatarValor, leadStatusConfig, type LeadStatus, type Resposta } from '@/lib/leads/formulario'
 import { ETAPAS_FUNIL, motivoPerdaOpcoes } from '@/lib/leads/funil'
 import { origemOpcoes } from '@/lib/crm/opcoes'
+import { comTemperatura, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
+import { normalizarUtm } from '@/lib/leads/utm'
+import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
 
 export type Lead = {
   id: string
@@ -39,8 +42,17 @@ export type Lead = {
 export const LEAD_SELECT =
   'id, nome, email, telefone, empresa, respostas, status, origem, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, etapa_desde, created_at, formularios(nome)'
 
-// Respostas que já aparecem no cabeçalho não se repetem na lista.
-const CHAVES_CABECALHO = ['nome', 'email', 'telefone', 'empresa']
+// Respostas que já aparecem no cabeçalho (ou no selo de temperatura) não se repetem na lista.
+const CHAVES_CABECALHO = ['nome', 'email', 'telefone', 'empresa', 'classificacao', 'pontuacao']
+
+const ROTULO_UTM: Record<string, string> = {
+  utm_source: 'Fonte',
+  utm_medium: 'Mídia',
+  utm_campaign: 'Campanha',
+  utm_content: 'Anúncio',
+  utm_term: 'Termo',
+  fbclid: 'fbclid',
+}
 
 interface Props {
   lead: Lead | null
@@ -138,13 +150,17 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
 
   const whatsapp = whatsappUrl(atual.telefone, `Oi ${atual.nome.split(' ')[0]}! Aqui é da Slick, recebemos seu contato pelo site.`)
   const extras = atual.respostas.filter((r) => !CHAVES_CABECALHO.includes(r.chave))
-  const utm = atual.utm ? Object.entries(atual.utm) : []
+  const utm = Object.entries(normalizarUtm(atual.utm)).filter(([k]) => k !== 'fbclid')
+  const temperatura = temperaturaDoLead(atual)
 
   return (
     <Dialog open={!!lead} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{atual.nome}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {atual.nome}
+            <TemperaturaBadge temperatura={temperatura} pontos={pontuacaoDoLead(atual)} className="text-[11px]" />
+          </DialogTitle>
           <DialogDescription>
             {[atual.empresa, atual.formularios?.nome, formatDate(atual.created_at, "dd/MM/yyyy 'às' HH:mm")].filter(Boolean).join(' · ')}
           </DialogDescription>
@@ -201,6 +217,19 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
                 </SelectContent>
               </Select>
             )}
+            <Label className="block pt-2">Temperatura</Label>
+            <Select
+              value={temperatura ?? 'sem'}
+              onValueChange={(v) => atualizar({ respostas: comTemperatura(atual.respostas, v === 'sem' ? null : (v as Temperatura)) })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sem">Sem classificação</SelectItem>
+                {TEMPERATURAS.map((t) => (
+                  <SelectItem key={t} value={t}>{temperaturaConfig[t].emoji} {temperaturaConfig[t].label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Label htmlFor="lead-valor" className="block pt-2">Valor estimado (R$)</Label>
             <Input
               id="lead-valor"
@@ -238,7 +267,7 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
         {(atual.pagina || utm.length > 0) && (
           <p className="mt-4 text-[11px] text-brand-lavanda/40">
             {atual.pagina && <>Página: {atual.pagina}</>}
-            {utm.length > 0 && <> · {utm.map(([k, v]) => `${k}=${v}`).join(' · ')}</>}
+            {utm.length > 0 && <>{atual.pagina && ' · '}{utm.map(([k, v]) => `${ROTULO_UTM[k] ?? k}: ${v}`).join(' · ')}</>}
           </p>
         )}
 

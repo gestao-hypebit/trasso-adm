@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createClient } from '@/lib/supabase/client'
 import { origemOpcoes } from '@/lib/crm/opcoes'
 import { LEAD_SELECT, type Lead } from '@/components/leads/lead-detalhe-dialog'
+import { comTemperatura, TEMPERATURAS, temperaturaConfig, type Temperatura } from '@/lib/leads/trafego'
 
-const VAZIO = { nome: '', telefone: '', email: '', empresa: '', origem: 'whatsapp', valor_estimado: '', observacoes: '' }
+type CampanhaOpcao = { campaign_id: string; nome: string; status: string | null }
+
+// Origens que pedem a campanha do anúncio (para o painel de tráfego pago).
+const ORIGENS_PAGAS = ['trafego_pago', 'trafego_pago_whatsapp']
+
+// Campanhas da marca Slick no módulo de anúncios (nome começando com SLICK/TRASSO).
+async function carregarCampanhasSlick(): Promise<CampanhaOpcao[]> {
+  const supabase = createClient() as any
+  // anuncio_marcas tem permissão por coluna: lê só as liberadas e filtra aqui (como em /anuncios).
+  const { data: marcas } = await supabase.from('anuncio_marcas').select('id, slug')
+  const marca = (marcas ?? []).find((m: { slug: string }) => m.slug === 'slick')
+  if (!marca) return []
+  const { data: vinculos } = await supabase.from('anuncio_campanha_marca').select('campaign_id').eq('marca_id', marca.id)
+  const ids = (vinculos ?? []).map((v: { campaign_id: string }) => v.campaign_id)
+  if (ids.length === 0) return []
+  const { data } = await supabase.from('anuncio_campanhas').select('campaign_id, nome, status').in('campaign_id', ids)
+  // Ativas primeiro.
+  return ((data ?? []) as CampanhaOpcao[]).sort((a, b) => Number(b.status === 'ACTIVE') - Number(a.status === 'ACTIVE') || a.nome.localeCompare(b.nome))
+}
+
+const VAZIO = { nome: '', telefone: '', email: '', empresa: '', origem: 'whatsapp', valor_estimado: '', observacoes: '', temperatura: '', campanha: '' }
 
 // Lead que chegou fora do site: WhatsApp, indicação, Instagram, evento...
 export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
@@ -23,6 +44,12 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [campanhas, setCampanhas] = useState<CampanhaOpcao[]>([])
+  const pago = ORIGENS_PAGAS.includes(form.origem)
+
+  useEffect(() => {
+    if (open && pago && campanhas.length === 0) carregarCampanhasSlick().then(setCampanhas).catch(() => {})
+  }, [open, pago]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function salvar() {
     if (!form.nome.trim()) return
@@ -38,6 +65,15 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
         origem: form.origem,
         valor_estimado: form.valor_estimado ? Number(form.valor_estimado) : null,
         observacoes: form.observacoes.trim() || null,
+        respostas: comTemperatura([], (form.temperatura || null) as Temperatura | null),
+        // Mesmo formato das landings: o painel de tráfego pago liga o lead à campanha.
+        utm: pago
+          ? {
+              utm_source: 'meta',
+              utm_medium: form.origem === 'trafego_pago_whatsapp' ? 'whatsapp' : 'paid',
+              ...(form.campanha ? { utm_campaign: form.campanha } : {}),
+            }
+          : null,
       })
       .select(LEAD_SELECT)
       .single()
@@ -94,6 +130,40 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
               <Label>Valor estimado (R$)</Label>
               <Input type="number" min="0" step="100" value={form.valor_estimado} onChange={set('valor_estimado')} />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Temperatura</Label>
+              <Select value={form.temperatura || 'sem'} onValueChange={(t) => setForm((f) => ({ ...f, temperatura: t === 'sem' ? '' : t }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sem">Sem classificação</SelectItem>
+                  {TEMPERATURAS.map((t) => (
+                    <SelectItem key={t} value={t}>{temperaturaConfig[t].emoji} {temperaturaConfig[t].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {pago && (
+              <div className="space-y-1.5">
+                <Label>Campanha</Label>
+                {campanhas.length > 0 ? (
+                  <Select value={form.campanha || 'sem'} onValueChange={(c) => setForm((f) => ({ ...f, campanha: c === 'sem' ? '' : c }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sem">Não sei</SelectItem>
+                      {campanhas.map((c) => (
+                        <SelectItem key={c.campaign_id} value={c.campaign_id}>
+                          {c.nome}{c.status === 'ACTIVE' ? '' : ' (pausada)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={form.campanha} onChange={set('campanha')} placeholder="Nome da campanha" />
+                )}
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Anotações</Label>

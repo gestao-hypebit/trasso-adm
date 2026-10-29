@@ -1,6 +1,7 @@
 // Funil de vendas: etapas, canal de origem e as contas da tela /leads/conversao.
 
 import { labelOrigem } from '@/lib/crm/opcoes'
+import { normalizarUtm } from '@/lib/leads/utm'
 import { leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
 
 // Etapas "andando" do funil, na ordem. Perdido fica de fora: não é etapa, é saída.
@@ -18,13 +19,15 @@ export const motivoPerdaOpcoes = [
   'Outro',
 ]
 
-// Origem do lead no formato usado no funil. Leads do site são separados pela
-// fonte do anúncio (utm_source) ou, sem UTM, pelo formulário que preencheram.
-export function canalDoLead(lead: { origem: string; utm: Record<string, string> | null; formularios?: { nome: string } | null }) {
-  if (lead.origem !== 'site') return labelOrigem(lead.origem)
-  const fonte = lead.utm?.utm_source
-  if (fonte) return `Site · ${fonte}`
-  return lead.formularios?.nome ? `Site · ${lead.formularios.nome}` : 'Site'
+// Origem do lead no formato usado no funil. Leads que chegam com UTM (site,
+// landings, tráfego pago) são separados pela fonte do anúncio; leads do site
+// sem UTM, pelo formulário que preencheram.
+export function canalDoLead(lead: { origem: string; utm: Record<string, unknown> | null; formularios?: { nome: string } | null }) {
+  const fonte = normalizarUtm(lead.utm).utm_source
+  const base = lead.origem === 'site' ? 'Site' : labelOrigem(lead.origem)
+  if (fonte) return `${base} · ${fonte}`
+  if (lead.origem === 'site' && lead.formularios?.nome) return `Site · ${lead.formularios.nome}`
+  return base
 }
 
 export type LeadFunil = {
@@ -42,7 +45,7 @@ export type Historico = { lead_id: string; de: string | null; para: string; crea
 const indice = (status: string) => ETAPAS_FUNIL.indexOf(status as LeadStatus)
 
 // Etapa mais avançada que o lead chegou a atingir (mesmo que depois tenha sido perdido).
-export function etapaMaxima(lead: LeadFunil, historico: Historico[]): number {
+export function etapaMaxima(lead: { status: string }, historico: Historico[]): number {
   let max = Math.max(0, indice(lead.status))
   for (const h of historico) max = Math.max(max, indice(h.para))
   return max

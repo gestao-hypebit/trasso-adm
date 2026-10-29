@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency } from '@/lib/utils'
 import { ETAPAS_FUNIL, etapaLabel, resumoFunil, taxa, type Historico, type LeadFunil } from '@/lib/leads/funil'
+import type { LeadTrafego } from '@/lib/leads/trafego'
+import { PainelTrafego } from '@/components/leads/painel-trafego'
 
 const periodos = [
   { dias: 30, label: '30 dias' },
@@ -21,7 +23,8 @@ const periodos = [
 const fmtDias = (d: number | null) => (d === null ? '—' : d < 1 ? '< 1 dia' : `${d.toFixed(d < 10 ? 1 : 0).replace('.', ',')} dias`)
 
 export default function ConversaoPage() {
-  const [leads, setLeads] = useState<LeadFunil[]>([])
+  // Respostas vêm junto para o painel de tráfego pago (temperatura do lead).
+  const [leads, setLeads] = useState<(LeadFunil & Pick<LeadTrafego, 'respostas'>)[]>([])
   const [historico, setHistorico] = useState<Historico[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -31,11 +34,11 @@ export default function ConversaoPage() {
     async function load() {
       const supabase = createClient() as any
       const [{ data: l, error }, { data: h }] = await Promise.all([
-        supabase.from('leads').select('id, status, origem, utm, valor_estimado, motivo_perda, created_at, formularios(nome)'),
+        supabase.from('leads').select('id, status, origem, utm, respostas, valor_estimado, motivo_perda, created_at, formularios(nome)'),
         supabase.from('lead_historico').select('lead_id, de, para, created_at'),
       ])
       if (error) setErro('Não foi possível carregar. A migration do funil já foi aplicada no Supabase?')
-      setLeads((l as LeadFunil[]) ?? [])
+      setLeads(l ?? [])
       setHistorico((h as Historico[]) ?? [])
       setLoading(false)
     }
@@ -85,6 +88,8 @@ export default function ConversaoPage() {
               <KpiCard title="Propostas que fecham" value={`${taxa(t.porEtapa[iFechado], t.porEtapa[iProposta])}%`} icon={FileText} />
               <KpiCard title="Ciclo médio de venda" value={fmtDias(r.cicloMedioDias)} icon={Clock} />
             </div>
+
+            <PainelTrafego leads={leads} historico={historico} periodo={periodo} />
 
             <Card>
               <CardHeader><CardTitle className="text-base">Funil</CardTitle></CardHeader>
