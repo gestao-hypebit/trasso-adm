@@ -12,10 +12,9 @@ import { KpiCard } from '@/components/dashboard/kpi-card'
 import { createClient } from '@/lib/supabase/client'
 import { labelOrigem } from '@/lib/crm/opcoes'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { CATEGORIA_TRAFEGO } from '@/lib/leads/trafego'
 
 const ORIGEM = 'trafego_pago'
-// Despesa conta como investimento em tráfego quando a categoria tem um destes nomes.
-const CATEGORIA_TRAFEGO = /tr[aá]fego|an[uú]ncio|\bads\b/i
 
 const PERIODOS = [
   { value: '3', label: 'Últimos 3 meses' },

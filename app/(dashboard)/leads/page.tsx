@@ -20,6 +20,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LeadDetalheDialog, LEAD_SELECT, type Lead } from '@/components/leads/lead-detalhe-dialog'
 import { NovoLeadDialog } from '@/components/leads/novo-lead-dialog'
+import { LeadsSubNav } from '@/components/leads/leads-sub-nav'
+import { corFrenteLead, frenteLeadOpcoes, labelFrenteLead, type FrenteLead } from '@/lib/leads/frente'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatRelative } from '@/lib/utils'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
@@ -82,7 +84,8 @@ function LeadCard({ lead, onAbrir, fantasma = false }: { lead: Lead; onAbrir?: (
         </div>
         <div className="flex items-center gap-1.5 min-w-0">
           <TemperaturaBadge temperatura={temperaturaDoLead(lead)} />
-          <p className="text-[11px] text-brand-lavanda/50 truncate">{canalDoLead(lead)}</p>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: corFrenteLead(lead.frente) }} title={labelFrenteLead(lead.frente)} />
+          <p className="text-[11px] text-brand-lavanda/50 truncate">{labelFrenteLead(lead.frente)} · {canalDoLead(lead)}</p>
         </div>
         {lead.status === 'descartado' && lead.motivo_perda && (
           <p className="text-[11px] text-brand-rosa/70 truncate">{lead.motivo_perda}</p>
@@ -126,6 +129,7 @@ function LeadsConteudo() {
   const [filtroStatus, setFiltroStatus] = useState<string>('ativos')
   const [filtroTemperatura, setFiltroTemperatura] = useState<Temperatura | 'todas'>('todas')
   const [soTrafegoPago, setSoTrafegoPago] = useState(false)
+  const [filtroFrente, setFiltroFrente] = useState<FrenteLead | 'todas'>('todas')
   const [abertoId, setAbertoId] = useState<string | null>(searchParams.get('lead'))
   const [novoAberto, setNovoAberto] = useState(false)
   const [arrastando, setArrastando] = useState<Lead | null>(null)
@@ -194,7 +198,9 @@ function LeadsConteudo() {
   }
 
   const termo = busca.toLowerCase()
-  const buscados = leads.filter((l) =>
+  // O negócio escolhido vale para tudo na tela: quadro, lista, contadores e totais.
+  const daFrente = filtroFrente === 'todas' ? leads : leads.filter((l) => l.frente === filtroFrente)
+  const buscados = daFrente.filter((l) =>
     (!termo || [l.nome, l.email, l.telefone, l.empresa].some((v) => v?.toLowerCase().includes(termo))) &&
     (filtroTemperatura === 'todas' || temperaturaDoLead(l) === filtroTemperatura) &&
     (!soTrafegoPago || ehTrafegoPago(l))
@@ -204,15 +210,15 @@ function LeadsConteudo() {
     (filtroStatus === 'ativos' ? !FECHADAS.includes(l.status) : l.status === filtroStatus)
   )
 
-  const abertos = leads.filter((l) => !FECHADAS.includes(l.status))
+  const abertos = daFrente.filter((l) => !FECHADAS.includes(l.status))
   const valorPipeline = abertos.reduce((s, l) => s + Number(l.valor_estimado ?? 0), 0)
-  const fechados = leads.filter((l) => l.status === 'convertido').length
+  const fechados = daFrente.filter((l) => l.status === 'convertido').length
   const aberto = leads.find((l) => l.id === abertoId) ?? null
 
   const filtros = [
     { key: 'ativos', label: 'Em aberto', count: abertos.length },
-    ...Object.entries(leadStatusConfig).map(([key, sc]) => ({ key, label: sc.label, count: leads.filter((l) => l.status === key).length })),
-    { key: 'todos', label: 'Todos', count: leads.length },
+    ...Object.entries(leadStatusConfig).map(([key, sc]) => ({ key, label: sc.label, count: daFrente.filter((l) => l.status === key).length })),
+    { key: 'todos', label: 'Todos', count: daFrente.length },
   ]
 
   return (
@@ -220,9 +226,10 @@ function LeadsConteudo() {
       <Header title="Leads" description="Funil de vendas" />
 
       <main className="flex-1 p-4 md:p-6">
+        <LeadsSubNav />
         <PageHeader
           title="Funil de vendas"
-          description={loading ? 'Carregando…' : `${abertos.length} em aberto • ${formatCurrency(valorPipeline)} no funil • ${taxa(fechados, leads.length)}% fechados`}
+          description={loading ? 'Carregando…' : `${abertos.length} em aberto • ${formatCurrency(valorPipeline)} no funil • ${taxa(fechados, daFrente.length)}% fechados`}
         >
           <div className="flex rounded-lg border border-white/[0.1] p-0.5">
             <button
@@ -260,9 +267,34 @@ function LeadsConteudo() {
         )}
 
         {!loading && leads.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {([{ value: 'todas', label: 'Todos os negócios' }, ...frenteLeadOpcoes] as const).map((o) => {
+              const qtd = o.value === 'todas' ? leads.length : leads.filter((l) => l.frente === o.value).length
+              if (o.value !== 'todas' && qtd === 0 && filtroFrente !== o.value) return null
+              return (
+                <button
+                  key={o.value}
+                  onClick={() => setFiltroFrente(o.value)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                    filtroFrente === o.value
+                      ? 'border-brand-lima bg-brand-lima/20 text-brand-lima'
+                      : 'border-white/[0.1] bg-white/[0.04] text-brand-lavanda/70 hover:border-white/[0.2] hover:text-brand-lavanda'
+                  )}
+                >
+                  {o.value !== 'todas' && <span className="h-2 w-2 rounded-full" style={{ background: corFrenteLead(o.value) }} />}
+                  {o.label}
+                  <span className="rounded-full bg-white/[0.02] px-1.5">{qtd}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {!loading && leads.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mb-4">
             {(['todas', ...TEMPERATURAS] as const).map((t) => {
-              const qtd = t === 'todas' ? leads.length : leads.filter((l) => temperaturaDoLead(l) === t).length
+              const qtd = t === 'todas' ? daFrente.length : daFrente.filter((l) => temperaturaDoLead(l) === t).length
               return (
                 <button
                   key={t}
@@ -289,7 +321,7 @@ function LeadsConteudo() {
               )}
             >
               Só tráfego pago
-              <span className="rounded-full bg-white/[0.02] px-1.5">{leads.filter(ehTrafegoPago).length}</span>
+              <span className="rounded-full bg-white/[0.02] px-1.5">{daFrente.filter(ehTrafegoPago).length}</span>
             </button>
           </div>
         )}
@@ -378,7 +410,13 @@ function LeadsConteudo() {
                             <p>{l.telefone ?? '—'}</p>
                             {l.email && <p className="text-brand-lavanda/40">{l.email}</p>}
                           </td>
-                          <td className="px-4 py-3.5 text-xs text-brand-lavanda/60 whitespace-nowrap">{canalDoLead(l)}</td>
+                          <td className="px-4 py-3.5 text-xs text-brand-lavanda/60 whitespace-nowrap">
+                            <p className="flex items-center gap-1.5 text-brand-lavanda/80">
+                              <span className="h-1.5 w-1.5 rounded-full" style={{ background: corFrenteLead(l.frente) }} />
+                              {labelFrenteLead(l.frente)}
+                            </p>
+                            <p className="text-brand-lavanda/40">{canalDoLead(l)}</p>
+                          </td>
                           <td className="px-4 py-3.5 text-xs text-brand-lavanda/60">
                             <p className="truncate max-w-[260px]">{resumo(l) || '—'}</p>
                           </td>

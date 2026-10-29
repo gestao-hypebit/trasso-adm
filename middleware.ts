@@ -31,9 +31,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Telas escondidas por enquanto (integração com a Meta parada). O código e os
-  // dados continuam; para voltar, tire daqui e devolva os links no menu.
-  if (/^\/(anuncios|leads\/conversao|leads\/formularios)(\/|$)/.test(pathname)) {
+  // Anúncios escondido por enquanto (integração com a Meta parada). O código e os
+  // dados continuam; para voltar, tire daqui e devolva o link no menu.
+  if (/^\/anuncios(\/|$)/.test(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/leads'
     url.search = ''

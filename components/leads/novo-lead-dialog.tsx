@@ -9,21 +9,23 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import { origemOpcoes } from '@/lib/crm/opcoes'
 import { LEAD_SELECT, type Lead } from '@/components/leads/lead-detalhe-dialog'
 import { comTemperatura, TEMPERATURAS, temperaturaConfig, type Temperatura } from '@/lib/leads/trafego'
+import { frenteLeadOpcoes, MARCA_DA_FRENTE, type FrenteLead } from '@/lib/leads/frente'
 
 type CampanhaOpcao = { campaign_id: string; nome: string; status: string | null }
 
 // Origens que pedem a campanha do anúncio (para o painel de tráfego pago).
 const ORIGENS_PAGAS = ['trafego_pago', 'trafego_pago_whatsapp']
 
-// Campanhas da marca Slick no módulo de anúncios (nome começando com SLICK/TRASSO).
-async function carregarCampanhasSlick(): Promise<CampanhaOpcao[]> {
+// Campanhas da marca do negócio no módulo de anúncios (o que já foi sincronizado do Meta).
+async function carregarCampanhas(frente: FrenteLead): Promise<CampanhaOpcao[]> {
   const supabase = createClient() as any
   // anuncio_marcas tem permissão por coluna: lê só as liberadas e filtra aqui (como em /anuncios).
   const { data: marcas } = await supabase.from('anuncio_marcas').select('id, slug')
-  const marca = (marcas ?? []).find((m: { slug: string }) => m.slug === 'slick')
+  const marca = (marcas ?? []).find((m: { slug: string }) => m.slug === MARCA_DA_FRENTE[frente])
   if (!marca) return []
   const { data: vinculos } = await supabase.from('anuncio_campanha_marca').select('campaign_id').eq('marca_id', marca.id)
   const ids = (vinculos ?? []).map((v: { campaign_id: string }) => v.campaign_id)
@@ -33,7 +35,7 @@ async function carregarCampanhasSlick(): Promise<CampanhaOpcao[]> {
   return ((data ?? []) as CampanhaOpcao[]).sort((a, b) => Number(b.status === 'ACTIVE') - Number(a.status === 'ACTIVE') || a.nome.localeCompare(b.nome))
 }
 
-const VAZIO = { nome: '', telefone: '', email: '', empresa: '', origem: 'whatsapp', valor_estimado: '', observacoes: '', temperatura: '', campanha: '' }
+const VAZIO = { nome: '', telefone: '', email: '', empresa: '', frente: 'agencia' as FrenteLead, origem: 'whatsapp', valor_estimado: '', observacoes: '', temperatura: '', campanha: '' }
 
 // Lead que chegou fora do site: WhatsApp, indicação, Instagram, evento...
 export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
@@ -48,8 +50,8 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
   const pago = ORIGENS_PAGAS.includes(form.origem)
 
   useEffect(() => {
-    if (open && pago && campanhas.length === 0) carregarCampanhasSlick().then(setCampanhas).catch(() => {})
-  }, [open, pago]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (open && pago) carregarCampanhas(form.frente).then(setCampanhas).catch(() => setCampanhas([]))
+  }, [open, pago, form.frente])
 
   async function salvar() {
     if (!form.nome.trim()) return
@@ -62,6 +64,7 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
         telefone: form.telefone.trim() || null,
         email: form.email.trim() || null,
         empresa: form.empresa.trim() || null,
+        frente: form.frente,
         origem: form.origem,
         valor_estimado: form.valor_estimado ? Number(form.valor_estimado) : null,
         observacoes: form.observacoes.trim() || null,
@@ -115,6 +118,19 @@ export function NovoLeadDialog({ open, onOpenChange, onCriado }: {
           <div className="space-y-1.5">
             <Label>E-mail</Label>
             <Input type="email" value={form.email} onChange={set('email')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Negócio</Label>
+            <div className="flex rounded-lg border border-white/[0.1] p-0.5">
+              {frenteLeadOpcoes.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, frente: o.value, campanha: '' }))}
+                  className={cn('flex-1 rounded-md px-2.5 py-1.5 text-xs', form.frente === o.value ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/50')}
+                >{o.label}</button>
+              ))}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

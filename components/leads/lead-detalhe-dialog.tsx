@@ -15,6 +15,7 @@ import { formatDate, whatsappUrl } from '@/lib/utils'
 import { formatarValor, leadStatusConfig, type LeadStatus, type Resposta } from '@/lib/leads/formulario'
 import { ETAPAS_FUNIL, motivoPerdaOpcoes } from '@/lib/leads/funil'
 import { origemOpcoes } from '@/lib/crm/opcoes'
+import { frenteLeadOpcoes, labelFrenteLead } from '@/lib/leads/frente'
 import { comTemperatura, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
 import { normalizarUtm } from '@/lib/leads/utm'
 import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
@@ -28,6 +29,7 @@ export type Lead = {
   respostas: Resposta[]
   status: string
   origem: string
+  frente: string
   pagina: string | null
   utm: Record<string, string> | null
   cliente_id: string | null
@@ -40,7 +42,7 @@ export type Lead = {
 }
 
 export const LEAD_SELECT =
-  'id, nome, email, telefone, empresa, respostas, status, origem, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, etapa_desde, created_at, formularios(nome)'
+  'id, nome, email, telefone, empresa, respostas, status, origem, frente, pagina, utm, cliente_id, observacoes, valor_estimado, motivo_perda, etapa_desde, created_at, formularios(nome)'
 
 // Respostas que já aparecem no cabeçalho (ou no selo de temperatura) não se repetem na lista.
 const CHAVES_CABECALHO = ['nome', 'email', 'telefone', 'empresa', 'classificacao', 'pontuacao']
@@ -112,7 +114,7 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
         whatsapp: atual.telefone,
         origem: atual.origem,
         status: 'lead',
-        tipo: 'agencia',
+        tipo: atual.frente === 'agencia' ? 'agencia' : 'saas',
         observacoes: [`Lead do site em ${formatDate(atual.created_at)}`, detalhes, atual.observacoes].filter(Boolean).join('\n\n'),
       })
       .select('id')
@@ -148,7 +150,7 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
     if (atual.status === 'novo') atualizar({ status: 'em_contato' })
   }
 
-  const whatsapp = whatsappUrl(atual.telefone, `Oi ${atual.nome.split(' ')[0]}! Aqui é da Slick, recebemos seu contato pelo site.`)
+  const whatsapp = whatsappUrl(atual.telefone, `Oi ${atual.nome.split(' ')[0]}! Aqui é da ${labelFrenteLead(atual.frente)}, recebemos seu contato.`)
   const extras = atual.respostas.filter((r) => !CHAVES_CABECALHO.includes(r.chave))
   const utm = Object.entries(normalizarUtm(atual.utm)).filter(([k]) => k !== 'fbclid')
   const temperatura = temperaturaDoLead(atual)
@@ -243,6 +245,13 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete }: Pr
                 if (novo !== atual.valor_estimado) atualizar({ valor_estimado: novo })
               }}
             />
+            <Label className="block pt-2">Negócio</Label>
+            <Select value={atual.frente} onValueChange={(frente) => atualizar({ frente })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {frenteLeadOpcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Label className="block pt-2">Origem</Label>
             <Select value={atual.origem} onValueChange={(origem) => atualizar({ origem })}>
               <SelectTrigger><SelectValue /></SelectTrigger>

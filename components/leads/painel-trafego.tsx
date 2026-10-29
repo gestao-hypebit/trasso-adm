@@ -1,59 +1,53 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Megaphone, Wallet, Users, CalendarCheck, Trophy, Flame, Timer, TrendingUp } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatCurrency } from '@/lib/utils'
-import { buscarTudo } from '@/lib/anuncios/consulta'
+import { formatCurrency } from '@/lib/utils'
 import { diaSP } from '@/lib/anuncios/regras'
 import { taxa, type Historico } from '@/lib/leads/funil'
+import { labelFrenteLead, type FrenteLead } from '@/lib/leads/frente'
 import {
-  custoPor, ehTrafegoPago, horasAtePrimeiroContato, mediana, resumoCampanhas, temperaturaConfig,
-  type Campanha, type GastoCampanha, type LeadTrafego,
+  CATEGORIA_TRAFEGO, custoPor, ehTrafegoPago, horasAtePrimeiroContato, mediana, resumoCampanhas, temperaturaConfig,
+  type LeadTrafego,
 } from '@/lib/leads/trafego'
 
-// Painel de tráfego pago em /leads/conversao: gasto das campanhas da marca Slick
-// (módulo de anúncios) cruzado com os leads que cada campanha trouxe (utm_campaign).
+// Painel de tráfego pago em /leads/conversao. Enquanto a integração com a Meta
+// está parada, o investimento vem das despesas pagas em categorias de tráfego
+// (lançadas à mão no financeiro), separadas pela frente do lançamento.
+// Os leads de cada campanha vêm do utm_campaign (ou da campanha escolhida no cadastro).
 
-type Metrica = { campaign_id: string; data: string; spend: number }
+type Despesa = { valor: number; data: string; frente: string | null; categorias_financeiras: { nome: string } | null }
 
 const fmtCusto = (v: number | null) => (v === null ? '—' : formatCurrency(v))
 const fmtHoras = (h: number | null) =>
   h === null ? '—' : h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${h.toFixed(h < 10 ? 1 : 0).replace('.', ',')} h` : `${Math.round(h / 24)} dias`
 
-export function PainelTrafego({ leads, historico, periodo }: { leads: LeadTrafego[]; historico: Historico[]; periodo: number }) {
-  const [campanhas, setCampanhas] = useState<Campanha[]>([])
-  const [metricas, setMetricas] = useState<Metrica[]>([])
+export function PainelTrafego({ leads, historico, periodo, frente }: {
+  leads: LeadTrafego[]
+  historico: Historico[]
+  periodo: number
+  frente: FrenteLead | 'todas'
+}) {
+  const [despesas, setDespesas] = useState<Despesa[]>([])
   const [aviso, setAviso] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient() as any
-      // anuncio_marcas tem permissão por coluna: lê só as liberadas e filtra aqui (como em /anuncios).
-      const { data: marcas, error } = await supabase.from('anuncio_marcas').select('id, slug')
+      const { data, error } = await (createClient() as any)
+        .from('lancamentos')
+        .select('valor, data, frente, categorias_financeiras(nome)')
+        .eq('tipo', 'despesa')
+        .in('status', ['pago', 'recebido'])
       if (error) throw new Error(error.message)
-      const marca = (marcas ?? []).find((m: { slug: string }) => m.slug === 'slick')
-      if (!marca) {
-        setAviso('A marca "Slick" não existe no módulo de anúncios: o gasto não aparece aqui.')
-        return
-      }
-      const { data: vinculos } = await supabase.from('anuncio_campanha_marca').select('campaign_id').eq('marca_id', marca.id)
-      const ids = (vinculos ?? []).map((v: { campaign_id: string }) => v.campaign_id)
-      if (ids.length === 0) return
-      const [{ data: c }, m] = await Promise.all([
-        supabase.from('anuncio_campanhas').select('campaign_id, nome').in('campaign_id', ids),
-        buscarTudo<Metrica>((de, ate) =>
-          supabase.from('anuncio_metricas_diarias').select('campaign_id, data, spend').in('campaign_id', ids).order('data').range(de, ate),
-        ),
-      ])
-      setCampanhas((c as Campanha[]) ?? [])
-      setMetricas(m)
+      setDespesas(((data ?? []) as Despesa[]).filter((d) => CATEGORIA_TRAFEGO.test(d.categorias_financeiras?.nome ?? '')))
     }
     load().catch((e) => {
       console.error('[leads] painel de tráfego', e)
-      setAviso(`Não foi possível ler o gasto das campanhas: ${e instanceof Error ? e.message : e}`)
+      setAviso(`Não foi possível ler o investimento: ${e instanceof Error ? e.message : e}`)
     })
   }, [])
 
@@ -63,10 +57,24 @@ export function PainelTrafego({ leads, historico, periodo }: { leads: LeadTrafeg
     const pagos = leads.filter((l) => ehTrafegoPago(l) && new Date(l.created_at).getTime() >= corte)
     const ids = new Set(pagos.map((l) => l.id))
     const hist = historico.filter((h) => ids.has(h.lead_id))
-    const gastos: GastoCampanha[] = metricas.filter((m) => !diaCorte || m.data >= diaCorte)
     const horas = pagos.map((l) => horasAtePrimeiroContato(l, hist)).filter((h): h is number => h !== null)
-    return { ...resumoCampanhas(pagos, hist, campanhas, gastos), primeiroContato: mediana(horas), amostraContato: horas.length }
-  }, [leads, historico, campanhas, metricas, periodo])
+
+    const noPeriodo = despesas.filter((d) => !diaCorte || d.data >= diaCorte)
+    // Com um negócio escolhido, só conta a despesa lançada nele; "Geral" fica de fora e aparece no aviso.
+    const investimento = noPeriodo
+      .filter((d) => frente === 'todas' || d.frente === frente)
+      .reduce((s, d) => s + Number(d.valor), 0)
+    const semNegocio = frente === 'todas' ? 0 : noPeriodo.filter((d) => d.frente === 'geral').reduce((s, d) => s + Number(d.valor), 0)
+
+    const resumo = resumoCampanhas(pagos, hist, [], [])
+    return {
+      ...resumo,
+      total: { ...resumo.total, gasto: investimento },
+      semNegocio,
+      primeiroContato: mediana(horas),
+      amostraContato: horas.length,
+    }
+  }, [leads, historico, despesas, periodo, frente])
 
   const t = r.total
   const semDados = t.leads === 0 && t.gasto === 0
@@ -76,14 +84,22 @@ export function PainelTrafego({ leads, historico, periodo }: { leads: LeadTrafeg
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2"><Megaphone className="h-4 w-4 text-brand-lima" /> Tráfego pago</CardTitle>
         <p className="text-xs text-brand-lavanda/50">
-          Gasto das campanhas da marca Slick (nome começando com SLICK ou TRASSO no módulo de anúncios) e os leads que cada uma trouxe.
+          {frente === 'todas' ? 'Todos os negócios' : labelFrenteLead(frente)}: investimento lançado em{' '}
+          <Link href="/financeiro/despesas" className="text-brand-lima">Contas a Pagar</Link> (categoria de tráfego/anúncios, já paga)
+          e os leads de tráfego pago que chegaram no período.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
         {aviso && <p className="text-sm text-brand-rosa">{aviso}</p>}
+        {r.semNegocio > 0 && (
+          <p className="text-xs text-brand-lavanda/50 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+            {formatCurrency(r.semNegocio)} em tráfego estão lançados como <span className="text-brand-lavanda">Geral</span> e não entram aqui.
+            Para separar, edite a despesa e escolha a frente {labelFrenteLead(frente)}.
+          </p>
+        )}
 
         {semDados ? (
-          <p className="text-sm text-brand-lavanda/40">Nenhum lead de tráfego pago nem gasto de campanha no período.</p>
+          <p className="text-sm text-brand-lavanda/40">Nenhum lead de tráfego pago nem investimento lançado no período.</p>
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -124,26 +140,22 @@ export function PainelTrafego({ leads, historico, periodo }: { leads: LeadTrafeg
                 <thead>
                   <tr className="border-b border-white/[0.06]">
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-6 py-3">Campanha</th>
-                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Gasto</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Leads</th>
-                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Custo/lead</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Quentes</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Reuniões</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-4 py-3">Vendas</th>
-                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-6 py-3">Custo/venda</th>
+                    <th className="text-right text-xs text-brand-lavanda/50 font-medium px-6 py-3">Receita</th>
                   </tr>
                 </thead>
                 <tbody>
                   {r.campanhas.map((c) => (
                     <tr key={c.chave} className="border-b border-white/[0.04]">
                       <td className="px-6 py-3 text-brand-lavanda max-w-[280px] truncate" title={c.nome}>{c.nome}</td>
-                      <td className="px-4 py-3 text-right text-brand-lavanda/70">{c.gasto === null ? '—' : formatCurrency(c.gasto)}</td>
-                      <td className={cn('px-4 py-3 text-right', c.leads === 0 && (c.gasto ?? 0) > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/70')}>{c.leads}</td>
-                      <td className="px-4 py-3 text-right text-brand-lavanda/70">{fmtCusto(custoPor(c.gasto ?? 0, c.leads))}</td>
+                      <td className="px-4 py-3 text-right text-brand-lavanda/70">{c.leads}</td>
                       <td className="px-4 py-3 text-right text-brand-lavanda/70">{c.leads ? `${taxa(c.quentes, c.leads)}%` : '—'}</td>
                       <td className="px-4 py-3 text-right text-brand-lavanda/70">{c.reunioes}</td>
                       <td className="px-4 py-3 text-right text-brand-lavanda/70">{c.vendas}</td>
-                      <td className="px-6 py-3 text-right text-brand-lima">{fmtCusto(custoPor(c.gasto ?? 0, c.vendas))}</td>
+                      <td className="px-6 py-3 text-right text-brand-lima">{formatCurrency(c.receita)}</td>
                     </tr>
                   ))}
                 </tbody>

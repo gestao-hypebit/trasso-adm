@@ -44,6 +44,9 @@ export function comTemperatura(respostas: Resposta[] | null, temperatura: Temper
 // ---------------------------------------------------------------
 export const ORIGENS_TRAFEGO_PAGO = ['trafego_pago', 'trafego_pago_whatsapp', 'landing-site', 'landing-planejadores']
 
+// Despesa conta como investimento em tráfego quando a categoria tem um destes nomes.
+export const CATEGORIA_TRAFEGO = /tr[aá]fego|an[uú]ncio|\bads\b/i
+
 export function ehTrafegoPago(lead: { origem: string; utm: Record<string, unknown> | null }) {
   const utm = normalizarUtm(lead.utm)
   if (utm.fbclid) return true

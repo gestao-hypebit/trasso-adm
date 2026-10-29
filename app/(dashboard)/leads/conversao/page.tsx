@@ -12,6 +12,7 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { ETAPAS_FUNIL, etapaLabel, resumoFunil, taxa, type Historico, type LeadFunil } from '@/lib/leads/funil'
 import type { LeadTrafego } from '@/lib/leads/trafego'
 import { PainelTrafego } from '@/components/leads/painel-trafego'
+import { frenteLeadOpcoes, type FrenteLead } from '@/lib/leads/frente'
 
 const periodos = [
   { dias: 30, label: '30 dias' },
@@ -24,17 +25,18 @@ const fmtDias = (d: number | null) => (d === null ? '—' : d < 1 ? '< 1 dia' : 
 
 export default function ConversaoPage() {
   // Respostas vêm junto para o painel de tráfego pago (temperatura do lead).
-  const [leads, setLeads] = useState<(LeadFunil & Pick<LeadTrafego, 'respostas'>)[]>([])
+  const [leads, setLeads] = useState<(LeadFunil & Pick<LeadTrafego, 'respostas'> & { frente: string })[]>([])
   const [historico, setHistorico] = useState<Historico[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [periodo, setPeriodo] = useState(90)
+  const [frente, setFrente] = useState<FrenteLead | 'todas'>('todas')
 
   useEffect(() => {
     async function load() {
       const supabase = createClient() as any
       const [{ data: l, error }, { data: h }] = await Promise.all([
-        supabase.from('leads').select('id, status, origem, utm, respostas, valor_estimado, motivo_perda, created_at, formularios(nome)'),
+        supabase.from('leads').select('id, status, origem, frente, utm, respostas, valor_estimado, motivo_perda, created_at, formularios(nome)'),
         supabase.from('lead_historico').select('lead_id, de, para, created_at'),
       ])
       if (error) setErro('Não foi possível carregar. A migration do funil já foi aplicada no Supabase?')
@@ -45,13 +47,15 @@ export default function ConversaoPage() {
     load()
   }, [])
 
+  const daFrente = useMemo(() => (frente === 'todas' ? leads : leads.filter((l) => l.frente === frente)), [leads, frente])
+
   // O período filtra pela data em que o lead chegou (coorte), não pela data do fechamento.
   const r = useMemo(() => {
     const corte = periodo ? Date.now() - periodo * 86_400_000 : 0
-    const noPeriodo = leads.filter((l) => new Date(l.created_at).getTime() >= corte)
+    const noPeriodo = daFrente.filter((l) => new Date(l.created_at).getTime() >= corte)
     const ids = new Set(noPeriodo.map((l) => l.id))
     return resumoFunil(noPeriodo, historico.filter((h) => ids.has(h.lead_id)))
-  }, [leads, historico, periodo])
+  }, [daFrente, historico, periodo])
 
   const t = r.total
   const iFechado = ETAPAS_FUNIL.indexOf('convertido')
@@ -65,6 +69,15 @@ export default function ConversaoPage() {
       <main className="flex-1 p-4 md:p-6">
         <LeadsSubNav />
         <PageHeader title="Conversão" description="Leads que chegaram no período e até onde cada um avançou.">
+          <div className="flex rounded-lg border border-white/[0.1] p-0.5">
+            {([{ value: 'todas', label: 'Todos' }, ...frenteLeadOpcoes] as const).map((o) => (
+              <button
+                key={o.value}
+                onClick={() => setFrente(o.value)}
+                className={cn('rounded-md px-2.5 py-1.5 text-xs', frente === o.value ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/50')}
+              >{o.label}</button>
+            ))}
+          </div>
           <div className="flex rounded-lg border border-white/[0.1] p-0.5">
             {periodos.map((p) => (
               <button
@@ -89,7 +102,7 @@ export default function ConversaoPage() {
               <KpiCard title="Ciclo médio de venda" value={fmtDias(r.cicloMedioDias)} icon={Clock} />
             </div>
 
-            <PainelTrafego leads={leads} historico={historico} periodo={periodo} />
+            <PainelTrafego leads={daFrente} historico={historico} periodo={periodo} frente={frente} />
 
             <Card>
               <CardHeader><CardTitle className="text-base">Funil</CardTitle></CardHeader>
