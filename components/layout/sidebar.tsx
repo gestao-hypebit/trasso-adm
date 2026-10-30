@@ -75,10 +75,9 @@ const grupos: { titulo?: string; itens: NavItem[] }[] = [
 const navItems = grupos.flatMap((g) => g.itens)
 
 // Contador vermelho no menu: o que está pedindo ação.
-type Pendencias = { leads: number; receitasVencidas: number; tarefasAtrasadas: number }
+type Pendencias = { leads: number; tarefasAtrasadas: number }
 const DICA_PENDENCIA: Record<keyof Pendencias, string> = {
   leads: 'leads novos do site',
-  receitasVencidas: 'recebimentos vencidos',
   tarefasAtrasadas: 'tarefas atrasadas',
 }
 
@@ -90,7 +89,7 @@ export function Sidebar() {
   const [agenciaNome, setAgenciaNome] = useState('Slick')
   const [userNome, setUserNome] = useState('')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
-  const [pendencias, setPendencias] = useState<Pendencias>({ leads: 0, receitasVencidas: 0, tarefasAtrasadas: 0 })
+  const [pendencias, setPendencias] = useState<Pendencias>({ leads: 0, tarefasAtrasadas: 0 })
   const [financeiroAberto, setFinanceiroAberto] = useState(false)
 
   const isPathActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
@@ -107,18 +106,16 @@ export function Sidebar() {
 
     async function load() {
       const hoje = diaSP(new Date())
-      const [configRes, userRes, leadsRes, receitasRes, tarefasRes] = await Promise.all([
+      const [configRes, userRes, leadsRes, tarefasRes] = await Promise.all([
         db.from('configuracoes_agencia').select('logo_url, nome').limit(1).maybeSingle() as Promise<{ data: { logo_url: string | null; nome: string } | null }>,
         supabase.auth.getUser(),
         // Só leads novos que chegaram pelos formulários do site; cadastro manual não conta.
         db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'novo')
           .not('formulario_id', 'is', null) as Promise<{ count: number | null }>,
-        db.from('lancamentos').select('id', { count: 'exact', head: true })
-          .eq('tipo', 'receita').eq('status', 'pendente').lt('data', hoje) as Promise<{ count: number | null }>,
         db.from('tarefas').select('id', { count: 'exact', head: true })
           .neq('status', 'concluida').lt('data_vencimento', hoje) as Promise<{ count: number | null }>,
       ])
-      setPendencias({ leads: leadsRes.count ?? 0, receitasVencidas: receitasRes.count ?? 0, tarefasAtrasadas: tarefasRes.count ?? 0 })
+      setPendencias({ leads: leadsRes.count ?? 0, tarefasAtrasadas: tarefasRes.count ?? 0 })
 
       if (configRes.data) {
         if (configRes.data.logo_url) setLogoUrl(configRes.data.logo_url)
@@ -163,7 +160,7 @@ export function Sidebar() {
 
   // Quantas pendências cada item do menu mostra (e o que significam, no title).
   function contador(href: string) {
-    const chave: keyof Pendencias | null = href === '/leads' ? 'leads' : href === '/financeiro' ? 'receitasVencidas' : href === '/projetos' ? 'tarefasAtrasadas' : null
+    const chave: keyof Pendencias | null = href === '/leads' ? 'leads' : href === '/projetos' ? 'tarefasAtrasadas' : null
     if (!chave || pendencias[chave] === 0) return null
     return (
       <span title={`${pendencias[chave]} ${DICA_PENDENCIA[chave]}`} className="ml-auto rounded-full bg-brand-rosa px-1.5 text-[10px] font-bold leading-4 text-brand-lavanda">
@@ -188,10 +185,7 @@ export function Sidebar() {
           >
             <Icon className={cn('h-4 w-4 shrink-0', emFinanceiro ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
             <span className={cn('font-medium', emFinanceiro ? '' : 'font-normal')}>{label}</span>
-            <span className="ml-auto flex items-center gap-2">
-              {contador(href)}
-              <ChevronDown className={cn('h-3.5 w-3.5 text-brand-lavanda/30 transition-transform', financeiroAberto && 'rotate-180')} />
-            </span>
+            <ChevronDown className={cn('ml-auto h-3.5 w-3.5 text-brand-lavanda/30 transition-transform', financeiroAberto && 'rotate-180')} />
           </button>
           {financeiroAberto && (
             <div className="ml-[22px] mt-0.5 mb-1 space-y-0.5 border-l border-white/[0.06] pl-3">
