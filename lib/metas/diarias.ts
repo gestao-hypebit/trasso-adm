@@ -10,12 +10,16 @@ export type MetaDiaria = {
   cor: string
   ordem: number
   ativa: boolean
+  // Mostra o contador de quantos converteram.
+  mede_conversao: boolean
   created_at: string
 }
 
-export type RegistroDiario = { meta_id: string; data: string; quantidade: number }
+export type CampoRegistro = 'quantidade' | 'convertidos'
 
-// Quanto foi feito por meta e dia: feito[meta_id][dia].
+export type RegistroDiario = { meta_id: string; data: string; quantidade: number; convertidos: number }
+
+// Valor de um campo por meta e dia: feito[meta_id][dia].
 export type Feito = Record<string, Record<string, number>>
 
 export const DIAS_SEMANA = [
@@ -36,11 +40,14 @@ export const diaDaSemana = (dia: string) => new Date(`${dia}T12:00:00Z`).getUTCD
 export const valeNoDia = (meta: Pick<MetaDiaria, 'dias_semana'>, dia: string) =>
   meta.dias_semana.includes(diaDaSemana(dia))
 
-export function agruparFeito(registros: RegistroDiario[]): Feito {
+export function agruparFeito(registros: RegistroDiario[], campo: CampoRegistro = 'quantidade'): Feito {
   const feito: Feito = {}
-  for (const r of registros) (feito[r.meta_id] ??= {})[r.data] = r.quantidade
+  for (const r of registros) (feito[r.meta_id] ??= {})[r.data] = r[campo] ?? 0
   return feito
 }
+
+// Convertidos sobre feitos; nulo quando não houve nenhum contato.
+export const taxaConversao = (convertidos: number, feitos: number) => (feitos > 0 ? convertidos / feitos : null)
 
 // Dias seguidos batendo a meta, contando só os dias em que ela vale.
 // Hoje ainda em andamento não quebra a sequência: só conta se já bateu.

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Minus, Pencil, Flame, Trophy, CalendarCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Minus, Pencil, Flame, Trophy, CalendarCheck, BadgeCheck } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,8 +12,8 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate } from '@/lib/utils'
 import { diaSP, somarDias } from '@/lib/anuncios/regras'
 import {
-  DIAS_SEMANA, agruparFeito, resumirPeriodo, sequencia, ultimosDias, valeNoDia,
-  type Feito, type MetaDiaria, type RegistroDiario,
+  DIAS_SEMANA, agruparFeito, resumirPeriodo, sequencia, taxaConversao, ultimosDias, valeNoDia,
+  type CampoRegistro, type Feito, type MetaDiaria, type RegistroDiario,
 } from '@/lib/metas/diarias'
 
 // Histórico carregado de uma vez: cobre a sequência e a navegação para trás.
@@ -22,6 +22,7 @@ const DIAS_GRADE = 30
 const ESPERA_SALVAR_MS = 500
 
 const fmtNum = (n: number, casas = 1) => n.toLocaleString('pt-BR', { maximumFractionDigits: casas })
+const fmtPct = (t: number | null) => (t === null ? '—' : `${fmtNum(t * 100)}%`)
 
 function labelDias(dias: number[]) {
   const s = [...dias].sort().join(',')
@@ -37,6 +38,7 @@ export default function MetasDiariasPage() {
   const [loading, setLoading] = useState(true)
   const [metas, setMetas] = useState<MetaDiaria[]>([])
   const [feito, setFeito] = useState<Feito>({})
+  const [convertidos, setConvertidos] = useState<Feito>({})
   const [erro, setErro] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<MetaDiaria | null>(null)
@@ -48,11 +50,13 @@ export default function MetasDiariasPage() {
     const db = createClient() as any
     const [{ data: m, error: e1 }, { data: r, error: e2 }] = await Promise.all([
       db.from('metas_diarias').select('*').order('ordem').order('created_at'),
-      db.from('metas_diarias_registros').select('meta_id, data, quantidade').gte('data', somarDias(hoje, -DIAS_HISTORICO)),
+      db.from('metas_diarias_registros').select('meta_id, data, quantidade, convertidos').gte('data', somarDias(hoje, -DIAS_HISTORICO)),
     ])
     setErro(e1?.message ?? e2?.message ?? null)
     setMetas((m ?? []) as MetaDiaria[])
-    setFeito(agruparFeito((r ?? []) as RegistroDiario[]))
+    const registros = (r ?? []) as RegistroDiario[]
+    setFeito(agruparFeito(registros))
+    setConvertidos(agruparFeito(registros, 'convertidos'))
     setLoading(false)
   }
 
@@ -63,15 +67,17 @@ export default function MetasDiariasPage() {
     Object.values(pendentes.current).forEach((p) => { clearTimeout(p.timer); p.salvar() })
   }, [])
 
-  function definir(meta: MetaDiaria, valor: number) {
+  // O upsert só manda o campo alterado; o outro fica como está (ou 0 se a linha é nova).
+  function definir(meta: MetaDiaria, campo: CampoRegistro, valor: number) {
     const quantidade = Math.max(0, Math.round(valor))
-    setFeito((f) => ({ ...f, [meta.id]: { ...f[meta.id], [dia]: quantidade } }))
-    const chave = `${meta.id}:${dia}`
+    const setCampo = campo === 'quantidade' ? setFeito : setConvertidos
+    setCampo((f) => ({ ...f, [meta.id]: { ...f[meta.id], [dia]: quantidade } }))
+    const chave = `${campo}:${meta.id}:${dia}`
     const diaSalvo = dia
     async function salvar() {
       delete pendentes.current[chave]
       const { error } = await (createClient() as any).from('metas_diarias_registros').upsert(
-        { meta_id: meta.id, data: diaSalvo, quantidade, updated_at: new Date().toISOString() },
+        { meta_id: meta.id, data: diaSalvo, [campo]: quantidade, updated_at: new Date().toISOString() },
         { onConflict: 'meta_id,data' },
       )
       setErro(error ? `Não foi possível salvar: ${error.message}` : null)
@@ -133,8 +139,8 @@ export default function MetasDiariasPage() {
             )}
             <div className="grid gap-4 lg:grid-cols-2">
               {ativas.map((m) => (
-                <CardMeta key={m.id} meta={m} dia={dia} hoje={hoje} feito={feito[m.id] ?? {}}
-                  onDefinir={(v) => definir(m, v)} onEditar={() => abrir(m)} onVerDia={setDia} />
+                <CardMeta key={m.id} meta={m} dia={dia} hoje={hoje} feito={feito[m.id] ?? {}} convertidos={convertidos[m.id] ?? {}}
+                  onDefinir={(campo, v) => definir(m, campo, v)} onEditar={() => abrir(m)} onVerDia={setDia} />
               ))}
             </div>
           </>
@@ -148,8 +154,8 @@ export default function MetasDiariasPage() {
             {verArquivadas && (
               <div className="mt-3 grid gap-4 lg:grid-cols-2 opacity-60">
                 {arquivadas.map((m) => (
-                  <CardMeta key={m.id} meta={m} dia={dia} hoje={hoje} feito={feito[m.id] ?? {}}
-                    onDefinir={(v) => definir(m, v)} onEditar={() => abrir(m)} onVerDia={setDia} />
+                  <CardMeta key={m.id} meta={m} dia={dia} hoje={hoje} feito={feito[m.id] ?? {}} convertidos={convertidos[m.id] ?? {}}
+                    onDefinir={(campo, v) => definir(m, campo, v)} onEditar={() => abrir(m)} onVerDia={setDia} />
                 ))}
               </div>
             )}
@@ -171,12 +177,13 @@ export default function MetasDiariasPage() {
 // ---------------------------------------------------------------
 // Card de uma meta: contador do dia, sequência e últimos 30 dias
 // ---------------------------------------------------------------
-function CardMeta({ meta, dia, hoje, feito, onDefinir, onEditar, onVerDia }: {
+function CardMeta({ meta, dia, hoje, feito, convertidos, onDefinir, onEditar, onVerDia }: {
   meta: MetaDiaria
   dia: string
   hoje: string
   feito: Record<string, number>
-  onDefinir: (valor: number) => void
+  convertidos: Record<string, number>
+  onDefinir: (campo: CampoRegistro, valor: number) => void
   onEditar: () => void
   onVerDia: (dia: string) => void
 }) {
@@ -188,10 +195,12 @@ function CardMeta({ meta, dia, hoje, feito, onDefinir, onEditar, onVerDia }: {
   const seq = sequencia(meta, feito, hoje)
   const grade = useMemo(() => ultimosDias(DIAS_GRADE, hoje), [hoje])
   const periodo = resumirPeriodo(meta, feito, grade)
+  const conv = convertidos[dia] ?? 0
+  const convPeriodo = grade.reduce((s, d) => s + (convertidos[d] ?? 0), 0)
   const [digitando, setDigitando] = useState<string | null>(null)
 
   function confirmarDigitado() {
-    if (digitando !== null && digitando !== '') onDefinir(Number(digitando) || 0)
+    if (digitando !== null && digitando !== '') onDefinir('quantidade', Number(digitando) || 0)
     setDigitando(null)
   }
 
@@ -253,16 +262,35 @@ function CardMeta({ meta, dia, hoje, feito, onDefinir, onEditar, onVerDia }: {
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" className="h-12 w-12 shrink-0" onClick={() => onDefinir(qtd - 1)} disabled={qtd === 0} title="Tirar 1">
+          <Button variant="outline" size="icon" className="h-12 w-12 shrink-0" onClick={() => onDefinir('quantidade', qtd - 1)} disabled={qtd === 0} title="Tirar 1">
             <Minus className="h-4 w-4" />
           </Button>
-          <Button className="h-12 flex-1 gap-1.5 text-base font-semibold" onClick={() => onDefinir(qtd + 1)}>
+          <Button className="h-12 flex-1 gap-1.5 text-base font-semibold" onClick={() => onDefinir('quantidade', qtd + 1)}>
             <Plus className="h-5 w-5" /> 1
           </Button>
-          <Button variant="outline" className="h-12 shrink-0 px-4" onClick={() => onDefinir(qtd + 5)} title="Somar 5">
+          <Button variant="outline" className="h-12 shrink-0 px-4" onClick={() => onDefinir('quantidade', qtd + 5)} title="Somar 5">
             +5
           </Button>
         </div>
+
+        {meta.mede_conversao && (
+          <div className="mt-3 flex items-center gap-3 rounded-lg bg-white/[0.03] px-3 py-2">
+            <BadgeCheck className="h-4 w-4 shrink-0 text-brand-lima" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-brand-lavanda/60">Converteram</p>
+              <p className="text-[11px] text-brand-lavanda/40">
+                {conv > qtd ? 'Mais do que contatos neste dia' : <>Taxa no dia: <b className="text-brand-lavanda">{fmtPct(taxaConversao(conv, qtd))}</b></>}
+              </p>
+            </div>
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => onDefinir('convertidos', conv - 1)} disabled={conv === 0} title="Tirar 1 convertido">
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <span className="w-8 text-center text-xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{conv}</span>
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => onDefinir('convertidos', conv + 1)} title="Somar 1 convertido">
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
 
         {/* Últimos 30 dias: cada quadrado é um dia, mais forte quanto mais perto do alvo */}
         <div className="mt-5">
@@ -281,7 +309,7 @@ function CardMeta({ meta, dia, hoje, feito, onDefinir, onEditar, onVerDia }: {
               return (
                 <button
                   key={d} onClick={() => onVerDia(d)}
-                  title={`${formatDate(d, "EEE, dd/MM")}: ${q} de ${meta.alvo}${valeDia ? '' : ' (folga)'}`}
+                  title={`${formatDate(d, "EEE, dd/MM")}: ${q} de ${meta.alvo}${meta.mede_conversao && convertidos[d] ? ` · ${convertidos[d]} converteram` : ''}${valeDia ? '' : ' (folga)'}`}
                   className={cn(
                     'aspect-square rounded-[3px] transition-transform hover:scale-125',
                     d === dia && 'ring-1 ring-brand-lavanda ring-offset-1 ring-offset-[#141318]',
@@ -298,6 +326,7 @@ function CardMeta({ meta, dia, hoje, feito, onDefinir, onEditar, onVerDia }: {
           </div>
           <p className="mt-2 text-[11px] text-brand-lavanda/40">
             Total no período: <b className="text-brand-lavanda">{periodo.total}</b> {meta.unidade}
+            {meta.mede_conversao && <> · <b className="text-brand-lavanda">{convPeriodo}</b> {convPeriodo === 1 ? 'convertido' : 'convertidos'} ({fmtPct(taxaConversao(convPeriodo, periodo.total))})</>}
           </p>
         </div>
       </CardContent>

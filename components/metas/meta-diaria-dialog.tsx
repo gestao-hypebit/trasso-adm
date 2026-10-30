@@ -19,7 +19,7 @@ type Props = {
   onSalvo: () => void
 }
 
-const vazio = { titulo: '', alvo: '', unidade: '', dias_semana: [1, 2, 3, 4, 5], cor: CORES_META[0] }
+const vazio = { titulo: '', alvo: '', unidade: '', dias_semana: [1, 2, 3, 4, 5], cor: CORES_META[0], mede_conversao: true }
 
 export function MetaDiariaDialog({ open, onOpenChange, meta, proximaOrdem, onSalvo }: Props) {
   const [form, setForm] = useState(vazio)
@@ -30,7 +30,7 @@ export function MetaDiariaDialog({ open, onOpenChange, meta, proximaOrdem, onSal
     if (!open) return
     setErro(null)
     setForm(meta
-      ? { titulo: meta.titulo, alvo: String(meta.alvo), unidade: meta.unidade, dias_semana: meta.dias_semana, cor: meta.cor }
+      ? { titulo: meta.titulo, alvo: String(meta.alvo), unidade: meta.unidade, dias_semana: meta.dias_semana, cor: meta.cor, mede_conversao: meta.mede_conversao }
       : vazio)
   }, [open, meta])
 
@@ -54,6 +54,7 @@ export function MetaDiariaDialog({ open, onOpenChange, meta, proximaOrdem, onSal
       unidade: form.unidade.trim() || 'vezes',
       dias_semana: form.dias_semana,
       cor: form.cor,
+      mede_conversao: form.mede_conversao,
       updated_at: new Date().toISOString(),
     }
     const db = createClient() as any
@@ -143,6 +144,17 @@ export function MetaDiariaDialog({ open, onOpenChange, meta, proximaOrdem, onSal
               ))}
             </div>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3">
+            <input
+              type="checkbox" checked={form.mede_conversao} className="mt-0.5 accent-[var(--color-brand-lima)]"
+              onChange={(e) => setForm((f) => ({ ...f, mede_conversao: e.target.checked }))}
+            />
+            <span>
+              <span className="block text-xs font-medium text-brand-lavanda">Contar quantos converteram</span>
+              <span className="block text-[11px] text-brand-lavanda/40">Mostra um contador de conversões e a taxa (convertidos ÷ {form.unidade.trim() || 'feitos'}).</span>
+            </span>
+          </label>
 
           {erro && <p className="text-xs text-brand-rosa">{erro}</p>}
 
