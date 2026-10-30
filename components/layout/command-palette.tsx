@@ -28,7 +28,7 @@ const PAGINAS: ResultItem[] = [
   ['Propostas', '/propostas'], ['Clientes', '/clientes'], ['Projetos', '/projetos'], ['Tarefas', '/tarefas'],
   ['Social media', '/social'], ['Financeiro', '/financeiro'], ['Contas a receber', '/financeiro/receitas'],
   ['Contas a pagar', '/financeiro/despesas'], ['Fluxo de caixa', '/financeiro/fluxo-de-caixa'],
-  ['MRR e assinaturas', '/financeiro/mrr'], ['SaaS', '/financeiro/saas'], ['Metas', '/metas'],
+  ['MRR e assinaturas', '/financeiro/mrr'], ['SaaS', '/financeiro/saas'], ['Metas', '/metas'], ['Metas diárias', '/metas-diarias'],
   ['Anotações', '/anotacoes'], ['Configurações', '/configuracoes'],
 ].map(([titulo, href]) => ({ id: `p-${href}`, tipo: 'pagina' as const, titulo, href }))
 
