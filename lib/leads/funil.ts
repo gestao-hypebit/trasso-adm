@@ -44,11 +44,17 @@ export type Historico = { lead_id: string; de: string | null; para: string; crea
 
 const indice = (status: string) => ETAPAS_FUNIL.indexOf(status as LeadStatus)
 
-// Etapa mais avançada que o lead chegou a atingir (mesmo que depois tenha sido perdido).
+// Etapa mais avançada que o lead atingiu. Voltar para uma etapa anterior em aberto é
+// correção (desfaz o avanço), então lead em aberto vale pela etapa atual. Ser perdido
+// não desfaz: vale a etapa em que ele estava quando foi perdido.
 export function etapaMaxima(lead: { status: string }, historico: Historico[]): number {
-  let max = Math.max(0, indice(lead.status))
-  for (const h of historico) max = Math.max(max, indice(h.para))
-  return max
+  if (lead.status !== 'descartado') return Math.max(0, indice(lead.status))
+  let etapa = 0
+  for (const h of [...historico].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
+    const i = indice(h.para)
+    if (i >= 0) etapa = i
+  }
+  return etapa
 }
 
 export type LinhaCanal = {
