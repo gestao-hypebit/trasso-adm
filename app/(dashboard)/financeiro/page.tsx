@@ -18,6 +18,7 @@ import { labelLinha, type Linha } from '@/lib/financeiro/linhas'
 import { FiltroLinha, type FiltroLinhaValor } from '@/components/financeiro/filtro-linha'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Carregando } from '@/components/ui/carregando'
 
 type Lancamento = {
   id: string; tipo: string; descricao: string; valor: number; data: string; status: string
@@ -178,7 +179,7 @@ export default function FinanceiroPage() {
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description="Visão geral" />
       <main className="flex-1 p-4 md:p-6">
-        <PageHeader title="Financeiro" description={loading ? 'Carregando...' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}>
+        <PageHeader title="Financeiro" description={loading ? 'Carregando…' : mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}>
           <LancamentoForm onSuccess={load} />
         </PageHeader>
 
@@ -463,7 +464,7 @@ export default function FinanceiroPage() {
             <CardContent className="p-0">
               <div className="divide-y divide-white/[0.04]">
                 {loading ? (
-                  <p className="text-center text-brand-lavanda/40 text-sm py-8">Carregando...</p>
+                  <p className="text-center text-brand-lavanda/40 text-sm py-8"><Carregando /></p>
                 ) : receitasMes.length === 0 ? (
                   <p className="text-center text-brand-lavanda/40 text-sm py-8">Nenhuma receita neste período.</p>
                 ) : [...receitasMes].sort((a, b) => b.data.localeCompare(a.data)).map((r) => (
@@ -536,7 +537,7 @@ export default function FinanceiroPage() {
             <CardContent className="p-0">
               <div className="divide-y divide-white/[0.04]">
                 {loading ? (
-                  <p className="text-center text-brand-lavanda/40 text-sm py-8">Carregando...</p>
+                  <p className="text-center text-brand-lavanda/40 text-sm py-8"><Carregando /></p>
                 ) : despesasMes.length === 0 ? (
                   <p className="text-center text-brand-lavanda/40 text-sm py-8">Nenhuma despesa neste período.</p>
                 ) : [...despesasMes].sort((a, b) => b.data.localeCompare(a.data)).map((d) => (

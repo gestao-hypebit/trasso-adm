@@ -2,17 +2,41 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Users, FolderOpen, FileText, Loader2 } from 'lucide-react'
+import { Search, Users, FolderOpen, FileText, Loader2, Inbox, Plus, CornerDownRight } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
 
-type Tipo = 'cliente' | 'projeto' | 'proposta'
+type Tipo = 'acao' | 'lead' | 'cliente' | 'projeto' | 'proposta' | 'pagina'
 type ResultItem = { id: string; tipo: Tipo; titulo: string; subtitulo?: string; href: string }
 
-const TIPOS: Tipo[] = ['cliente', 'projeto', 'proposta']
-const ICONS: Record<Tipo, React.FC<any>> = { cliente: Users, projeto: FolderOpen, proposta: FileText }
-const LABELS: Record<Tipo, string> = { cliente: 'Clientes', projeto: 'Projetos', proposta: 'Propostas' }
+const TIPOS: Tipo[] = ['acao', 'lead', 'cliente', 'projeto', 'proposta', 'pagina']
+const ICONS: Record<Tipo, React.FC<any>> = { acao: Plus, lead: Inbox, cliente: Users, projeto: FolderOpen, proposta: FileText, pagina: CornerDownRight }
+const LABELS: Record<Tipo, string> = { acao: 'Criar', lead: 'Leads', cliente: 'Clientes', projeto: 'Projetos', proposta: 'Propostas', pagina: 'Ir para' }
+
+// Atalhos que aparecem sem digitar nada (e filtram pelo texto digitado).
+const ACOES: ResultItem[] = [
+  { id: 'a-lead', tipo: 'acao', titulo: 'Novo lead', href: '/leads?novo=1' },
+  { id: 'a-proposta', tipo: 'acao', titulo: 'Nova proposta', href: '/propostas/nova' },
+  { id: 'a-evento', tipo: 'acao', titulo: 'Novo evento na agenda', href: '/agenda?novo=1' },
+  { id: 'a-cliente', tipo: 'acao', titulo: 'Novo cliente', href: '/clientes/novo' },
+  { id: 'a-projeto', tipo: 'acao', titulo: 'Novo projeto', href: '/projetos/novo' },
+]
+const PAGINAS: ResultItem[] = [
+  ['Dashboard', '/dashboard'], ['Leads', '/leads'], ['Conversão do funil', '/leads/conversao'], ['Agenda', '/agenda'],
+  ['Propostas', '/propostas'], ['Clientes', '/clientes'], ['Projetos', '/projetos'], ['Tarefas', '/tarefas'],
+  ['Social media', '/social'], ['Financeiro', '/financeiro'], ['Contas a receber', '/financeiro/receitas'],
+  ['Contas a pagar', '/financeiro/despesas'], ['Fluxo de caixa', '/financeiro/fluxo-de-caixa'],
+  ['MRR e assinaturas', '/financeiro/mrr'], ['SaaS', '/financeiro/saas'], ['Metas', '/metas'],
+  ['Anotações', '/anotacoes'], ['Configurações', '/configuracoes'],
+].map(([titulo, href]) => ({ id: `p-${href}`, tipo: 'pagina' as const, titulo, href }))
+
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const atalhosPara = (termo: string) => {
+  const t = semAcento(termo)
+  return [...ACOES, ...PAGINAS].filter((i) => semAcento(i.titulo).includes(t))
+}
 
 const CommandPaletteContext = createContext<{ open: () => void } | null>(null)
 
@@ -45,7 +69,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!open) return
     setQuery('')
-    setResults([])
+    setResults([...ACOES, ...PAGINAS.slice(0, 6)])
     setActiveIndex(0)
     const t = setTimeout(() => inputRef.current?.focus(), 50)
     return () => clearTimeout(t)
@@ -53,21 +77,26 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const termo = query.trim()
-    if (!termo) { setResults([]); setLoading(false); return }
+    if (!termo) { setResults([...ACOES, ...PAGINAS.slice(0, 6)]); setLoading(false); setActiveIndex(0); return }
+    setResults(atalhosPara(termo))
     setLoading(true)
     const handle = setTimeout(async () => {
       const supabase = createClient() as any
       const safe = termo.replace(/[,()%]/g, '')
       const like = `%${safe}%`
-      const [{ data: clientes }, { data: projetos }, { data: propostas }] = await Promise.all([
+      const [{ data: leads }, { data: clientes }, { data: projetos }, { data: propostas }] = await Promise.all([
+        supabase.from('leads').select('id, nome, empresa, status').or(`nome.ilike.${like},empresa.ilike.${like},email.ilike.${like},telefone.ilike.${like}`).order('created_at', { ascending: false }).limit(5),
         supabase.from('clientes').select('id, nome, empresa').or(`nome.ilike.${like},empresa.ilike.${like}`).limit(5),
         supabase.from('projetos').select('id, nome, clientes(nome)').ilike('nome', like).limit(5),
         supabase.from('propostas').select('id, numero, titulo, clientes(nome)').or(`numero.ilike.${like},titulo.ilike.${like}`).limit(5),
       ])
       const items: ResultItem[] = [
+        ...atalhosPara(termo).filter((i) => i.tipo === 'acao'),
+        ...(leads ?? []).map((l: any) => ({ id: l.id, tipo: 'lead' as const, titulo: l.nome, subtitulo: [l.empresa, leadStatusConfig[l.status as LeadStatus]?.label].filter(Boolean).join(' · ') || undefined, href: `/leads?lead=${l.id}` })),
         ...(clientes ?? []).map((c: any) => ({ id: c.id, tipo: 'cliente' as const, titulo: c.nome, subtitulo: c.empresa ?? undefined, href: `/clientes/${c.id}` })),
         ...(projetos ?? []).map((p: any) => ({ id: p.id, tipo: 'projeto' as const, titulo: p.nome, subtitulo: p.clientes?.nome, href: `/projetos/${p.id}` })),
         ...(propostas ?? []).map((p: any) => ({ id: p.id, tipo: 'proposta' as const, titulo: p.titulo, subtitulo: `${p.numero}${p.clientes?.nome ? ' · ' + p.clientes.nome : ''}`, href: `/propostas/${p.id}` })),
+        ...atalhosPara(termo).filter((i) => i.tipo === 'pagina'),
       ]
       setResults(items)
       setActiveIndex(0)
@@ -102,15 +131,13 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Buscar clientes, projetos, propostas..."
+              placeholder="Buscar leads, clientes, propostas… ou digite uma ação"
               className="flex-1 bg-transparent py-3.5 text-sm text-brand-lavanda placeholder:text-brand-lavanda/30 outline-none"
             />
             {loading && <Loader2 className="h-4 w-4 animate-spin text-brand-lavanda/40 shrink-0" />}
           </div>
           <div className="max-h-80 overflow-y-auto py-2">
-            {!query.trim() ? (
-              <p className="text-center text-xs text-brand-lavanda/30 py-8">Digite para buscar em todo o sistema</p>
-            ) : results.length === 0 && !loading ? (
+            {results.length === 0 && !loading ? (
               <p className="text-center text-xs text-brand-lavanda/30 py-8">Nenhum resultado para &ldquo;{query}&rdquo;</p>
             ) : (
               grupos.map((grupo) => {

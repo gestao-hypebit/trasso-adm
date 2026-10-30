@@ -11,6 +11,7 @@ import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { Carregando } from '@/components/ui/carregando'
 
 type Anotacao = {
   id: string
@@ -276,7 +277,7 @@ export default function AnotacoesPage() {
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-brand-lavanda/40 text-sm">
-          Carregando...
+          <Carregando />
         </div>
       ) : (
         <div className="flex-1 overflow-auto min-h-0">

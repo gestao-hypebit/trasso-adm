@@ -11,6 +11,7 @@ import { PortalLinkAcoes, type ClientePortal } from '@/components/projetos/porta
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate } from '@/lib/utils'
 import { criarOnboarding, type Briefing, type OnboardingItem } from '@/lib/projetos/onboarding'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 export function OnboardingProjeto({ projetoId, tipo, cliente }: { projetoId: string; tipo: string | null; cliente: ClientePortal | null }) {
   const [itens, setItens] = useState<OnboardingItem[]>([])
@@ -72,7 +73,7 @@ export function OnboardingProjeto({ projetoId, tipo, cliente }: { projetoId: str
     await (createClient() as any).from('onboarding_itens').delete().eq('id', id)
   }
 
-  if (loading) return <p className="py-10 text-center text-sm text-brand-lavanda/40">Carregando...</p>
+  if (loading) return <SkeletonLista linhas={3} />
 
   if (itens.length === 0 && !briefing) {
     return (

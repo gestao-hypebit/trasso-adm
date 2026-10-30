@@ -27,6 +27,7 @@ import {
   excluirIndicacaoAction,
   excluirIndicadorAction,
 } from './actions'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type ComissaoRow = {
   id: string
@@ -253,7 +254,7 @@ export default function ComissoesPage() {
                     </thead>
                     <tbody>
                       {loading ? (
-                        <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                        <tr><td colSpan={6} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                       ) : comissoesFiltradas.length === 0 ? (
                         <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhuma comissão gerada ainda.</td></tr>
                       ) : comissoesFiltradas.map((c) => {
@@ -305,7 +306,7 @@ export default function ComissoesPage() {
                     </thead>
                     <tbody>
                       {loading ? (
-                        <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                        <tr><td colSpan={6} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                       ) : indicadores.length === 0 ? (
                         <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhum indicador cadastrado.</td></tr>
                       ) : indicadores.map((i) => (
@@ -371,7 +372,7 @@ export default function ComissoesPage() {
                     </thead>
                     <tbody>
                       {loading ? (
-                        <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                        <tr><td colSpan={6} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                       ) : indicacoes.length === 0 ? (
                         <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhuma indicação cadastrada.</td></tr>
                       ) : indicacoes.map((i) => {

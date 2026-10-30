@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { enviarContratoAssinado } from '@/lib/contratos/arquivo'
 import { ContratoFormDialog } from '@/components/contratos/contrato-form-dialog'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Contrato = {
   id: string
@@ -171,7 +172,7 @@ export default function ContratosPage() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={7} className="px-6 py-16 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                    <tr><td colSpan={7} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                   ) : contratosFiltrados.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-16 text-center">

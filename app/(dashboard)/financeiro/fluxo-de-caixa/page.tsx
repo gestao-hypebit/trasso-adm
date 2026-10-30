@@ -17,6 +17,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Respons
 import { createClient } from '@/lib/supabase/client'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Carregando } from '@/components/ui/carregando'
 
 type Lanc = { tipo: string; valor: number; data: string; status: string }
 
@@ -182,7 +183,7 @@ export default function FluxoCaixaPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="h-[260px] flex items-center justify-center text-brand-lavanda/30 text-sm">Carregando...</div>
+              <div className="h-[260px] flex items-center justify-center text-brand-lavanda/30 text-sm"><Carregando /></div>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} stackOffset="sign">

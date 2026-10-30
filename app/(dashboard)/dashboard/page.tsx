@@ -18,6 +18,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ehLinhaSaas, linhasDeReceita, LINHA_CORES, type Linha } from '@/lib/financeiro/linhas'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Carregando } from '@/components/ui/carregando'
 
 type Lancamento = { tipo: string; valor: number; data: string; status: string; descricao: string; frente: Linha; categorias_financeiras: { nome: string } | null }
 type Projeto = { id: string; status: string; data_entrega: string | null; nome: string }
@@ -283,22 +284,28 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="sm:col-span-2 lg:col-span-1">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-xs text-brand-lavanda/40 mb-3">Receita Total</p>
-                  <p className="text-2xl font-bold text-brand-lima" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                    {loading ? '...' : formatCurrency(faturamento)}
-                  </p>
-                </div>
-                <DollarSign className="h-5 w-5 shrink-0 text-brand-lima" />
-              </div>
-            </CardContent>
-          </Card>
-          <KpiCard title="Projetos Ativos" value={loading ? '...' : String(projetosAtivos)} icon={FolderOpen} iconColor="text-brand-violeta" />
-          <KpiCard title="Propostas em Aberto" value={loading ? '...' : String(propostas.length)} icon={FileText} iconColor="text-brand-rosa" />
-          <KpiCard title="Novos Clientes" value={loading ? '...' : String(clientesMes.length)} icon={Users} iconColor="text-brand-lima" />
+          <div className="sm:col-span-2 lg:col-span-1">
+            <KpiCard
+              title="Receita total"
+              value={formatCurrency(faturamento)}
+              icon={DollarSign}
+              iconColor="text-brand-lima"
+              carregando={loading}
+              href="/financeiro/receitas"
+              info="Tudo o que foi recebido no período escolhido acima (receitas com status recebido), de todas as linhas."
+            />
+          </div>
+          <KpiCard title="Projetos ativos" value={String(projetosAtivos)} icon={FolderOpen} iconColor="text-brand-violeta" carregando={loading} href="/projetos" />
+          <KpiCard
+            title="Propostas em aberto"
+            value={String(propostas.length)}
+            icon={FileText}
+            iconColor="text-brand-rosa"
+            carregando={loading}
+            href="/propostas"
+            info="Propostas enviadas ou em negociação, esperando resposta do cliente. Rascunhos não contam."
+          />
+          <KpiCard title="Novos clientes" value={String(clientesMes.length)} icon={Users} iconColor="text-brand-lima" carregando={loading} href="/clientes" info="Clientes cadastrados no período escolhido acima." />
         </div>
 
         {/* Receita por linha */}
@@ -346,7 +353,7 @@ export default function DashboardPage() {
             <CardContent>
               {revenueData.length === 0 ? (
                 <div className="h-[260px] flex items-center justify-center text-brand-lavanda/30 text-sm">
-                  {loading ? 'Carregando...' : 'Sem dados financeiros ainda'}
+                  {loading ? <Carregando /> : 'Sem dados financeiros ainda'}
                 </div>
               ) : (
                 <>
@@ -383,7 +390,7 @@ export default function DashboardPage() {
             <CardContent>
               {projetos.length === 0 ? (
                 <div className="h-[200px] flex items-center justify-center text-brand-lavanda/30 text-sm">
-                  {loading ? 'Carregando...' : 'Sem projetos'}
+                  {loading ? <Carregando /> : 'Sem projetos'}
                 </div>
               ) : (
                 <>
@@ -422,7 +429,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {loading ? (
-                <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
+                <p className="text-xs text-brand-lavanda/40 text-center py-4"><Carregando /></p>
               ) : recenteLancamentos.length === 0 ? (
                 <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhum lançamento neste mês.</p>
               ) : recenteLancamentos.map((l, i) => (
@@ -446,7 +453,7 @@ export default function DashboardPage() {
             <CardHeader><CardTitle className="text-base">Próximas Entregas</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {loading ? (
-                <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
+                <p className="text-xs text-brand-lavanda/40 text-center py-4"><Carregando /></p>
               ) : proximosVencimentos.length === 0 ? (
                 <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhuma entrega próxima.</p>
               ) : proximosVencimentos.map((p) => {
@@ -476,7 +483,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {loading ? (
-              <p className="text-xs text-brand-lavanda/40 text-center py-4">Carregando...</p>
+              <p className="text-xs text-brand-lavanda/40 text-center py-4"><Carregando /></p>
             ) : atividades.length === 0 ? (
               <p className="text-xs text-brand-lavanda/40 text-center py-4">Nenhuma atividade recente.</p>
             ) : atividades.map((a) => {

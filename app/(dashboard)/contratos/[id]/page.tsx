@@ -14,6 +14,7 @@ import { ContratoPDF, type AgenciaPDFData } from '@/components/contratos/contrat
 import { ContratoFormDialog } from '@/components/contratos/contrato-form-dialog'
 import { enviarContratoAssinado, urlArquivoContrato } from '@/lib/contratos/arquivo'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then(m => m.PDFDownloadLink),
@@ -95,7 +96,7 @@ export default function ContratoDetailPage({ params }: { params: Promise<{ id: s
     else setErroArquivo('Não foi possível abrir o arquivo.')
   }
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return <div className="p-4 md:p-6"><SkeletonLista linhas={4} /></div>
   if (!contrato) return (
     <div className="p-4 md:p-6">
       <Link href="/contratos"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>

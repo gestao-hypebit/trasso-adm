@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type ClienteOption = { id: string; nome: string }
 
@@ -89,7 +90,7 @@ export default function EditarProjetoPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return <div className="p-4 md:p-6"><SkeletonLista linhas={4} /></div>
 
   return (
     <div>

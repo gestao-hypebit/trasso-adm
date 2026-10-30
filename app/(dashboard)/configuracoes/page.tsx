@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { Carregando } from '@/components/ui/carregando'
 
 const tabs = [
   { key: 'agencia', label: 'Agência', icon: Building2 },
@@ -324,7 +325,7 @@ export default function ConfiguracoesPage() {
 
           <div className="flex-1 min-w-0">
             {loading ? (
-              <Card><CardContent className="py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</CardContent></Card>
+              <Card><CardContent className="py-12 text-center text-brand-lavanda/40 text-sm"><Carregando /></CardContent></Card>
             ) : (
               <>
                 {/* ── Agência ── */}

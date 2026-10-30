@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 import { labelOrigem } from '@/lib/crm/opcoes'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { CATEGORIA_TRAFEGO } from '@/lib/leads/trafego'
+import { Carregando } from '@/components/ui/carregando'
 
 const ORIGEM = 'trafego_pago'
 
@@ -137,7 +138,7 @@ export function TrafegoPago() {
           <CardContent className="p-0">
             {r.clientes.length === 0 ? (
               <p className="text-xs text-brand-lavanda/40 text-center py-12 px-6">
-                {loading ? 'Carregando...' : 'Nenhum cliente com origem "Tráfego pago" no período. Marque a origem no cadastro do cliente.'}
+                {loading ? <Carregando /> : 'Nenhum cliente com origem "Tráfego pago" no período. Marque a origem no cadastro do cliente.'}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -173,7 +174,7 @@ export function TrafegoPago() {
           <CardHeader className="pb-3"><CardTitle className="text-base">Comparativo por origem</CardTitle></CardHeader>
           <CardContent className="p-0">
             {r.origens.length === 0 ? (
-              <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? 'Carregando...' : 'Sem dados'}</p>
+              <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? <Carregando /> : 'Sem dados'}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

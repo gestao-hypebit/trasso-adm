@@ -17,6 +17,7 @@ import {
   ENTREGA_SELECT, ajustesPedidos, entregaStatusConfig, entregaTipoOpcoes, eventoLabel, labelEntregaTipo, ordenarEventos,
   type Entrega,
 } from '@/lib/projetos/entregas'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Avaliacao = { id: string; status: string; nota: number | null; comentario: string | null; respondida_em: string | null }
 
@@ -121,7 +122,7 @@ export function EntregasProjeto({ projetoId, clienteId, cliente, revisoesInclusa
     else setAvaliacao(data as Avaliacao)
   }
 
-  if (loading) return <p className="py-10 text-center text-sm text-brand-lavanda/40">Carregando...</p>
+  if (loading) return <SkeletonLista linhas={3} />
 
   const ajustes = ajustesPedidos(entregas)
   const excedeu = revisoesInclusas != null && ajustes > revisoesInclusas

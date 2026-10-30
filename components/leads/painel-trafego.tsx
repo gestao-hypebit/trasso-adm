@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Megaphone, Wallet, Users, CalendarCheck, Trophy, Flame, Timer, TrendingUp } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { noIntervalo, type Intervalo } from '@/lib/periodo'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import { diaSP } from '@/lib/anuncios/regras'
@@ -26,10 +27,10 @@ const fmtCusto = (v: number | null) => (v === null ? '—' : formatCurrency(v))
 const fmtHoras = (h: number | null) =>
   h === null ? '—' : h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${h.toFixed(h < 10 ? 1 : 0).replace('.', ',')} h` : `${Math.round(h / 24)} dias`
 
-export function PainelTrafego({ leads, historico, periodo, frente }: {
+export function PainelTrafego({ leads, historico, intervalo, frente }: {
   leads: LeadTrafego[]
   historico: Historico[]
-  periodo: number
+  intervalo: Intervalo
   frente: FrenteLead | 'todas'
 }) {
   const [despesas, setDespesas] = useState<Despesa[]>([])
@@ -52,14 +53,12 @@ export function PainelTrafego({ leads, historico, periodo, frente }: {
   }, [])
 
   const r = useMemo(() => {
-    const corte = periodo ? Date.now() - periodo * 86_400_000 : 0
-    const diaCorte = periodo ? diaSP(new Date(corte)) : ''
-    const pagos = leads.filter((l) => ehTrafegoPago(l) && new Date(l.created_at).getTime() >= corte)
+    const pagos = leads.filter((l) => ehTrafegoPago(l) && noIntervalo(diaSP(l.created_at), intervalo))
     const ids = new Set(pagos.map((l) => l.id))
     const hist = historico.filter((h) => ids.has(h.lead_id))
     const horas = pagos.map((l) => horasAtePrimeiroContato(l, hist)).filter((h): h is number => h !== null)
 
-    const noPeriodo = despesas.filter((d) => !diaCorte || d.data >= diaCorte)
+    const noPeriodo = despesas.filter((d) => noIntervalo(d.data, intervalo))
     // Com um negócio escolhido, só conta a despesa lançada nele; "Geral" fica de fora e aparece no aviso.
     const investimento = noPeriodo
       .filter((d) => frente === 'todas' || d.frente === frente)
@@ -74,7 +73,7 @@ export function PainelTrafego({ leads, historico, periodo, frente }: {
       primeiroContato: mediana(horas),
       amostraContato: horas.length,
     }
-  }, [leads, historico, despesas, periodo, frente])
+  }, [leads, historico, despesas, intervalo.de, intervalo.ate, frente]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const t = r.total
   const semDados = t.leads === 0 && t.gasto === 0

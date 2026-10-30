@@ -20,6 +20,7 @@ import { hojeISO, diasEntre, situacaoDe, aging, baixarCSV, type Situacao } from 
 import { SeletorMes, periodoInicial, intervaloPeriodo, rotuloPeriodo, type Periodo } from '@/components/financeiro/seletor-mes'
 import { linhaOpcoes, type Linha } from '@/lib/financeiro/linhas'
 import { FiltroLinha, type FiltroLinhaValor } from '@/components/financeiro/filtro-linha'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Lancamento = {
   id: string; descricao: string; valor: number; data: string; status: string
@@ -402,7 +403,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={colunas} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                    <tr><td colSpan={colunas} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                   ) : filtradas.length === 0 ? (
                     <tr><td colSpan={colunas} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhum título nesta visão.</td></tr>
                   ) : filtradas.map((l) => {

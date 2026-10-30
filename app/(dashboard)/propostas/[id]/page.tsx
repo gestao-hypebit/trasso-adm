@@ -18,6 +18,7 @@ import { PropostaPDF } from '@/components/propostas/proposta-pdf'
 import { ConverterContratoDialog } from '@/components/propostas/converter-contrato-dialog'
 import { EnviarPropostaDialog } from '@/components/propostas/enviar-proposta-dialog'
 import { duplicarProposta } from '@/lib/propostas/duplicar'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then(m => m.PDFDownloadLink),
@@ -108,7 +109,7 @@ export default function PropostaDetailPage({ params }: { params: Promise<{ id: s
     load()
   }, [id])
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return <div className="p-4 md:p-6"><SkeletonLista linhas={4} /></div>
   if (!proposta) return (
     <div className="p-4 md:p-6">
       <Link href="/propostas"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>

@@ -16,6 +16,7 @@ import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, toISODateLocal, addMonthsISO, cn } from '@/lib/utils'
 import { calcularMrr, type LancamentoMrr } from '@/lib/mrr'
+import { Carregando } from '@/components/ui/carregando'
 
 // Paleta validada (CVD + contraste) contra a superfície escura #141318.
 const COR = { confirmado: '#76A000', saas: '#8B5CF6', pipeline: '#2E9FD0', despesas: '#E0457B' }
@@ -207,7 +208,7 @@ export default function PrevisaoPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="h-[280px] flex items-center justify-center text-brand-lavanda/30 text-sm">Carregando...</div>
+              <div className="h-[280px] flex items-center justify-center text-brand-lavanda/30 text-sm"><Carregando /></div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart data={calc.meses} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">

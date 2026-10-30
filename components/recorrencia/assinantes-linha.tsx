@@ -137,6 +137,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
         <KpiCard
           title={`MRR ${nomeLinha[linha]}`}
           value={formatCurrency(calc.mrrBruto)}
+          info="Receita recorrente por mês: soma das assinaturas ativas pelo valor cobrado, incluindo inadimplentes até a assinatura ser cancelada. Líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas."
           icon={Repeat}
           iconColor="text-brand-lima"
           sub={r.asaasCarregando
@@ -148,6 +149,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
         <KpiCard
           title="Assinaturas"
           value={String(calc.totalAssinaturas)}
+          info="Clientes com assinatura ativa ou que ainda devem mensalidade. Em dia = nada vencido; inadimplente = tem mensalidade vencida e não paga."
           icon={Users}
           sub={<>
             <span className="text-brand-lima/80">{calc.totalAssinaturas - calc.inadimplentes} em dia</span>
@@ -156,7 +158,7 @@ export function AssinantesLinha({ r, linha }: { r: Recorrencia; linha: LinhaRec 
           </>}
         />
         <KpiCard title="Novos este mês" value={String(mov.novos)} icon={UserPlus} />
-        <KpiCard title="Cancelaram mês passado" value={String(passado.churn)} icon={UserMinus} iconColor={passado.churn > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/40'} />
+        <KpiCard title="Cancelaram mês passado" info="Assinantes que pagaram até o mês retrasado e não pagaram no mês passado (churn)." value={String(passado.churn)} icon={UserMinus} iconColor={passado.churn > 0 ? 'text-brand-rosa' : 'text-brand-lavanda/40'} />
         <button type="button" onClick={() => setAba('atraso')} className="text-left" title="Ver inadimplentes">
           <KpiCard
             title="Inadimplência"

@@ -93,16 +93,18 @@ export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbr
         <KpiCard
           title="MRR da agência"
           value={formatCurrency(bruto)}
+          info="Receita recorrente por mês: soma das assinaturas ativas pelo valor cobrado, incluindo inadimplentes até a assinatura ser cancelada. Líquido = mensalidades lançadas no financeiro, já sem as taxas do Asaas."
           icon={Repeat}
           iconColor="text-brand-lima"
           sub={r.asaasCarregando
             ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> buscando no Asaas…</span>
             : <>Bruto · líquido <span className="text-brand-lavanda/70">{formatCurrency(liquido)}</span></>}
         />
-        <KpiCard title="ARR (MRR × 12)" value={formatCurrency(bruto * 12)} icon={CalendarRange} sub="Receita recorrente anual" />
+        <KpiCard title="ARR (MRR × 12)" value={formatCurrency(bruto * 12)} icon={CalendarRange} sub="Receita recorrente anual" info="Quanto as assinaturas de hoje rendem em 12 meses se ninguém entrar nem sair." />
         <KpiCard
           title="Assinaturas"
           value={String(assinaturas)}
+          info="Clientes com assinatura ativa ou que ainda devem mensalidade. Em dia = nada vencido; inadimplente = tem mensalidade vencida e não paga."
           icon={Users}
           sub={<>
             <span className="text-brand-lima/80">{assinaturas - inadimplentes} em dia</span>
@@ -113,6 +115,7 @@ export function VisaoGeral({ r, onAbrir, focoCobranca }: { r: Recorrencia; onAbr
         <KpiCard
           title="Ticket médio"
           value={formatCurrency(ativas ? bruto / ativas : 0)}
+          info="MRR dividido pelo número de assinaturas ativas: quanto cada assinante paga por mês, em média."
           icon={Receipt}
           sub={atraso > 0 ? <span className="text-brand-rosa/80">{formatCurrency(atraso)} em atraso</span> : 'Ninguém em atraso'}
         />

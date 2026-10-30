@@ -23,6 +23,8 @@ import { ehLinhaSaas, labelLinha, linhaDoProduto, temSaas, LINHAS_SAAS } from '@
 import { toCSV, downloadCSV } from '@/lib/csv'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
+import { SkeletonLista } from '@/components/ui/skeleton'
+import { EstadoVazio } from '@/components/ui/estado-vazio'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
 type Produto = { id: string; nome: string; cor: string }
@@ -471,15 +473,14 @@ export default function ClientesPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-brand-lavanda/40 text-sm">Carregando...</div>
+          <SkeletonLista />
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.06] mb-4">
-              <Users className="h-8 w-8 text-brand-violeta/50" />
-            </div>
-            <h3 className="text-lg font-semibold text-brand-lavanda">Nenhum cliente encontrado</h3>
-            <p className="text-sm text-brand-lavanda/50 mt-1">Tente ajustar os filtros ou adicione um novo cliente.</p>
-          </div>
+          <EstadoVazio
+            icone={Users}
+            titulo={clientes.length === 0 ? 'Nenhum cliente ainda' : 'Nenhum cliente com esses filtros'}
+            texto={clientes.length === 0 ? 'Cadastre o primeiro cliente, ou converta um lead em cliente pelo funil de vendas.' : 'Tente limpar a busca ou os filtros acima.'}
+            acao={{ label: 'Novo cliente', href: '/clientes/novo', icon: Plus }}
+          />
         ) : visao === 'tabela' ? (
           <Card>
             <CardContent className="p-0">

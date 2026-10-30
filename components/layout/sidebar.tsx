@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   Settings, LogOut,
-  StickyNote, Inbox, Target, ChevronDown, CalendarDays, X, Globe, Megaphone,
+  StickyNote, Inbox, Target, ChevronDown, CalendarDays, X, Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -15,6 +15,8 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { useMobileNav } from '@/components/layout/mobile-nav'
+import { diaSP } from '@/lib/anuncios/regras'
+
 type NavItem = {
   href: string
   icon: typeof LayoutDashboard
@@ -22,30 +24,63 @@ type NavItem = {
   children?: { href: string; label: string }[]
 }
 
-const navItems: NavItem[] = [
-  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/metas',         icon: Target,          label: 'Metas' },
-  { href: '/clientes',      icon: Users,           label: 'Clientes' },
-  { href: '/leads',         icon: Inbox,           label: 'Leads' },
-  { href: '/agenda',        icon: CalendarDays,    label: 'Agenda' },
-  { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
-  { href: '/social',        icon: Megaphone,       label: 'Social media' },
+// Menu agrupado por assunto. Prévias de site está escondido por enquanto (ver middleware).
+const grupos: { titulo?: string; itens: NavItem[] }[] = [
   {
-    href: '/financeiro', icon: DollarSign, label: 'Financeiro',
-    children: [
-      { href: '/financeiro',               label: 'Visão Geral' },
-      { href: '/financeiro/receitas',      label: 'Contas a Receber' },
-      { href: '/financeiro/despesas',      label: 'Contas a Pagar' },
-      { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
-      { href: '/financeiro/mrr',            label: 'MRR e assinaturas' },
-      { href: '/financeiro/saas',           label: 'SaaS' },
+    itens: [
+      { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
+      { href: '/metas',         icon: Target,          label: 'Metas' },
     ],
   },
-  { href: '/propostas',     icon: FileText,        label: 'Propostas' },
-  { href: '/sites',         icon: Globe,           label: 'Prévias de site' },
-  { href: '/anotacoes',     icon: StickyNote,      label: 'Anotações' },
-  { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
+  {
+    titulo: 'Vendas',
+    itens: [
+      { href: '/leads',         icon: Inbox,           label: 'Leads' },
+      { href: '/agenda',        icon: CalendarDays,    label: 'Agenda' },
+      { href: '/propostas',     icon: FileText,        label: 'Propostas' },
+    ],
+  },
+  {
+    titulo: 'Clientes',
+    itens: [
+      { href: '/clientes',      icon: Users,           label: 'Clientes' },
+      { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
+      { href: '/social',        icon: Megaphone,       label: 'Social media' },
+    ],
+  },
+  {
+    titulo: 'Dinheiro',
+    itens: [
+      {
+        href: '/financeiro', icon: DollarSign, label: 'Financeiro',
+        children: [
+          { href: '/financeiro',               label: 'Visão Geral' },
+          { href: '/financeiro/receitas',      label: 'Contas a Receber' },
+          { href: '/financeiro/despesas',      label: 'Contas a Pagar' },
+          { href: '/financeiro/fluxo-de-caixa', label: 'Fluxo de Caixa' },
+          { href: '/financeiro/mrr',            label: 'MRR e assinaturas' },
+          { href: '/financeiro/saas',           label: 'SaaS' },
+        ],
+      },
+    ],
+  },
+  {
+    titulo: 'Geral',
+    itens: [
+      { href: '/anotacoes',     icon: StickyNote,      label: 'Anotações' },
+      { href: '/configuracoes', icon: Settings,        label: 'Configurações' },
+    ],
+  },
 ]
+const navItems = grupos.flatMap((g) => g.itens)
+
+// Contador vermelho no menu: o que está pedindo ação.
+type Pendencias = { leads: number; receitasVencidas: number; tarefasAtrasadas: number }
+const DICA_PENDENCIA: Record<keyof Pendencias, string> = {
+  leads: 'leads novos do site',
+  receitasVencidas: 'recebimentos vencidos',
+  tarefasAtrasadas: 'tarefas atrasadas',
+}
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -55,7 +90,7 @@ export function Sidebar() {
   const [agenciaNome, setAgenciaNome] = useState('Slick')
   const [userNome, setUserNome] = useState('')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
-  const [leadsNovos, setLeadsNovos] = useState(0)
+  const [pendencias, setPendencias] = useState<Pendencias>({ leads: 0, receitasVencidas: 0, tarefasAtrasadas: 0 })
   const [financeiroAberto, setFinanceiroAberto] = useState(false)
 
   const isPathActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
@@ -71,14 +106,19 @@ export function Sidebar() {
     const db = supabase as any
 
     async function load() {
-      const [configRes, userRes, leadsRes] = await Promise.all([
+      const hoje = diaSP(new Date())
+      const [configRes, userRes, leadsRes, receitasRes, tarefasRes] = await Promise.all([
         db.from('configuracoes_agencia').select('logo_url, nome').limit(1).maybeSingle() as Promise<{ data: { logo_url: string | null; nome: string } | null }>,
         supabase.auth.getUser(),
         // Só leads novos que chegaram pelos formulários do site; cadastro manual não conta.
         db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'novo')
           .not('formulario_id', 'is', null) as Promise<{ count: number | null }>,
+        db.from('lancamentos').select('id', { count: 'exact', head: true })
+          .eq('tipo', 'receita').eq('status', 'pendente').lt('data', hoje) as Promise<{ count: number | null }>,
+        db.from('tarefas').select('id', { count: 'exact', head: true })
+          .neq('status', 'concluida').lt('data_vencimento', hoje) as Promise<{ count: number | null }>,
       ])
-      setLeadsNovos(leadsRes.count ?? 0)
+      setPendencias({ leads: leadsRes.count ?? 0, receitasVencidas: receitasRes.count ?? 0, tarefasAtrasadas: tarefasRes.count ?? 0 })
 
       if (configRes.data) {
         if (configRes.data.logo_url) setLogoUrl(configRes.data.logo_url)
@@ -120,6 +160,82 @@ export function Sidebar() {
     .map(n => n[0])
     .join('')
     .toUpperCase() || 'U'
+
+  // Quantas pendências cada item do menu mostra (e o que significam, no title).
+  function contador(href: string) {
+    const chave: keyof Pendencias | null = href === '/leads' ? 'leads' : href === '/financeiro' ? 'receitasVencidas' : href === '/projetos' ? 'tarefasAtrasadas' : null
+    if (!chave || pendencias[chave] === 0) return null
+    return (
+      <span title={`${pendencias[chave]} ${DICA_PENDENCIA[chave]}`} className="ml-auto rounded-full bg-brand-rosa px-1.5 text-[10px] font-bold leading-4 text-brand-lavanda">
+        {pendencias[chave]}
+      </span>
+    )
+  }
+
+  function renderItem({ href, icon: Icon, label, children }: NavItem) {
+    if (children) {
+      return (
+        <div key={href}>
+          <button
+            type="button"
+            onClick={() => setFinanceiroAberto(v => !v)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-100',
+              emFinanceiro
+                ? 'text-brand-lavanda'
+                : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
+            )}
+          >
+            <Icon className={cn('h-4 w-4 shrink-0', emFinanceiro ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
+            <span className={cn('font-medium', emFinanceiro ? '' : 'font-normal')}>{label}</span>
+            <span className="ml-auto flex items-center gap-2">
+              {contador(href)}
+              <ChevronDown className={cn('h-3.5 w-3.5 text-brand-lavanda/30 transition-transform', financeiroAberto && 'rotate-180')} />
+            </span>
+          </button>
+          {financeiroAberto && (
+            <div className="ml-[22px] mt-0.5 mb-1 space-y-0.5 border-l border-white/[0.06] pl-3">
+              {children.map(child => {
+                // Visão Geral só fica ativa na rota exata, senão acenderia em todas as subpáginas
+                const childActive = child.href === '/financeiro' ? pathname === child.href : isPathActive(child.href)
+                return (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    className={cn(
+                      'block rounded-md px-2.5 py-2 md:py-1.5 text-[13px] transition-all duration-100',
+                      childActive
+                        ? 'bg-brand-rosa/[0.08] text-brand-lavanda font-medium shadow-[inset_2px_0_0_var(--color-brand-rosa)]'
+                        : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
+                    )}
+                  >
+                    {child.label}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )
+    }
+    const isActive = isPathActive(href)
+    return (
+      <Link
+        key={href}
+        href={href}
+        className={cn(
+          'flex items-center gap-3 rounded-lg px-3 py-2.5 md:py-2 text-sm transition-all duration-100',
+          isActive
+            ? 'bg-brand-rosa/[0.08] text-brand-lavanda shadow-[inset_2px_0_0_var(--color-brand-rosa)]'
+            : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
+        )}
+      >
+        <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
+        <span className={cn('font-medium', isActive ? '' : 'font-normal')}>{label}</span>
+        {contador(href)}
+      </Link>
+    )
+  }
 
   return (
     <>
@@ -165,70 +281,15 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-        {navItems.map(({ href, icon: Icon, label, children }) => {
-          if (children) {
-            return (
-              <div key={href}>
-                <button
-                  type="button"
-                  onClick={() => setFinanceiroAberto(v => !v)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-100',
-                    emFinanceiro
-                      ? 'text-brand-lavanda'
-                      : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
-                  )}
-                >
-                  <Icon className={cn('h-4 w-4 shrink-0', emFinanceiro ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
-                  <span className={cn('font-medium', emFinanceiro ? '' : 'font-normal')}>{label}</span>
-                  <ChevronDown className={cn('ml-auto h-3.5 w-3.5 text-brand-lavanda/30 transition-transform', financeiroAberto && 'rotate-180')} />
-                </button>
-                {financeiroAberto && (
-                  <div className="ml-[22px] mt-0.5 mb-1 space-y-0.5 border-l border-white/[0.06] pl-3">
-                    {children.map(child => {
-                      // Visão Geral só fica ativa na rota exata, senão acenderia em todas as subpáginas
-                      const childActive = child.href === '/financeiro' ? pathname === child.href : isPathActive(child.href)
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={cn(
-                            'block rounded-md px-2.5 py-2 md:py-1.5 text-[13px] transition-all duration-100',
-                            childActive
-                              ? 'bg-brand-rosa/[0.08] text-brand-lavanda font-medium shadow-[inset_2px_0_0_var(--color-brand-rosa)]'
-                              : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
-                          )}
-                        >
-                          {child.label}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          }
-          const isActive = isPathActive(href)
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 md:py-2 text-sm transition-all duration-100',
-                isActive
-                  ? 'bg-brand-rosa/[0.08] text-brand-lavanda shadow-[inset_2px_0_0_var(--color-brand-rosa)]'
-                  : 'text-brand-lavanda/40 hover:text-brand-lavanda/80 hover:bg-white/[0.04]'
-              )}
-            >
-              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-brand-rosa' : 'text-brand-lavanda/30')} />
-              <span className={cn('font-medium', isActive ? '' : 'font-normal')}>{label}</span>
-              {href === '/leads' && leadsNovos > 0 && (
-                <span className="ml-auto rounded-full bg-brand-rosa px-1.5 text-[10px] font-bold leading-4 text-brand-lavanda">{leadsNovos}</span>
-              )}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 overflow-y-auto py-3 px-3">
+        {grupos.map((grupo, gi) => (
+          <div key={grupo.titulo ?? gi} className={cn('space-y-0.5', gi > 0 && 'mt-4')}>
+            {grupo.titulo && (
+              <p className="px-3 pb-1 text-[10px] font-medium uppercase tracking-wider text-brand-lavanda/25">{grupo.titulo}</p>
+            )}
+            {grupo.itens.map((item) => renderItem(item))}
+          </div>
+        ))}
       </nav>
 
       {/* Footer user */}

@@ -13,6 +13,7 @@ import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { createClient } from '@/lib/supabase/client'
 import { calcularRentabilidade, corMargem, type Rentabilidade } from '@/lib/financeiro/rentabilidade'
 import { formatCurrency, cn } from '@/lib/utils'
+import { Carregando } from '@/components/ui/carregando'
 
 type Projeto = { id: string; nome: string; tipo: string | null; status: string; valor: number | null; horas_estimadas: number | null; clientes: { nome: string } | null }
 type Linha = Projeto & { r: Rentabilidade }
@@ -162,7 +163,7 @@ export default function RentabilidadePage() {
                 </thead>
                 <tbody>
                   {porTipo.length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">{loading ? 'Carregando...' : 'Nenhum projeto.'}</td></tr>
+                    <tr><td colSpan={6} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">{loading ? <Carregando /> : 'Nenhum projeto.'}</td></tr>
                   ) : porTipo.map((g) => (
                     <tr key={g.tipo} className="border-b border-white/[0.04]">
                       <td className="px-6 py-2.5 font-medium text-brand-lavanda">{tipoLabel[g.tipo] ?? g.tipo}</td>
@@ -207,7 +208,7 @@ export default function RentabilidadePage() {
                 </thead>
                 <tbody>
                   {visiveis.length === 0 ? (
-                    <tr><td colSpan={7} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">{loading ? 'Carregando...' : 'Nenhum projeto.'}</td></tr>
+                    <tr><td colSpan={7} className="px-6 py-10 text-center text-brand-lavanda/40 text-sm">{loading ? <Carregando /> : 'Nenhum projeto.'}</td></tr>
                   ) : visiveis.map((l) => (
                     <tr key={l.id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
                       <td className="px-6 py-2.5">

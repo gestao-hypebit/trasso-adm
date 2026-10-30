@@ -1,4 +1,4 @@
-// Filtro de período da tela de leads (pela data em que o lead chegou).
+// Filtro de período usado nas telas (Leads, Conversão…). Cada tela decide qual data filtra.
 // Dias no formato YYYY-MM-DD, no fuso de São Paulo, com as duas pontas incluídas.
 
 import { somarDias } from '@/lib/anuncios/regras'

@@ -18,6 +18,7 @@ import {
   CHAVE_NOME, campoTipoOpcoes, novoCampo, tiposComOpcoes, validarEstrutura,
   type Campo, type CampoTipo, type Formulario,
 } from '@/lib/leads/formulario'
+import { Carregando } from '@/components/ui/carregando'
 
 const SLUG_DO_SITE = 'site-contato'
 
@@ -231,7 +232,7 @@ export default function EditarFormularioPage({ params }: { params: Promise<{ id:
     return (
       <div className="flex flex-col min-h-screen">
         <Header title="Formulário" />
-        <main className="p-4 md:p-6 text-sm text-brand-lavanda/40">Carregando...</main>
+        <main className="p-4 md:p-6 text-sm text-brand-lavanda/40"><Carregando /></main>
       </div>
     )
   }

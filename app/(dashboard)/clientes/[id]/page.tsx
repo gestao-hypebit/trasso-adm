@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   ArrowLeft, Mail, Phone, Building2, MapPin, Edit, Plus, MessageCircle, Video, PhoneCall, FileText, StickyNote,
   FolderOpen, Copy, RefreshCw, Check, FileSignature, DollarSign, UserPlus, Globe, CheckCircle2, Send, CalendarClock,
+  Inbox, ArrowRight, AlertTriangle, CalendarDays,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,9 @@ import { labelOrigem, labelSegmento } from '@/lib/crm/opcoes'
 import { formatDate, formatCurrency, formatRelative, getInitials, cn, whatsappUrl, toISODateLocal } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
+import { SkeletonCards, SkeletonLista } from '@/components/ui/skeleton'
+import { etapaLabel } from '@/lib/leads/funil'
+import { labelTipoContato, resultadoContato } from '@/lib/leads/contatos'
 
 type ClienteRow = Database['public']['Tables']['clientes']['Row']
 type Cliente = ClienteRow & { produto: { id: string; nome: string; cor: string } | null; responsavel: { nome: string } | null }
@@ -28,6 +32,13 @@ type Proposta = { id: string; numero: string; titulo: string; status: string; va
 type Contrato = { id: string; numero: string; titulo: string; status: string; valor_total: number; data_inicio: string | null; data_fim: string | null; assinado_em: string | null; created_at: string }
 
 type EventoTimeline = { data: string; titulo: string; detalhe?: string; icon: React.FC<{ className?: string }>; cor: string; href?: string }
+// História de vendas: o(s) lead(s) que viraram este cliente, etapas, contatos e reuniões.
+type Venda = {
+  leads: { id: string; nome: string; origem: string; created_at: string; formularios: { nome: string } | null }[]
+  etapas: { lead_id: string; de: string | null; para: string; created_at: string }[]
+  contatos: { lead_id: string; tipo: string; resultado: string; nota: string | null; created_at: string }[]
+  eventos: { id: string; titulo: string; data_inicio: string; link_meet: string | null }[]
+}
 
 const tipoLabel: Record<string, string> = { agencia: 'Agência', saas: 'SaaS', ambos: 'Agência + SaaS' }
 
@@ -81,6 +92,8 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
   const [rotating, setRotating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [interacaoOpen, setInteracaoOpen] = useState(false)
+  const [aba, setAba] = useState('visao-geral')
+  const [venda, setVenda] = useState<Venda>({ leads: [], etapas: [], contatos: [], eventos: [] })
 
   useEffect(() => {
     const supabase = createClient() as any
@@ -106,6 +119,20 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
       setPropostas(pr ?? [])
       setContratos(ct ?? [])
       setLoading(false)
+
+      // Depois do principal: de onde o cliente veio (lead), o caminho no funil e a agenda.
+      const [{ data: ls }, { data: evs }] = await Promise.all([
+        supabase.from('leads').select('id, nome, origem, created_at, formularios(nome)').eq('cliente_id', id),
+        supabase.from('eventos').select('id, titulo, data_inicio, link_meet').eq('cliente_id', id),
+      ])
+      const ids = ((ls ?? []) as { id: string }[]).map((l) => l.id)
+      const [{ data: hs }, { data: cs }] = ids.length
+        ? await Promise.all([
+          supabase.from('lead_historico').select('lead_id, de, para, created_at').in('lead_id', ids),
+          supabase.from('lead_contatos').select('lead_id, tipo, resultado, nota, created_at').in('lead_id', ids),
+        ])
+        : [{ data: [] }, { data: [] }]
+      setVenda({ leads: ls ?? [], etapas: hs ?? [], contatos: cs ?? [], eventos: evs ?? [] })
     }
     load()
   }, [id])
@@ -138,7 +165,15 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
     if (!error) setCliente((prev) => (prev ? { ...prev, portal_ativo: novoValor } : prev))
   }
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return (
+    <div>
+      <Header title="Detalhe do Cliente" />
+      <div className="space-y-6 p-4 md:p-6">
+        <SkeletonCards />
+        <SkeletonLista linhas={4} />
+      </div>
+    </div>
+  )
   if (!cliente) return (
     <div className="p-4 md:p-6">
       <Link href="/clientes"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>
@@ -193,6 +228,26 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
       data: l.data, titulo: `Pagamento recebido: ${formatCurrency(Number(l.valor))}`, detalhe: l.descricao, icon: DollarSign, cor: 'text-brand-lima',
     })),
     ...(cliente.portal_last_accessed_at ? [{ data: cliente.portal_last_accessed_at, titulo: 'Acessou o portal do cliente', icon: Globe, cor: 'text-brand-lavanda/60' }] : []),
+    // Cobranças vencidas e não pagas também contam a história (em rosa).
+    ...pendentes.filter((l) => l.data < hoje).map((l) => ({
+      data: l.data, titulo: `Pagamento atrasado: ${formatCurrency(Number(l.valor))}`, detalhe: l.descricao, icon: AlertTriangle, cor: 'text-brand-rosa',
+    })),
+    ...venda.leads.map((l) => ({
+      data: l.created_at,
+      titulo: l.formularios?.nome ? `Chegou como lead pelo formulário ${l.formularios.nome}` : `Chegou como lead (${labelOrigem(l.origem)})`,
+      icon: Inbox, cor: 'text-brand-rosa', href: `/leads?lead=${l.id}`,
+    })),
+    // A entrada no funil (de = null) já aparece como "chegou como lead".
+    ...venda.etapas.filter((h) => h.de).map((h) => ({
+      data: h.created_at, titulo: `Funil: ${etapaLabel(h.de!)} → ${etapaLabel(h.para)}`, icon: ArrowRight, cor: 'text-brand-lavanda/60', href: `/leads?lead=${h.lead_id}`,
+    })),
+    ...venda.contatos.map((c) => ({
+      data: c.created_at, titulo: `Contato por ${labelTipoContato(c.tipo).toLowerCase()} · ${resultadoContato(c.resultado).label.toLowerCase()}`,
+      detalhe: c.nota ?? undefined, icon: PhoneCall, cor: 'text-brand-violeta', href: `/leads?lead=${c.lead_id}`,
+    })),
+    ...venda.eventos.map((e) => ({
+      data: e.data_inicio, titulo: `${e.data_inicio > new Date().toISOString() ? 'Reunião marcada' : 'Reunião'}: ${e.titulo}`, icon: CalendarDays, cor: 'text-brand-violeta', href: '/agenda',
+    })),
   ].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
 
   return (
@@ -302,10 +357,10 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="visao-geral">
+        <Tabs value={aba} onValueChange={setAba}>
           <TabsList className="mb-4 flex-wrap h-auto">
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="timeline">Linha do tempo ({timeline.length})</TabsTrigger>
             <TabsTrigger value="projetos">Projetos ({projetos.length})</TabsTrigger>
             <TabsTrigger value="propostas">Propostas ({propostas.length})</TabsTrigger>
             <TabsTrigger value="contratos">Contratos ({contratos.length})</TabsTrigger>
@@ -398,6 +453,36 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
                   )}
                   {cliente.portal_last_accessed_at && (
                     <p className="text-xs text-brand-lavanda/40">Último acesso: {formatDate(cliente.portal_last_accessed_at, 'dd/MM/yyyy HH:mm')}</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-sm">Últimos acontecimentos</CardTitle>
+                  <button type="button" onClick={() => setAba('timeline')} className="text-xs text-brand-lavanda/50 hover:text-brand-lavanda">Ver linha do tempo →</button>
+                </CardHeader>
+                <CardContent>
+                  {timeline.length === 0 ? <p className="text-xs text-brand-lavanda/40">Nada ainda.</p> : (
+                    <ul className="space-y-2.5">
+                      {timeline.slice(0, 6).map((ev, idx) => {
+                        const Icon = ev.icon
+                        const linha = (
+                          <>
+                            <Icon className={cn('h-3.5 w-3.5 shrink-0', ev.cor)} />
+                            <span className="min-w-0 flex-1 truncate text-sm text-brand-lavanda/90">{ev.titulo}</span>
+                            <span className="shrink-0 text-[11px] text-brand-lavanda/40">{formatRelative(ev.data)}</span>
+                          </>
+                        )
+                        return (
+                          <li key={idx}>
+                            {ev.href
+                              ? <Link href={ev.href} className="flex items-center gap-2.5 rounded-md -mx-1.5 px-1.5 py-0.5 hover:bg-white/[0.04]">{linha}</Link>
+                              : <div className="flex items-center gap-2.5">{linha}</div>}
+                          </li>
+                        )
+                      })}
+                    </ul>
                   )}
                 </CardContent>
               </Card>

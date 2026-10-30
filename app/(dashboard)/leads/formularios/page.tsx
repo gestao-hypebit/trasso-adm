@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { formatRelative } from '@/lib/utils'
 import { camposPadrao, type Formulario } from '@/lib/leads/formulario'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Item = Pick<Formulario, 'id' | 'slug' | 'nome' | 'ativo' | 'campos' | 'updated_at'> & { leads: { count: number }[] }
 
@@ -66,7 +67,7 @@ export default function FormulariosPage() {
         {erro && <p className="mb-4 text-xs text-brand-rosa">{erro}</p>}
 
         {loading ? (
-          <p className="py-16 text-center text-sm text-brand-lavanda/40">Carregando...</p>
+          <SkeletonLista />
         ) : itens.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">

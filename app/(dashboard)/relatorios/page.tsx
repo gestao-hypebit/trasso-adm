@@ -18,6 +18,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Carregando } from '@/components/ui/carregando'
 
 const tabItems = [
   { key: 'financeiro', label: 'Financeiro', icon: TrendingUp },
@@ -229,7 +230,7 @@ export default function RelatoriosPage() {
                 <CardHeader className="pb-3"><CardTitle className="text-base">Receita × Despesa Mensal</CardTitle></CardHeader>
                 <CardContent>
                   {receitaDespesaMensal.length === 0 ? (
-                    <div className="h-[220px] flex items-center justify-center text-brand-lavanda/30 text-sm">{loading ? 'Carregando...' : 'Sem dados'}</div>
+                    <div className="h-[220px] flex items-center justify-center text-brand-lavanda/30 text-sm">{loading ? <Carregando /> : 'Sem dados'}</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={receitaDespesaMensal} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -249,7 +250,7 @@ export default function RelatoriosPage() {
                 <CardHeader className="pb-3"><CardTitle className="text-base">Receita por Cliente</CardTitle></CardHeader>
                 <CardContent>
                   {receitaPorCliente.length === 0 ? (
-                    <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? 'Carregando...' : 'Sem dados'}</p>
+                    <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? <Carregando /> : 'Sem dados'}</p>
                   ) : (
                     <div className="space-y-2.5">
                       {receitaPorCliente.map((c) => {
@@ -301,7 +302,7 @@ export default function RelatoriosPage() {
                 <CardHeader className="pb-3"><CardTitle className="text-base">Projetos por Status</CardTitle></CardHeader>
                 <CardContent>
                   {projetosPorStatus.length === 0 ? (
-                    <div className="h-[220px] flex items-center justify-center text-brand-lavanda/30 text-sm">{loading ? 'Carregando...' : 'Sem dados'}</div>
+                    <div className="h-[220px] flex items-center justify-center text-brand-lavanda/30 text-sm">{loading ? <Carregando /> : 'Sem dados'}</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <PieChart>
@@ -320,7 +321,7 @@ export default function RelatoriosPage() {
                 <CardHeader className="pb-3"><CardTitle className="text-base">Projetos por Tipo</CardTitle></CardHeader>
                 <CardContent>
                   {projetosPorTipo.length === 0 ? (
-                    <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? 'Carregando...' : 'Sem dados'}</p>
+                    <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? <Carregando /> : 'Sem dados'}</p>
                   ) : (
                     <div className="space-y-3">
                       {projetosPorTipo.map((p: any) => (
@@ -370,7 +371,7 @@ export default function RelatoriosPage() {
                 <CardHeader className="pb-3"><CardTitle className="text-base">Novos Clientes por Mês</CardTitle></CardHeader>
                 <CardContent>
                   {clientesMensais.length === 0 ? (
-                    <div className="h-[200px] flex items-center justify-center text-brand-lavanda/30 text-sm">{loading ? 'Carregando...' : 'Sem dados'}</div>
+                    <div className="h-[200px] flex items-center justify-center text-brand-lavanda/30 text-sm">{loading ? <Carregando /> : 'Sem dados'}</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={clientesMensais} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -389,7 +390,7 @@ export default function RelatoriosPage() {
                 <CardHeader className="pb-3"><CardTitle className="text-base">Funil de Propostas</CardTitle></CardHeader>
                 <CardContent>
                   {funnelPropostas.length === 0 ? (
-                    <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? 'Carregando...' : 'Sem dados'}</p>
+                    <p className="text-xs text-brand-lavanda/40 text-center py-12">{loading ? <Carregando /> : 'Sem dados'}</p>
                   ) : (
                     <div className="space-y-3">
                       {funnelPropostas.map((f) => (

@@ -6,6 +6,8 @@ import { useRecorrencia } from '@/components/recorrencia/use-recorrencia'
 import { LINHA_CORES } from '@/lib/financeiro/linhas'
 import { nomeLinha } from '@/lib/recorrencia'
 import { formatCurrency } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
+import { InfoDica } from '@/components/ui/info-dica'
 
 // MRR da agência (Catálogo Place + Clubelly + Serviços), com o mesmo cálculo da tela
 // Financeiro → MRR e assinaturas. Clicar leva para lá.
@@ -22,10 +24,18 @@ export function MrrCard() {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-xs uppercase tracking-wide text-brand-lavanda/50">MRR da agência</p>
-          <p className="text-3xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-            {carregando ? '...' : formatCurrency(bruto)}
+          <p className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-brand-lavanda/50">
+            MRR da agência
+            <InfoDica>
+              Receita recorrente por mês: soma das assinaturas ativas (Catálogo Place, Clubelly e mensalidades de Serviços).
+              Bruto é o valor cobrado; líquido já desconta as taxas do Asaas. ARR é o MRR × 12.
+            </InfoDica>
           </p>
+          {carregando ? <Skeleton className="my-1 h-8 w-40" /> : (
+            <p className="text-3xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+              {formatCurrency(bruto)}
+            </p>
+          )}
           <p className="mt-1 text-xs text-brand-lavanda/30">
             {carregando
               ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> buscando no Asaas…</span>
@@ -47,7 +57,7 @@ export function MrrCard() {
           {linhas.map((l) => (
             <span key={l.linha} className="flex items-center gap-1.5 text-brand-lavanda/60">
               <span className="h-2 w-2 rounded-sm" style={{ background: LINHA_CORES[l.linha] }} />
-              {nomeLinha[l.linha]} <span className="font-medium text-brand-lavanda">{carregando ? '...' : formatCurrency(l.mrrBruto)}</span>
+              {nomeLinha[l.linha]} {carregando ? <Skeleton className="inline-block h-3 w-14 align-middle" /> : <span className="font-medium text-brand-lavanda">{formatCurrency(l.mrrBruto)}</span>}
               <span className="text-brand-lavanda/30">({l.emDia})</span>
             </span>
           ))}

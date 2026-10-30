@@ -5,7 +5,7 @@ import { KpiCard } from '@/components/dashboard/kpi-card'
 import { formatCurrency } from '@/lib/utils'
 import { etapaMaxima, ETAPAS_FUNIL, taxa, type Historico } from '@/lib/leads/funil'
 import { temperaturaDoLead } from '@/lib/leads/trafego'
-import { variacao } from '@/lib/leads/periodo'
+import { variacao } from '@/lib/periodo'
 import type { Lead } from '@/components/leads/lead-detalhe-dialog'
 
 const I_REUNIAO = ETAPAS_FUNIL.indexOf('qualificado')
@@ -65,6 +65,7 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
       <KpiCard
         title="Leads"
         value={String(leads.length)}
+        info="Leads que chegaram no período. Do site = vieram por um formulário (site ou landing); cadastrados = você colocou à mão (tráfego pago, indicação, captação ativa). A % compara com o período anterior do mesmo tamanho."
         icon={Inbox}
         iconColor="text-brand-rosa"
         sub={`${doSite} do site · ${leads.length - doSite} cadastrados`}
@@ -73,6 +74,7 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
       <KpiCard
         title="1º contato (mediana)"
         value={fmtDuracao(mediana(tempos))}
+        info="Quanto tempo, no meio da fila, você leva entre o lead chegar e o primeiro contato registrado no histórico dele. Quanto menor, mais chance de fechar."
         icon={Timer}
         iconColor="text-yellow-400"
         sub={semContato ? <span className="text-brand-rosa">{semContato} novos sem contato</span> : 'Todos já contatados'}
@@ -80,6 +82,7 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
       <KpiCard
         title="Chegaram à reunião"
         value={String(reunioes)}
+        info="Leads do período que chegaram pelo menos na etapa Reunião, mesmo que depois tenham sido perdidos."
         icon={CalendarCheck}
         iconColor="text-brand-violeta"
         sub={`${taxa(reunioes, leads.length)}% dos leads`}
@@ -87,6 +90,7 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
       <KpiCard
         title="Propostas"
         value={String(propostas)}
+        info="Leads do período que chegaram a receber proposta. A % é sobre quantos tiveram reunião."
         icon={FileText}
         iconColor="text-brand-lavanda/60"
         sub={`${taxa(propostas, reunioes)}% das reuniões`}
@@ -94,6 +98,7 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
       <KpiCard
         title="Fechados"
         value={String(fechados.length)}
+        info="Leads que chegaram no período e já fecharam. Não é o total de vendas do período: uma venda de hoje de um lead do mês passado entra no mês passado."
         icon={Target}
         iconColor="text-brand-lima"
         sub={`${formatCurrency(valorFechado)} · ${taxa(fechados.length, leads.length)}% conversão`}
@@ -102,6 +107,7 @@ export function ResumoLeads({ leads, anteriores, historico, primeiroContato, toq
       <KpiCard
         title="No funil agora"
         value={formatCurrency(valorAberto)}
+        info="Soma do valor estimado dos leads do período que ainda estão em aberto (de Novo até Proposta)."
         icon={Wallet}
         iconColor="text-brand-lima"
         sub={`${abertos.length} em aberto · ${quentes} quentes`}

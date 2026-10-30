@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { segmentoOpcoes, origemOpcoes } from '@/lib/crm/opcoes'
 import type { Database } from '@/types/database.types'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
 type Produto = { id: string; nome: string; cor: string }
@@ -100,7 +101,7 @@ export default function EditarClientePage({ params }: { params: Promise<{ id: st
     if (!error) router.push(`/clientes/${id}`)
   }
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return <div className="p-4 md:p-6"><SkeletonLista linhas={4} /></div>
   if (!cliente) return (
     <div className="p-4 md:p-6">
       <Link href="/clientes"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>

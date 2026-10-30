@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, Video, Phone, Package, Clock, Pencil, Loader2, CalendarDays, Trash2, ExternalLink,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { useAviso } from '@/components/ui/toaster'
 
 type Evento = {
   id: string
@@ -69,7 +71,10 @@ function Carregando({ className }: { className?: string }) {
   )
 }
 
-export default function AgendaPage() {
+function AgendaConteudo() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const avisar = useAviso()
   const [eventos, setEventos] = useState<Evento[]>([])
   const [doGoogle, setDoGoogle] = useState<Evento[]>([])
   const [google, setGoogle] = useState<{ connected: boolean; email: string | null } | null>(null)
@@ -108,6 +113,14 @@ export default function AgendaPage() {
         setCarregandoGoogle(false)
       })
   }, [])
+
+  // Busca (Ctrl+K): /agenda?novo=1 abre o cadastro de evento.
+  const novoParam = searchParams.get('novo')
+  useEffect(() => {
+    if (!novoParam) return
+    abrirNovo(true)
+    router.replace('/agenda', { scroll: false })
+  }, [novoParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Eventos do Google do mês na tela (com folga de uma semana para cada lado).
   useEffect(() => {
@@ -172,6 +185,9 @@ export default function AgendaPage() {
     setSalvando(false)
     setEventos(prev => [...prev, evento].sort((a, b) => a.data_inicio.localeCompare(b.data_inicio)))
     setNovoOpen(false)
+    setDiaSelecionado(new Date(evento.data_inicio))
+    setMesAtual(new Date(evento.data_inicio))
+    avisar(`Evento criado${evento.google_event_id ? ' e enviado ao Google Agenda' : ''}`)
   }
 
   async function apagar(e: Evento) {
@@ -191,8 +207,9 @@ export default function AgendaPage() {
       return
     }
     const { error } = await (createClient() as any).from('eventos').delete().eq('id', e.id)
-    if (error) { setAvisoGoogle('Não foi possível apagar o evento.'); return }
+    if (error) { avisar('Não foi possível apagar o evento.', { tipo: 'erro' }); return }
     setEventos((prev) => prev.filter((x) => x.id !== e.id))
+    avisar(`"${e.titulo}" apagado`)
   }
 
   // Evento da Slick que já foi para o Google não aparece duas vezes.
@@ -514,5 +531,13 @@ export default function AgendaPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function AgendaPage() {
+  return (
+    <Suspense>
+      <AgendaConteudo />
+    </Suspense>
   )
 }

@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ERRO_MIGRATION_BRIEFING, STATUS_BRIEFING, type StatusBriefing } from '@/lib/social/briefing'
 import { ERRO_MIGRATION, ERRO_MIGRATION_PERIODO, STATUS_PLANEJAMENTO, fimDoPeriodo, nomeMes, nomePeriodo, umMesDepois } from '@/lib/social/tipos'
 import { cn, formatDate } from '@/lib/utils'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Linha = {
   id: string; cliente_id: string; titulo: string; mes: string; data_fim: string | null; status: string; visualizacoes: number; ultima_visualizacao: string | null
@@ -144,7 +145,7 @@ export default function SocialPage() {
         )}
 
         {loading ? (
-          <p className="py-20 text-center text-sm text-brand-lavanda/40">Carregando...</p>
+          <SkeletonLista />
         ) : aba === 'clientes' ? (
           <>
             {erroBriefing && <p className="mb-4 text-sm text-brand-rosa">{erroBriefing}</p>}

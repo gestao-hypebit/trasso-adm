@@ -21,6 +21,7 @@ import {
   mesAtual, nomeMes, resumirFrente, somarMeses,
   type Frente, type MetaMensal, type Movimentacao, type ResumoFrente, type TipoMov,
 } from '@/lib/metas/calculos'
+import { Carregando } from '@/components/ui/carregando'
 
 const MESES_HISTORICO = 6
 const EIXO = { fill: 'rgba(245,242,255,0.45)', fontSize: 11 }
@@ -250,7 +251,7 @@ export default function MetasPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="h-[240px] flex items-center justify-center text-brand-lavanda/30 text-sm">Carregando...</div>
+              <div className="h-[240px] flex items-center justify-center text-brand-lavanda/30 text-sm"><Carregando /></div>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={historico} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%" barGap={2}>
@@ -289,7 +290,7 @@ export default function MetasPage() {
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <p className="text-sm text-brand-lavanda/40 py-10 text-center">Carregando...</p>
+              <p className="text-sm text-brand-lavanda/40 py-10 text-center"><Carregando /></p>
             ) : registros.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-12">
                 <p className="text-sm text-brand-lavanda/50">Nenhuma movimentação {doMes.length ? 'com esses filtros' : 'registrada neste mês'}.</p>

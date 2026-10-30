@@ -94,7 +94,7 @@ export function ResumoDoDia() {
     Promise.all([
       supabase.from('leads').select('id, nome, empresa, telefone, status, frente, proximo_contato, etapa_desde, formulario_id').in('status', ABERTOS),
       supabase.from('eventos').select('id, titulo, data_inicio, link_meet, google_event_id').gte('data_inicio', inicio).lte('data_inicio', fim).order('data_inicio'),
-      supabase.from('tarefas').select('id, titulo, data_vencimento, projetos(nome)').is('concluida_em', null).not('data_vencimento', 'is', null).lte('data_vencimento', hoje).order('data_vencimento'),
+      supabase.from('tarefas').select('id, titulo, data_vencimento, projetos(nome)').neq('status', 'concluida').not('data_vencimento', 'is', null).lte('data_vencimento', hoje).order('data_vencimento'),
     ]).then(([l, e, t]: { data: unknown[] | null }[]) => {
       setLeads((l.data as LeadResumo[]) ?? [])
       setEventos((e.data as EventoResumo[]) ?? [])

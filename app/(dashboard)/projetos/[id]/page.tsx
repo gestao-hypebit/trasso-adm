@@ -26,6 +26,7 @@ import { OnboardingProjeto } from '@/components/projetos/onboarding-projeto'
 import { EntregasProjeto } from '@/components/projetos/entregas-projeto'
 import { ExcluirProjetoDialog } from '@/components/projetos/excluir-projeto-dialog'
 import type { ClientePortal } from '@/components/projetos/portal-link-acoes'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 const TAREFA_VAZIA = { titulo: '', prioridade: 'media', data_vencimento: '', descricao: '' }
 
@@ -160,7 +161,7 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
     load()
   }, [id])
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return <div className="p-4 md:p-6"><SkeletonLista linhas={4} /></div>
   if (!projeto) return (
     <div className="p-4 md:p-6">
       <Link href="/projetos"><Button variant="outline" size="sm" className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button></Link>

@@ -40,6 +40,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Prévias de site escondido por enquanto (só o painel; os links públicos /p seguem no ar).
+  if (/^\/sites(\/|$)/.test(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'

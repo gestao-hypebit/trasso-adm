@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { duplicarProposta } from '@/lib/propostas/duplicar'
 import { ConverterContratoDialog } from '@/components/propostas/converter-contrato-dialog'
+import { SkeletonLista } from '@/components/ui/skeleton'
+import { EstadoVazio } from '@/components/ui/estado-vazio'
 
 type Proposta = {
   id: string
@@ -161,12 +163,16 @@ export default function PropostasPage() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={6} className="px-6 py-16 text-center text-brand-lavanda/40 text-sm">Carregando...</td></tr>
+                    <tr><td colSpan={6} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                   ) : propostasFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-16 text-center">
-                        <FileText className="h-10 w-10 text-brand-lavanda/20 mx-auto mb-3" />
-                        <p className="text-brand-lavanda/40 text-sm">Nenhuma proposta encontrada.</p>
+                      <td colSpan={6}>
+                        <EstadoVazio
+                          icone={FileText}
+                          titulo={propostas.length === 0 ? 'Nenhuma proposta ainda' : 'Nenhuma proposta com esses filtros'}
+                          texto={propostas.length === 0 ? 'Crie a primeira, ou use o atalho "Criar proposta" no lead depois da reunião.' : undefined}
+                          acao={{ label: 'Nova proposta', href: '/propostas/nova', icon: Plus }}
+                        />
                       </td>
                     </tr>
                   ) : propostasFiltradas.map((p) => {

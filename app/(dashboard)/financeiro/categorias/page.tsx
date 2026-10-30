@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import type { Linha } from '@/lib/financeiro/linhas'
+import { Carregando } from '@/components/ui/carregando'
 
 type Receita = {
   id: string; descricao: string; valor: number; data: string; status: string; frente: Linha
@@ -184,7 +185,7 @@ export default function ReceitasPorCategoriaPage() {
             </CardHeader>
             <CardContent className="space-y-1 pb-4">
               {loading ? (
-                <p className="py-10 text-center text-sm text-brand-lavanda/40">Carregando...</p>
+                <p className="py-10 text-center text-sm text-brand-lavanda/40"><Carregando /></p>
               ) : ranking.length === 0 ? (
                 <p className="py-10 text-center text-sm text-brand-lavanda/40">Nenhuma receita neste período.</p>
               ) : ranking.map((c) => {

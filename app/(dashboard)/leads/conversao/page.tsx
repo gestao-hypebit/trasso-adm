@@ -13,13 +13,10 @@ import { ETAPAS_FUNIL, etapaLabel, resumoFunil, taxa, type Historico, type LeadF
 import { mediana, type LeadTrafego } from '@/lib/leads/trafego'
 import { PainelTrafego } from '@/components/leads/painel-trafego'
 import { frenteLeadOpcoes, type FrenteLead } from '@/lib/leads/frente'
-
-const periodos = [
-  { dias: 30, label: '30 dias' },
-  { dias: 90, label: '90 dias' },
-  { dias: 365, label: '12 meses' },
-  { dias: 0, label: 'Tudo' },
-]
+import { noIntervalo } from '@/lib/periodo'
+import { diaSP } from '@/lib/anuncios/regras'
+import { FiltroPeriodo, usePeriodo } from '@/components/ui/filtro-periodo'
+import { SkeletonCards } from '@/components/ui/skeleton'
 
 const fmtDias = (d: number | null) => (d === null ? '—' : d < 1 ? '< 1 dia' : `${d.toFixed(d < 10 ? 1 : 0).replace('.', ',')} dias`)
 
@@ -30,7 +27,8 @@ export default function ConversaoPage() {
   const [toques, setToques] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
-  const [periodo, setPeriodo] = useState(90)
+  const periodo = usePeriodo()
+  const { intervalo } = periodo
   const [frente, setFrente] = useState<FrenteLead | 'todas'>('todas')
 
   useEffect(() => {
@@ -56,8 +54,7 @@ export default function ConversaoPage() {
 
   // O período filtra pela data em que o lead chegou (coorte), não pela data do fechamento.
   const r = useMemo(() => {
-    const corte = periodo ? Date.now() - periodo * 86_400_000 : 0
-    const noPeriodo = daFrente.filter((l) => new Date(l.created_at).getTime() >= corte)
+    const noPeriodo = daFrente.filter((l) => noIntervalo(diaSP(l.created_at), intervalo))
     const ids = new Set(noPeriodo.map((l) => l.id))
     // Toques até fechar: só vendas com pelo menos um contato registrado (o registro começou agora).
     const toquesVendas = noPeriodo
@@ -68,7 +65,7 @@ export default function ConversaoPage() {
       toquesAteFechar: mediana(toquesVendas),
       amostraToques: toquesVendas.length,
     }
-  }, [daFrente, historico, toques, periodo])
+  }, [daFrente, historico, toques, intervalo.de, intervalo.ate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const t = r.total
   const iFechado = ETAPAS_FUNIL.indexOf('convertido')
@@ -91,29 +88,23 @@ export default function ConversaoPage() {
               >{o.label}</button>
             ))}
           </div>
-          <div className="flex rounded-lg border border-white/[0.1] p-0.5">
-            {periodos.map((p) => (
-              <button
-                key={p.dias}
-                onClick={() => setPeriodo(p.dias)}
-                className={cn('rounded-md px-2.5 py-1.5 text-xs', periodo === p.dias ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/50')}
-              >{p.label}</button>
-            ))}
-          </div>
         </PageHeader>
+
+        <FiltroPeriodo estado={periodo} descricao="Leads que chegaram" className="mb-4" />
 
         {erro && <p className="mb-4 text-sm text-brand-rosa">{erro}</p>}
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-brand-lavanda/40 text-sm">Carregando...</div>
+          <SkeletonCards />
         ) : (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard title="Leads" value={String(t.leads)} icon={Inbox} />
-              <KpiCard title="Taxa de fechamento" value={`${taxa(t.porEtapa[iFechado], t.leads)}%`} icon={Target} iconColor="text-brand-lima" />
-              <KpiCard title="Propostas que fecham" value={`${taxa(t.porEtapa[iFechado], t.porEtapa[iProposta])}%`} icon={FileText} />
+              <KpiCard title="Taxa de fechamento" value={`${taxa(t.porEtapa[iFechado], t.leads)}%`} icon={Target} iconColor="text-brand-lima" info="De cada 100 leads que chegaram no período, quantos já fecharam." />
+              <KpiCard title="Propostas que fecham" value={`${taxa(t.porEtapa[iFechado], t.porEtapa[iProposta])}%`} icon={FileText} info="Dos leads que receberam proposta, quantos % fecharam. Mostra se o problema está antes (gerar reunião) ou na proposta." />
               <KpiCard
                 title="Ciclo médio de venda"
+                info="Média de dias entre o lead chegar e fechar. Toques = quantos contatos registrados até a venda (mediana)."
                 value={fmtDias(r.cicloMedioDias)}
                 icon={Clock}
                 sub={r.toquesAteFechar !== null
@@ -122,7 +113,7 @@ export default function ConversaoPage() {
               />
             </div>
 
-            <PainelTrafego leads={daFrente} historico={historico} periodo={periodo} frente={frente} />
+            <PainelTrafego leads={daFrente} historico={historico} intervalo={intervalo} frente={frente} />
 
             <Card>
               <CardHeader><CardTitle className="text-base">Funil</CardTitle></CardHeader>

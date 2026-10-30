@@ -21,6 +21,7 @@ import { normalizarUtm } from '@/lib/leads/utm'
 import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
 import { LeadContatos } from '@/components/leads/lead-contatos'
 import { ProximoPasso } from '@/components/leads/proximo-passo'
+import { useAviso } from '@/components/ui/toaster'
 import type { LeadContato } from '@/lib/leads/contatos'
 
 export type Lead = {
@@ -71,6 +72,7 @@ interface Props {
 
 export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onContato }: Props) {
   const router = useRouter()
+  const avisar = useAviso()
   const [observacoes, setObservacoes] = useState('')
   const [valor, setValor] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -109,7 +111,11 @@ export function LeadDetalheDialog({ lead, onOpenChange, onChange, onDelete, onCo
       .eq('id', atual.id)
     if (error) {
       setErro('Não foi possível salvar.')
+      avisar('Não foi possível salvar o lead.', { tipo: 'erro' })
       return false
+    }
+    if (campos.status && campos.status !== atual.status) {
+      avisar(`${atual.nome.split(' ')[0]} → ${leadStatusConfig[campos.status as LeadStatus]?.label ?? campos.status}`)
     }
     onChange({ ...atual, ...campos, ...(campos.status && campos.status !== atual.status ? { etapa_desde: new Date().toISOString() } : {}) })
     return true

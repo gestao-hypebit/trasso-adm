@@ -23,16 +23,20 @@ import { NovoLeadDialog } from '@/components/leads/novo-lead-dialog'
 import { LeadsSubNav } from '@/components/leads/leads-sub-nav'
 import { corFrenteLead, frenteLeadOpcoes, labelFrenteLead, type FrenteLead } from '@/lib/leads/frente'
 import { contatoPendente, situacaoContato } from '@/lib/leads/contatos'
-import { diaSP, somarDias } from '@/lib/anuncios/regras'
+import { diaSP } from '@/lib/anuncios/regras'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency, formatDate, formatRelative, whatsappUrl } from '@/lib/utils'
 import { mensagemWhatsapp, proximoPasso } from '@/lib/leads/proximo-passo'
 import { formatarValor, leadStatusConfig, type LeadStatus } from '@/lib/leads/formulario'
 import { canalDoLead, motivoPerdaOpcoes, taxa, type Historico } from '@/lib/leads/funil'
-import { intervaloAnterior, intervaloDoPeriodo, noIntervalo, periodoOpcoes, type PeriodoChave } from '@/lib/leads/periodo'
+import { noIntervalo } from '@/lib/periodo'
+import { FiltroPeriodo, usePeriodo } from '@/components/ui/filtro-periodo'
 import { ResumoLeads } from '@/components/leads/resumo-leads'
 import { ehTrafegoPago, pontuacaoDoLead, TEMPERATURAS, temperaturaConfig, temperaturaDoLead, type Temperatura } from '@/lib/leads/trafego'
 import { TemperaturaBadge } from '@/components/leads/temperatura-badge'
+import { useAviso } from '@/components/ui/toaster'
+import { SkeletonLista } from '@/components/ui/skeleton'
+import { EstadoVazio } from '@/components/ui/estado-vazio'
 
 // Respostas que já aparecem em outro lugar da tabela (cabeçalho ou selo de temperatura).
 const CHAVES_FORA_DO_RESUMO = ['nome', 'email', 'telefone', 'empresa', 'classificacao', 'pontuacao']
@@ -73,7 +77,7 @@ function ProximoContato({ dia, hoje }: { dia: string | null; hoje: string }) {
   return (
     <span className={cn(
       'inline-flex items-center gap-1 text-[11px]',
-      s === 'atrasado' ? 'text-brand-rosa' : s === 'hoje' ? 'text-brand-lima' : 'text-brand-lavanda/50'
+      s === 'atrasado' ? 'text-brand-rosa' : s === 'hoje' ? 'text-yellow-400' : 'text-brand-lavanda/50'
     )}>
       <CalendarClock className="h-3 w-3" />
       {s === 'hoje' ? 'Hoje' : s === 'atrasado' ? `Atrasado · ${formatDate(dia, 'dd/MM')}` : formatDate(dia, 'dd/MM')}
@@ -183,8 +187,7 @@ function LeadsConteudo() {
   const [soTrafegoPago, setSoTrafegoPago] = useState(false)
   const [filtroFrente, setFiltroFrente] = useState<FrenteLead | 'todas'>('todas')
   const [soParaHoje, setSoParaHoje] = useState(false)
-  const [periodo, setPeriodo] = useState<PeriodoChave>('tudo')
-  const [periodoCustom, setPeriodoCustom] = useState<{ de: string | null; ate: string | null }>({ de: null, ate: null })
+  const periodo = usePeriodo()
   // Histórico de etapas (até onde cada lead chegou) e quando foi o primeiro contato de cada um.
   const [historico, setHistorico] = useState<Map<string, Historico[]>>(new Map())
   const [primeiroContato, setPrimeiroContato] = useState<Map<string, string>>(new Map())
@@ -197,6 +200,19 @@ function LeadsConteudo() {
   // Lead solto na coluna "Perdido": espera o motivo antes de salvar.
   const [perdendo, setPerdendo] = useState<Lead | null>(null)
   const [motivo, setMotivo] = useState('')
+  // No celular o quadro vira abas: uma etapa por vez, sem arrastar.
+  const [etapaMobile, setEtapaMobile] = useState<LeadStatus>('novo')
+  const avisar = useAviso()
+
+  // Busca (Ctrl+K) e links podem abrir um lead ou o cadastro mesmo já estando nesta tela.
+  const leadParam = searchParams.get('lead')
+  const novoParam = searchParams.get('novo')
+  useEffect(() => { if (leadParam) setAbertoId(leadParam) }, [leadParam])
+  useEffect(() => {
+    if (!novoParam) return
+    setNovoAberto(true)
+    router.replace('/leads', { scroll: false })
+  }, [novoParam, router])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -204,8 +220,6 @@ function LeadsConteudo() {
     try {
       const salva = localStorage.getItem('leads:visao')
       if (salva === 'funil' || salva === 'lista') setVisao(salva)
-      const p = localStorage.getItem('leads:periodo') as PeriodoChave | null
-      if (p && p !== 'personalizado' && periodoOpcoes.some((o) => o.value === p)) setPeriodo(p)
     } catch {}
     async function load() {
       const supabase = createClient() as any
@@ -238,18 +252,12 @@ function LeadsConteudo() {
     try { localStorage.setItem('leads:visao', v) } catch {}
   }
 
-  function trocarPeriodo(p: PeriodoChave) {
-    setPeriodo(p)
-    if (p === 'personalizado' && !periodoCustom.de) setPeriodoCustom({ de: somarDias(hoje, -29), ate: hoje })
-    try { localStorage.setItem('leads:periodo', p) } catch {}
-  }
-
   function abrir(id: string | null) {
     setAbertoId(id)
     router.replace(id ? `/leads?lead=${id}` : '/leads', { scroll: false })
   }
 
-  async function mover(lead: Lead, status: string, motivoPerda: string | null = null) {
+  async function mover(lead: Lead, status: string, motivoPerda: string | null = null, desfazendo = false) {
     const antes = lead
     const campos = { status, motivo_perda: status === 'descartado' ? motivoPerda : null }
     setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, ...campos, etapa_desde: new Date().toISOString() } : l)))
@@ -259,8 +267,14 @@ function LeadsConteudo() {
       .eq('id', lead.id)
     if (error) {
       setLeads((prev) => prev.map((l) => (l.id === lead.id ? antes : l)))
-      setErro('Não foi possível mover o lead.')
+      avisar('Não foi possível mover o lead.', { tipo: 'erro' })
+      return
     }
+    if (desfazendo) return
+    const etapa = leadStatusConfig[status as LeadStatus]?.label ?? status
+    avisar(`${lead.nome.split(' ')[0]} → ${etapa}`, {
+      desfazer: () => mover({ ...lead, ...campos }, antes.status, antes.motivo_perda, true),
+    })
   }
 
   function handleDragStart(e: DragStartEvent) {
@@ -282,9 +296,7 @@ function LeadsConteudo() {
 
   const termo = busca.toLowerCase()
   // Período (pela data de chegada) e negócio valem para tudo na tela: cards, quadro, lista e contadores.
-  const intervalo = intervaloDoPeriodo(periodo, hoje, periodoCustom)
-  const anterior = intervaloAnterior(intervalo)
-  const filtraPeriodo = periodo !== 'tudo'
+  const { intervalo, anterior, filtra: filtraPeriodo } = periodo
   const doNegocio = (l: Lead) => filtroFrente === 'todas' || l.frente === filtroFrente
   const noPeriodo = leads.filter((l) => noIntervalo(diaSP(l.created_at), intervalo))
   const daFrente = noPeriodo.filter(doNegocio)
@@ -305,6 +317,18 @@ function LeadsConteudo() {
   const valorPipeline = abertos.reduce((s, l) => s + Number(l.valor_estimado ?? 0), 0)
   const fechados = daFrente.filter((l) => l.status === 'convertido').length
   const aberto = leads.find((l) => l.id === abertoId) ?? null
+
+  // Leads de cada etapa do quadro (o mesmo cálculo serve para o quadro e para as abas do celular).
+  const quadro = colunas.map((col) => {
+    const naColuna = buscados
+      .filter((l) => l.status === col.key && (filtraPeriodo || !FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO))
+      // Contato vencido ou de hoje no topo; depois os mais quentes.
+      .sort((a, b) =>
+        Number(contatoPendente(b.proximo_contato, hoje)) - Number(contatoPendente(a.proximo_contato, hoje)) ||
+        ordemTemperatura(a) - ordemTemperatura(b))
+    return { col, naColuna, soma: naColuna.reduce((s, l) => s + Number(l.valor_estimado ?? 0), 0) }
+  })
+  const etapaCelular = quadro.find((q) => q.col.key === etapaMobile) ?? quadro[0]
 
   const filtros = [
     { key: 'ativos', label: 'Em aberto', count: abertos.length },
@@ -337,29 +361,7 @@ function LeadsConteudo() {
 
         {erro && <p className="mb-4 text-sm text-brand-rosa">{erro}</p>}
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap rounded-lg border border-white/[0.1] p-0.5">
-            {periodoOpcoes.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => trocarPeriodo(o.value)}
-                className={cn('rounded-md px-2.5 py-1.5 text-xs', periodo === o.value ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/50 hover:text-brand-lavanda/80')}
-              >{o.label}</button>
-            ))}
-          </div>
-          {periodo === 'personalizado' && (
-            <div className="flex items-center gap-2 text-xs text-brand-lavanda/50">
-              <Input type="date" className="h-8 w-[150px]" value={periodoCustom.de ?? ''} onChange={(e) => setPeriodoCustom((c) => ({ ...c, de: e.target.value || null }))} />
-              até
-              <Input type="date" className="h-8 w-[150px]" value={periodoCustom.ate ?? ''} onChange={(e) => setPeriodoCustom((c) => ({ ...c, ate: e.target.value || null }))} />
-            </div>
-          )}
-          {filtraPeriodo && intervalo.de && (
-            <span className="text-[11px] text-brand-lavanda/40">
-              Leads que chegaram {intervalo.de === intervalo.ate ? `em ${formatDate(intervalo.de, 'dd/MM')}` : `de ${formatDate(intervalo.de, 'dd/MM')} a ${formatDate(intervalo.ate ?? hoje, 'dd/MM')}`}
-            </span>
-          )}
-        </div>
+        <FiltroPeriodo estado={periodo} descricao="Leads que chegaram" className="mb-4" />
 
         {!loading && (
           <ResumoLeads
@@ -472,18 +474,48 @@ function LeadsConteudo() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-brand-lavanda/40 text-sm">Carregando...</div>
+          <SkeletonLista linhas={6} />
+        ) : leads.length === 0 ? (
+          <Card>
+            <EstadoVazio
+              icone={Inbox}
+              titulo="Nenhum lead ainda"
+              texto="Os contatos dos formulários do site aparecem aqui sozinhos. Leads de tráfego pago, indicação ou captação ativa você cadastra à mão."
+              acao={{ label: 'Cadastrar lead', icon: Plus, onClick: () => setNovoAberto(true) }}
+            />
+          </Card>
         ) : visao === 'funil' ? (
+          <>
+          {/* Celular: uma etapa por vez. Para mudar de etapa, abra o lead e toque na etapa. */}
+          <div className="md:hidden">
+            <div className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1">
+              {quadro.map(({ col, naColuna }) => (
+                <button
+                  key={col.key}
+                  onClick={() => setEtapaMobile(col.key)}
+                  className={cn(
+                    'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
+                    etapaMobile === col.key ? 'border-brand-lima bg-brand-lima/20 text-brand-lima' : 'border-white/[0.1] bg-white/[0.04] text-brand-lavanda/70'
+                  )}
+                >
+                  {leadStatusConfig[col.key].label}
+                  <span className="rounded-full bg-white/[0.06] px-1.5">{naColuna.length}</span>
+                </button>
+              ))}
+            </div>
+            {etapaCelular.soma > 0 && <p className="mb-2 text-[11px] text-brand-lavanda/40">{formatCurrency(etapaCelular.soma)} nesta etapa</p>}
+            <div className="space-y-2">
+              {etapaCelular.naColuna.length === 0
+                ? <p className="py-10 text-center text-xs text-brand-lavanda/30">Nenhum lead em {leadStatusConfig[etapaCelular.col.key].label.toLowerCase()}.</p>
+                : etapaCelular.naColuna.map((l) => (
+                  <LeadCard key={l.id} lead={l} toques={toques.get(l.id) ?? 0} hoje={hoje} onAbrir={() => abrir(l.id)} onWhatsapp={() => l.status === 'novo' && mover(l, 'em_contato')} />
+                ))}
+            </div>
+          </div>
+          <div className="hidden md:block">
           <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="flex gap-3 overflow-x-auto pb-4">
-              {colunas.map((col) => {
-                const naColuna = buscados
-                  .filter((l) => l.status === col.key && (filtraPeriodo || !FECHADAS.includes(col.key) || diasDesde(l.etapa_desde) <= DIAS_NO_QUADRO))
-                  // Contato vencido ou de hoje no topo; depois os mais quentes.
-                  .sort((a, b) =>
-                    Number(contatoPendente(b.proximo_contato, hoje)) - Number(contatoPendente(a.proximo_contato, hoje)) ||
-                    ordemTemperatura(a) - ordemTemperatura(b))
-                const soma = naColuna.reduce((s, l) => s + Number(l.valor_estimado ?? 0), 0)
+              {quadro.map(({ col, naColuna, soma }) => {
                 return (
                   <div key={col.key} className={cn('w-64 shrink-0 rounded-xl border-t-2 bg-brand-noite/30', col.cor)}>
                     <div className="px-3 py-2.5 border-b border-white/[0.04]">
@@ -508,6 +540,8 @@ function LeadsConteudo() {
               {arrastando ? <LeadCard lead={arrastando} toques={toques.get(arrastando.id) ?? 0} hoje={hoje} fantasma /> : null}
             </DragOverlay>
           </DndContext>
+          </div>
+          </>
         ) : (
           <Card>
             <CardContent className="p-0">
@@ -529,9 +563,7 @@ function LeadsConteudo() {
                       <tr>
                         <td colSpan={7} className="px-6 py-16 text-center">
                           <Inbox className="h-10 w-10 text-brand-lavanda/20 mx-auto mb-3" />
-                          <p className="text-brand-lavanda/40 text-sm">
-                            {leads.length === 0 ? 'Nenhum lead ainda. Os contatos do formulário do site aparecem aqui.' : 'Nenhum lead encontrado.'}
-                          </p>
+                          <p className="text-brand-lavanda/40 text-sm">Nenhum lead com esses filtros.</p>
                         </td>
                       </tr>
                     ) : filtrados.map((l) => {
@@ -591,7 +623,14 @@ function LeadsConteudo() {
         }}
       />
 
-      <NovoLeadDialog open={novoAberto} onOpenChange={setNovoAberto} onCriado={(lead) => setLeads((prev) => [lead, ...prev])} />
+      <NovoLeadDialog
+        open={novoAberto}
+        onOpenChange={setNovoAberto}
+        onCriado={(lead) => {
+          setLeads((prev) => [lead, ...prev])
+          avisar(`Lead ${lead.nome} cadastrado`)
+        }}
+      />
 
       <Dialog open={!!perdendo} onOpenChange={(open) => !open && setPerdendo(null)}>
         <DialogContent className="max-w-sm">

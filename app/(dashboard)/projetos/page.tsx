@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, List, Kanban, AlertTriangle } from 'lucide-react'
+import { Plus, List, Kanban, AlertTriangle, FolderOpen } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,8 @@ import { formatDate, formatCurrency, getInitials } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { isBefore } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
+import { SkeletonLista } from '@/components/ui/skeleton'
+import { EstadoVazio } from '@/components/ui/estado-vazio'
 
 type Projeto = {
   id: string
@@ -145,7 +147,7 @@ export default function ProjetosPage() {
         </PageHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-brand-lavanda/40 text-sm">Carregando...</div>
+          <SkeletonLista />
         ) : view === 'kanban' ? (
           <div className="flex gap-4 overflow-x-auto pb-4">
             {statusColumns.map((col) => {
@@ -201,7 +203,12 @@ export default function ProjetosPage() {
               </Link>
             ))}
             {projetos.length === 0 && (
-              <p className="text-center text-brand-lavanda/40 py-16 text-sm">Nenhum projeto encontrado.</p>
+              <EstadoVazio
+                icone={FolderOpen}
+                titulo="Nenhum projeto ainda"
+                texto="Quando uma proposta é aprovada, crie o projeto para acompanhar tarefas e entregas."
+                acao={{ label: 'Novo projeto', href: '/projetos/novo', icon: Plus }}
+              />
             )}
           </div>
         )}

@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  /* Cor com significado fixo em todas as telas:
+     lima    = dinheiro entrando, concluído, positivo, filtro selecionado
+     rosa    = atrasado, problema, perda (e o destaque da marca no menu)
+     amarelo = atenção: vence hoje, parado, aguardando (text-yellow-400)
+     violeta = ação, link, próximo passo */
   --color-brand-noite: #0C0B10;
   --color-brand-violeta: #7C3AED;
   --color-brand-medio: #111015;

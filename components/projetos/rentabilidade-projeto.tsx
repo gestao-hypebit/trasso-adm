@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { createClient } from '@/lib/supabase/client'
 import { calcularRentabilidade, corMargem } from '@/lib/financeiro/rentabilidade'
 import { cn, formatCurrency, formatDate, toISODateLocal } from '@/lib/utils'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Lancamento = { id: string; projeto_id: string | null; tipo: string; descricao: string; valor: number; data: string; status: string }
 type Apontamento = { id: string; projeto_id: string; data: string; horas: number; descricao: string | null; profiles: { nome: string } | null }
@@ -73,7 +74,7 @@ export function RentabilidadeProjeto({ projetoId, valorProjeto, horasEstimadas }
     await (createClient() as any).from('apontamentos_horas').delete().eq('id', id)
   }
 
-  if (loading) return <p className="text-sm text-brand-lavanda/40 py-8 text-center">Carregando...</p>
+  if (loading) return <SkeletonLista linhas={3} />
 
   const r = calcularRentabilidade(valorProjeto, lancamentos, apontamentos, custoHora)
   const horasPct = horasEstimadas ? Math.min(100, (r.horas / horasEstimadas) * 100) : null

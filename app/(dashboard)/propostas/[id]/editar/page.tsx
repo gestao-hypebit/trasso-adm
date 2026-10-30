@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type ClienteOption = { id: string; nome: string }
 
@@ -154,7 +155,7 @@ export default function EditarPropostaPage({ params }: { params: Promise<{ id: s
     router.push(`/propostas/${id}`)
   }
 
-  if (loading) return <div className="p-6 text-brand-lavanda/40 text-sm">Carregando...</div>
+  if (loading) return <div className="p-4 md:p-6"><SkeletonLista linhas={4} /></div>
 
   return (
     <div className="flex flex-col min-h-screen">

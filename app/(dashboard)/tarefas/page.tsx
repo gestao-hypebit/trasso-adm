@@ -22,6 +22,7 @@ import { formatDate, getInitials } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { isBefore, isToday, isTomorrow } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
+import { SkeletonLista } from '@/components/ui/skeleton'
 
 type Tarefa = {
   id: string
@@ -424,7 +425,7 @@ export default function TarefasPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-brand-lavanda/40 text-sm">Carregando...</div>
+          <SkeletonLista />
         ) : (
           <DndContext
             sensors={sensors}
