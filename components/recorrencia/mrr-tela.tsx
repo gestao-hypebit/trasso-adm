@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { AlertTriangle, Check, Info, PlugZap, Settings2 } from 'lucide-react'
+import { AlertTriangle, Check, Info, Loader2, PlugZap, Settings2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +33,13 @@ export function MrrTela({ abaInicial, focoCobranca }: { abaInicial: AbaMrr; foco
   const [aba, setAbaState] = useState<AbaMrr>(abaInicial)
   const [configAberta, setConfigAberta] = useState(false)
   const [salvandoCat, setSalvandoCat] = useState<string | null>(null)
+  // Na primeira carga, os números só aparecem depois do Asaas (antes disso viriam só
+  // dos lançamentos e mudariam na frente da pessoa). Recargas depois disso não escondem a tela.
+  const [asaasPronto, setAsaasPronto] = useState(false)
+  useEffect(() => {
+    if (!r.loading && !r.asaasCarregando) setAsaasPronto(true)
+  }, [r.loading, r.asaasCarregando])
+  const carregandoTela = r.loading || (!asaasPronto && r.asaasCarregando)
 
   // A aba fica no endereço (?aba=catalogo), então dá para mandar o link direto.
   function setAba(a: AbaMrr) {
@@ -127,8 +134,10 @@ export function MrrTela({ abaInicial, focoCobranca }: { abaInicial: AbaMrr; foco
           ))}
         </div>
 
-        {r.loading ? (
-          <div className="flex items-center justify-center py-20 text-sm text-brand-lavanda/40">Carregando...</div>
+        {carregandoTela ? (
+          <div className="flex items-center justify-center gap-2 py-20 text-sm text-brand-lavanda/40">
+            <Loader2 className="h-4 w-4 animate-spin" /> {r.loading ? 'Carregando…' : 'Buscando as assinaturas no Asaas…'}
+          </div>
         ) : aba === 'geral' ? (
           <VisaoGeral r={r} onAbrir={(l) => setAba(abaDaLinha(l))} focoCobranca={focoCobranca} />
         ) : (
