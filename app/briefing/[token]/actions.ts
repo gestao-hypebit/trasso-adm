@@ -18,8 +18,8 @@ export async function enviarBriefing(token: string, bruto: unknown): Promise<Env
     if (!briefing) return { success: false, error: 'Link não encontrado.' }
     if (briefing.status === 'respondido') return { success: true }
 
-    const respostas = limparRespostas(briefing.modelo, bruto)
-    const erros = errosDoBriefing(briefing.modelo, respostas)
+    const respostas = limparRespostas(briefing.perguntas, bruto)
+    const erros = errosDoBriefing(briefing.perguntas, respostas)
     if (Object.keys(erros).length) return { success: false, error: 'Faltam algumas respostas.', erros }
 
     const supabase = createServiceClient() as any

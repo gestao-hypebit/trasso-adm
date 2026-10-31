@@ -46,12 +46,13 @@ export function BriefingObrigado(agencia: Agencia & ComModelo) {
   )
 }
 
-export function BriefingFormulario({ token, modelo, contatoNome, nome, logoUrl }: Agencia & {
+export function BriefingFormulario({ token, modelo, perguntas, contatoNome, nome, logoUrl }: Agencia & {
   token: string
   modelo: ModeloBriefing
+  perguntas: Pergunta[]
   contatoNome: string
 }) {
-  const etapas = etapasDoModelo(modelo)
+  const etapas = etapasDoModelo(perguntas)
   const [respostas, setRespostas] = useState<Respostas>({})
   const [erros, setErros] = useState<Record<string, string>>({})
   const [aviso, setAviso] = useState<string | null>(null)
@@ -82,7 +83,7 @@ export function BriefingFormulario({ token, modelo, contatoNome, nome, logoUrl }
     const total = Object.keys(novos).length
     setAviso(`Falta${total > 1 ? 'm' : ''} ${total} resposta${total > 1 ? 's' : ''}. Confira o${total > 1 ? 's' : ''} campo${total > 1 ? 's' : ''} marcado${total > 1 ? 's' : ''} em rosa.`)
     // Rola até o primeiro campo faltando, na ordem do formulário.
-    const primeira = MODELOS_BRIEFING[modelo].perguntas.find((q) => novos[q.chave])
+    const primeira = perguntas.find((q) => novos[q.chave])
     const el = primeira && document.getElementById(`campo-${primeira.chave}`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -93,7 +94,7 @@ export function BriefingFormulario({ token, modelo, contatoNome, nome, logoUrl }
   function enviar(e: React.FormEvent) {
     e.preventDefault()
     setAviso(null)
-    const locais = errosDoBriefing(modelo, respostas)
+    const locais = errosDoBriefing(perguntas, respostas)
     if (Object.keys(locais).length) { mostrarErros(locais); return }
     startTransition(async () => {
       const r = await enviarBriefing(token, respostas)

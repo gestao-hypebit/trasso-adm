@@ -3,8 +3,11 @@ import type { BadgeProps } from '@/components/ui/badge'
 type Variante = NonNullable<BadgeProps['variant']>
 
 // ─── Modelos de briefing ───
-// As perguntas ficam aqui (não no banco). Mudar uma pergunta não mexe nas
-// respostas já salvas: elas são guardadas por `chave`.
+// As perguntas padrão ficam aqui. Ao gerar um briefing, as perguntas são
+// copiadas para ele (coluna `perguntas`) e podem ser ajustadas para aquele
+// cliente pelo painel. O padrão também pode ser trocado pelo painel
+// (tabela briefing_modelos); sem nada lá, vale o que está aqui.
+// As respostas são guardadas por `chave`.
 
 export type TipoPergunta = 'texto' | 'texto_longo' | 'telefone' | 'email' | 'escolha_unica' | 'multipla_escolha'
 
@@ -166,10 +169,15 @@ export const modelosDaArea = (area: AreaBriefing) =>
 
 export const isModelo = (v: unknown): v is ModeloBriefing => typeof v === 'string' && v in MODELOS_BRIEFING
 
+// As funções abaixo aceitam o modelo (perguntas padrão do código) ou a lista
+// de perguntas do próprio briefing.
+type Fonte = ModeloBriefing | Pergunta[]
+const listaDe = (f: Fonte): Pergunta[] => (typeof f === 'string' ? MODELOS_BRIEFING[f].perguntas : f)
+
 // Perguntas agrupadas por etapa, na ordem em que aparecem.
-export function etapasDoModelo(modelo: ModeloBriefing) {
+export function etapasDoModelo(fonte: Fonte) {
   const etapas: { titulo: string; perguntas: Pergunta[] }[] = []
-  for (const q of MODELOS_BRIEFING[modelo].perguntas) {
+  for (const q of listaDe(fonte)) {
     const ultima = etapas[etapas.length - 1]
     if (ultima?.titulo === q.etapa) ultima.perguntas.push(q)
     else etapas.push({ titulo: q.etapa, perguntas: [q] })
@@ -195,12 +203,86 @@ export type Briefing = {
   token: string
   status: StatusBriefing
   respostas: Respostas
+  perguntas?: unknown            // perguntas deste briefing; null nos antigos (usa o padrão do código)
   created_at: string
   respondido_em: string | null
 }
 
 export const ERRO_MIGRATION_BRIEFING = 'Rode a migration 20261027000000_social_briefings.sql no Supabase antes de usar.'
 export const ERRO_MIGRATION_BRIEFING_SITE = 'Rode a migration 20261108000000_briefing_site.sql no Supabase antes de usar.'
+export const ERRO_MIGRATION_PERGUNTAS = 'Rode a migration 20261109000000_briefing_perguntas.sql no Supabase para editar perguntas.'
+
+// ─── Perguntas editáveis ───
+
+const TIPOS: TipoPergunta[] = ['texto', 'texto_longo', 'telefone', 'email', 'escolha_unica', 'multipla_escolha']
+export const TIPOS_PERGUNTA: Record<TipoPergunta, string> = {
+  texto: 'Texto curto',
+  texto_longo: 'Texto longo',
+  telefone: 'Telefone',
+  email: 'E-mail',
+  escolha_unica: 'Escolha uma opção',
+  multipla_escolha: 'Escolha várias opções',
+}
+export const temOpcoes = (t: TipoPergunta) => t === 'escolha_unica' || t === 'multipla_escolha'
+
+const MAX_PERGUNTAS = 80
+const corta = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+
+// Lê perguntas vindas do banco ou do editor. Descarta o que estiver malformado.
+// Devolve null se não sobrar nenhuma (aí vale o padrão).
+export function normalizarPerguntas(bruto: unknown): Pergunta[] | null {
+  if (!Array.isArray(bruto)) return null
+  const vistas = new Set<string>()
+  const saida: Pergunta[] = []
+  for (const item of bruto.slice(0, MAX_PERGUNTAS)) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const chave = corta(o.chave, 60)
+    const rotulo = corta(o.rotulo, 300)
+    const tipo = o.tipo as TipoPergunta
+    if (!chave || !rotulo || !TIPOS.includes(tipo) || vistas.has(chave)) continue
+    const q: Pergunta = { chave, etapa: corta(o.etapa, 80) || 'Perguntas', rotulo, tipo, obrigatoria: o.obrigatoria === true }
+    if (temOpcoes(tipo)) {
+      const opcoes = [...new Set((Array.isArray(o.opcoes) ? o.opcoes : []).map((x) => corta(x, 120)).filter(Boolean))].slice(0, 30)
+      if (!opcoes.length) continue
+      q.opcoes = opcoes
+    }
+    const ajuda = corta(o.ajuda, 300)
+    const placeholder = corta(o.placeholder, 120)
+    if (ajuda) q.ajuda = ajuda
+    if (placeholder && !temOpcoes(tipo)) q.placeholder = placeholder
+    vistas.add(chave)
+    saida.push(q)
+  }
+  return saida.length ? saida : null
+}
+
+// Perguntas que valem para este briefing: as dele, ou o padrão do modelo.
+export const perguntasDoBriefing = (b: { modelo: ModeloBriefing; perguntas?: unknown }) =>
+  normalizarPerguntas(b.perguntas) ?? MODELOS_BRIEFING[b.modelo].perguntas
+
+// O que impede salvar o que está no editor, ou null se estiver tudo certo.
+export function problemaNasPerguntas(lista: Pergunta[]): string | null {
+  if (!lista.length) return 'Deixe pelo menos uma pergunta.'
+  if (lista.length > MAX_PERGUNTAS) return `No máximo ${MAX_PERGUNTAS} perguntas.`
+  for (const [i, q] of lista.entries()) {
+    const n = `Pergunta ${i + 1}`
+    if (!q.rotulo.trim()) return `${n}: escreva o texto da pergunta.`
+    if (!q.etapa.trim()) return `${n}: informe a etapa.`
+    if (temOpcoes(q.tipo) && !(q.opcoes ?? []).some((o) => o.trim())) return `${n} ("${q.rotulo.trim()}"): coloque as opções, uma por linha.`
+  }
+  return null
+}
+
+// Chave para uma pergunta nova, a partir do texto. Única dentro da lista.
+export function gerarChave(rotulo: string, existentes: Iterable<string>) {
+  const usadas = new Set(existentes)
+  const base = rotulo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'pergunta'
+  let chave = base
+  for (let i = 2; usadas.has(chave); i++) chave = `${base}_${i}`
+  return chave
+}
 
 // ─── Validação (usada no formulário e de novo no servidor) ───
 
@@ -219,9 +301,9 @@ export function erroDaPergunta(q: Pergunta, v: Resposta | undefined): string | n
   return null
 }
 
-export function errosDoBriefing(modelo: ModeloBriefing, respostas: Respostas) {
+export function errosDoBriefing(fonte: Fonte, respostas: Respostas) {
   const erros: Record<string, string> = {}
-  for (const q of MODELOS_BRIEFING[modelo].perguntas) {
+  for (const q of listaDe(fonte)) {
     const e = erroDaPergunta(q, respostas[q.chave])
     if (e) erros[q.chave] = e
   }
@@ -230,10 +312,10 @@ export function errosDoBriefing(modelo: ModeloBriefing, respostas: Respostas) {
 
 // Mantém só as chaves do modelo, com o tipo certo e tamanho limitado.
 // Escolhas fora da lista de opções são descartadas.
-export function limparRespostas(modelo: ModeloBriefing, bruto: unknown): Respostas {
+export function limparRespostas(fonte: Fonte, bruto: unknown): Respostas {
   const entrada = (bruto && typeof bruto === 'object' ? bruto : {}) as Record<string, unknown>
   const saida: Respostas = {}
-  for (const q of MODELOS_BRIEFING[modelo].perguntas) {
+  for (const q of listaDe(fonte)) {
     const v = entrada[q.chave]
     if (q.tipo === 'multipla_escolha') {
       const lista = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && q.opcoes!.includes(x)) : []
@@ -260,10 +342,10 @@ export const mensagemWhatsappBriefing = (nome: string, link: string, modelo: Mod
 export const formatarResposta = (v: Resposta | undefined) => (Array.isArray(v) ? v.join(', ') : v?.trim()) || '—'
 
 // Briefing inteiro em texto, organizado por etapa (para colar no Claude ou em outro lugar).
-export function textoRespostas(cliente: string, b: Pick<Briefing, 'modelo' | 'respostas' | 'respondido_em'>) {
+export function textoRespostas(cliente: string, b: Pick<Briefing, 'modelo' | 'respostas' | 'respondido_em' | 'perguntas'>) {
   const data = b.respondido_em ? new Date(b.respondido_em).toLocaleDateString('pt-BR') : null
   const linhas = [`Briefing · ${cliente} · ${MODELOS_BRIEFING[b.modelo].label}${data ? ` · respondido em ${data}` : ''}`]
-  etapasDoModelo(b.modelo).forEach((etapa, i) => {
+  etapasDoModelo(perguntasDoBriefing(b)).forEach((etapa, i) => {
     linhas.push('', `## ${i + 1}. ${etapa.titulo}`)
     for (const q of etapa.perguntas) linhas.push(`- ${q.rotulo}: ${formatarResposta(b.respostas[q.chave])}`)
   })

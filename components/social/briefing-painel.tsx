@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, ClipboardList, Copy, ExternalLink, Loader2, MessageCircle, Plus } from 'lucide-react'
+import { Check, ClipboardList, Copy, ExternalLink, ListChecks, Loader2, MessageCircle, Plus } from 'lucide-react'
+import { EditorPerguntasDialog, perguntasPadrao } from '@/components/social/editor-perguntas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { createClient } from '@/lib/supabase/client'
 import {
   ERRO_MIGRATION_BRIEFING, ERRO_MIGRATION_BRIEFING_SITE, MODELOS_BRIEFING, STATUS_BRIEFING, etapasDoModelo, formatarResposta, linkBriefing,
-  mensagemWhatsappBriefing, modelosDaArea, textoRespostas,
+  mensagemWhatsappBriefing, modelosDaArea, perguntasDoBriefing, textoRespostas,
   type AreaBriefing, type Briefing, type ModeloBriefing,
 } from '@/lib/social/briefing'
 import { cn, formatDate, whatsappUrl } from '@/lib/utils'
@@ -52,11 +53,15 @@ export function GerarBriefingDialog({ aberto, onClose, clienteId, clientes, onCr
     if (!cliente || !modelo) return
     setSalvando(true)
     setErro(null)
-    const { data, error } = await (createClient() as any)
-      .from('social_briefings')
-      .insert({ cliente_id: cliente, modelo, ...(projetoId ? { projeto_id: projetoId } : {}) })
-      .select('*')
-      .single()
+    const db = createClient() as any
+    const base = { cliente_id: cliente, modelo, ...(projetoId ? { projeto_id: projetoId } : {}) }
+    // O briefing nasce com uma cópia das perguntas padrão, que dá para ajustar só para este cliente.
+    const perguntas = await perguntasPadrao(db, modelo)
+    let { data, error } = await db.from('social_briefings').insert({ ...base, perguntas }).select('*').single()
+    // Sem a migration das perguntas editáveis: gera do jeito antigo (perguntas do código).
+    if (error && ['42703', 'PGRST204'].includes(error.code)) {
+      ({ data, error } = await db.from('social_briefings').insert(base).select('*').single())
+    }
     setSalvando(false)
     if (error) { setErro(mensagemErro(error, area)); return }
     onCriado(data)
@@ -116,6 +121,7 @@ export function BriefingPainel({ cliente, area = 'social', projetoId }: { client
   const [gerar, setGerar] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [copiado, setCopiado] = useState<string | null>(null)
+  const [editando, setEditando] = useState(false)
 
   const carregar = useCallback(async () => {
     const base = (createClient() as any).from('social_briefings').select('*')
@@ -166,6 +172,7 @@ export function BriefingPainel({ cliente, area = 'social', projetoId }: { client
             telefone={cliente.whatsapp ?? cliente.telefone}
             copiado={copiado}
             copiar={copiar}
+            onEditar={() => setEditando(true)}
           />
         )}
 
@@ -185,11 +192,14 @@ export function BriefingPainel({ cliente, area = 'social', projetoId }: { client
 
       <GerarBriefingDialog aberto={gerar} onClose={() => setGerar(false)} clienteId={cliente.id} area={area} projetoId={projetoId}
         onCriado={(b) => { setSelecionado(b.id); carregar() }} />
+      {atual && (
+        <EditorPerguntasDialog aberto={editando} onClose={() => setEditando(false)} briefing={atual} nomeCliente={nomeCliente} onSalvo={carregar} />
+      )}
     </Card>
   )
 }
 
-function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telefone, copiado, copiar }: {
+function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telefone, copiado, copiar, onEditar }: {
   briefing: Briefing
   maisRecente: boolean
   nomeCliente: string
@@ -197,7 +207,9 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
   telefone: string | null
   copiado: string | null
   copiar: (chave: string, texto: string) => void
+  onEditar: () => void
 }) {
+  const perguntas = perguntasDoBriefing(b)
   const link = linkBriefing(b.token)
   const mensagem = mensagemWhatsappBriefing(contato, link, b.modelo)
   const wa = whatsappUrl(telefone, mensagem)
@@ -212,6 +224,7 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
         {b.respondido_em
           ? <span className="text-brand-lima">Respondido em {formatDate(b.respondido_em, "dd/MM/yyyy 'às' HH:mm")}</span>
           : <span className="text-yellow-400">Aguardando resposta</span>}
+        <span>{perguntas.length} perguntas</span>
         {!maisRecente && <Badge variant="outline">Briefing anterior</Badge>}
       </div>
 
@@ -222,6 +235,9 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
           <Button size="sm" variant="ghost" asChild><a href={wa} target="_blank" rel="noreferrer"><MessageCircle className="h-3.5 w-3.5" /> Abrir WhatsApp</a></Button>
         )}
         <Button size="sm" variant="ghost" asChild><a href={`/briefing/${b.token}`} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /> Ver</a></Button>
+        {b.status === 'enviado' && (
+          <Button size="sm" variant="ghost" onClick={onEditar}><ListChecks className="h-3.5 w-3.5" /> Editar perguntas</Button>
+        )}
         {b.status === 'respondido' && (
           <Button size="sm" className="sm:ml-auto" onClick={() => copiar('respostas', textoRespostas(nomeCliente, b))}>{Icone('respostas')} Copiar respostas</Button>
         )}
@@ -229,7 +245,7 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
 
       {b.status === 'respondido' && modelo && (
         <div className="grid gap-4 lg:grid-cols-2">
-          {etapasDoModelo(b.modelo).map((etapa, i) => (
+          {etapasDoModelo(perguntas).map((etapa, i) => (
             <section key={etapa.titulo} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
               <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-brand-lavanda">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-lima/15 text-[11px] text-brand-lima">{i + 1}</span>

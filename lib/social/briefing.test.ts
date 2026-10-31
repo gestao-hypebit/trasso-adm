@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MODELOS_BRIEFING, errosDoBriefing, etapasDoModelo, limparRespostas, mensagemWhatsappBriefing, modelosDaArea, textoRespostas } from '@/lib/social/briefing'
+import { MODELOS_BRIEFING, errosDoBriefing, etapasDoModelo, gerarChave, limparRespostas, mensagemWhatsappBriefing, modelosDaArea, normalizarPerguntas, perguntasDoBriefing, problemaNasPerguntas, textoRespostas } from '@/lib/social/briefing'
 
 const NOVO_OK = {
   nome_loja: 'Loja da Ana', responsavel: 'Ana', whatsapp: '(11) 98765-4321',
@@ -90,5 +90,51 @@ describe('briefing de site', () => {
   it('mensagem do WhatsApp fala do site', () => {
     expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'site')).toContain('seu site')
     expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'perfil_novo')).toContain('Instagram')
+  })
+})
+
+describe('perguntas editáveis', () => {
+  const PROPRIAS = [
+    { chave: 'nome', etapa: 'Básico', rotulo: 'Nome', tipo: 'texto', obrigatoria: true },
+    { chave: 'pet', etapa: 'Extra', rotulo: 'Tem pet?', tipo: 'escolha_unica', opcoes: ['Sim', 'Não', 'Sim'], obrigatoria: false },
+  ]
+
+  it('normaliza e descarta o que está malformado', () => {
+    const lista = normalizarPerguntas([
+      ...PROPRIAS,
+      { chave: 'nome', etapa: 'X', rotulo: 'Repetida', tipo: 'texto' },        // chave repetida
+      { chave: 'sem_opcoes', etapa: 'X', rotulo: 'Escolha', tipo: 'multipla_escolha', opcoes: [] },
+      { chave: 'tipo_ruim', etapa: 'X', rotulo: 'Ruim', tipo: 'arquivo' },
+      'lixo', null,
+    ])!
+    expect(lista.map((q) => q.chave)).toEqual(['nome', 'pet'])
+    expect(lista[1].opcoes).toEqual(['Sim', 'Não'])
+    expect(normalizarPerguntas([])).toBeNull()
+    expect(normalizarPerguntas(null)).toBeNull()
+  })
+
+  it('briefing usa as próprias perguntas, ou o padrão se não tiver', () => {
+    expect(perguntasDoBriefing({ modelo: 'site', perguntas: PROPRIAS }).length).toBe(2)
+    expect(perguntasDoBriefing({ modelo: 'site', perguntas: null })).toBe(MODELOS_BRIEFING.site.perguntas)
+  })
+
+  it('valida e limpa respostas pelas perguntas do briefing', () => {
+    const lista = normalizarPerguntas(PROPRIAS)!
+    expect(errosDoBriefing(lista, {})).toEqual({ nome: 'Preencha este campo.' })
+    expect(limparRespostas(lista, { nome: 'Ana', pet: 'Talvez', nome_empresa: 'x' })).toEqual({ nome: 'Ana' })
+    expect(textoRespostas('Ana', { modelo: 'site', perguntas: lista, respostas: { nome: 'Ana' }, respondido_em: null })).toContain('## 2. Extra')
+  })
+
+  it('aponta problema antes de salvar', () => {
+    expect(problemaNasPerguntas([])).toBe('Deixe pelo menos uma pergunta.')
+    expect(problemaNasPerguntas([{ chave: 'a', etapa: 'E', rotulo: ' ', tipo: 'texto', obrigatoria: false }])).toContain('escreva o texto')
+    expect(problemaNasPerguntas([{ chave: 'a', etapa: 'E', rotulo: 'Cor?', tipo: 'escolha_unica', opcoes: [' '], obrigatoria: false }])).toContain('opções')
+    expect(problemaNasPerguntas(normalizarPerguntas(PROPRIAS)!)).toBeNull()
+  })
+
+  it('gera chave única sem acento', () => {
+    expect(gerarChave('Qual é o horário?', [])).toBe('qual_e_o_horario')
+    expect(gerarChave('Qual é o horário?', ['qual_e_o_horario'])).toBe('qual_e_o_horario_2')
+    expect(gerarChave('???', [])).toBe('pergunta')
   })
 })
