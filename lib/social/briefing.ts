@@ -94,11 +94,75 @@ const PERFIL_NOVO: Pergunta[] = [
   p('Estilo do perfil', 'observacoes', 'Mais alguma coisa?', 'texto_longo'),
 ]
 
+// Desenvolvimento de site. As opções de estilo e tom são as mesmas do
+// gerador de prévias (lib/sites/tipos.ts), para dar para levar as respostas para lá.
+const SITE: Pergunta[] = [
+  p('Sobre a empresa', 'nome_empresa', 'Nome da empresa', 'texto', OBRIG),
+  p('Sobre a empresa', 'responsavel', 'Seu nome', 'texto', OBRIG),
+  p('Sobre a empresa', 'whatsapp', 'Seu WhatsApp', 'telefone', { ...OBRIG, placeholder: '(00) 00000-0000' }),
+  p('Sobre a empresa', 'email', 'E-mail de contato', 'email'),
+  p('Sobre a empresa', 'segmento', 'Ramo de atuação', 'texto', { placeholder: 'Ex.: clínica odontológica, loja de móveis, advocacia' }),
+  p('Sobre a empresa', 'cidade', 'Cidade onde atende', 'texto'),
+  p('Sobre a empresa', 'descricao', 'O que a empresa faz e para quem?', 'texto_longo', { ...OBRIG, ajuda: 'Explique como se fosse para alguém que nunca ouviu falar de vocês.' }),
+  p('Sobre a empresa', 'historia', 'Um pouco da história', 'texto_longo', { ajuda: 'Como começou, há quanto tempo existe, o que deixa vocês orgulhosos.' }),
+
+  p('O site', 'objetivo', 'O que o site precisa fazer por você?', 'multipla_escolha', { ...OBRIG, opcoes: ['Trazer contatos pelo WhatsApp', 'Passar mais credibilidade', 'Aparecer no Google', 'Mostrar portfólio / trabalhos', 'Vender online', 'Receber agendamentos'] }),
+  p('O site', 'acao_principal', 'Qual a principal ação que o visitante deve fazer?', 'escolha_unica', { opcoes: ['Chamar no WhatsApp', 'Preencher um formulário', 'Ligar', 'Comprar', 'Agendar um horário'] }),
+  p('O site', 'paginas', 'O que o site precisa ter?', 'multipla_escolha', { opcoes: ['Sobre a empresa', 'Serviços / produtos', 'Portfólio / galeria', 'Depoimentos', 'Perguntas frequentes', 'Blog', 'Contato e mapa'] }),
+  p('O site', 'site_atual', 'Já tem site? Qual o endereço?', 'texto', { placeholder: 'www.suaempresa.com.br' }),
+  p('O site', 'site_atual_problema', 'Se já tem, o que não gosta nele?', 'texto_longo'),
+
+  p('Conteúdo', 'servicos', 'Quais serviços ou produtos vão aparecer no site?', 'texto_longo', { ...OBRIG, ajuda: 'Um por linha. Se quiser, coloque uma frase explicando cada um.' }),
+  p('Conteúdo', 'publico', 'Quem é o seu cliente ideal?', 'texto_longo', { ajuda: 'Idade, profissão, o que procura, o que o preocupa na hora de contratar.' }),
+  p('Conteúdo', 'diferencial', 'Por que o cliente escolhe vocês e não o concorrente?', 'texto_longo'),
+  p('Conteúdo', 'concorrentes', 'Principais concorrentes', 'texto'),
+  p('Conteúdo', 'textos', 'Quem vai escrever os textos do site?', 'escolha_unica', { opcoes: ['Eu envio os textos', 'Quero que a Slick escreva', 'Um pouco de cada'] }),
+  p('Conteúdo', 'fotos', 'Você tem fotos para o site?', 'escolha_unica', { opcoes: ['Sim, fotos profissionais', 'Algumas fotos de celular', 'Não tenho'] }),
+  p('Conteúdo', 'depoimentos', 'Tem depoimentos ou avaliações de clientes?', 'escolha_unica', { opcoes: ['Sim, vários', 'Alguns', 'Não tenho'] }),
+  p('Conteúdo', 'materiais', 'Link da pasta com logo, fotos e textos', 'texto', { ajuda: 'Google Drive, Dropbox ou WeTransfer. Pode mandar depois também.' }),
+
+  p('Visual', 'logo', 'Você já tem logo?', 'escolha_unica', { opcoes: ['Sim, em boa qualidade', 'Tenho, mas só em imagem pequena', 'Não tenho'] }),
+  p('Visual', 'cores', 'Cores da marca', 'texto', { ajuda: 'Se tiver alguma cor que você não quer de jeito nenhum, conta aqui também.' }),
+  p('Visual', 'estilo', 'Qual estilo combina mais com a empresa?', 'escolha_unica', { opcoes: ['Moderno e minimalista', 'Elegante e premium', 'Vibrante e colorido', 'Corporativo e sóbrio', 'Aconchegante e artesanal'] }),
+  p('Visual', 'tom_voz', 'Como a empresa conversa com o cliente?', 'escolha_unica', { opcoes: ['Profissional', 'Próximo e acolhedor', 'Sofisticado', 'Jovem e descontraído', 'Técnico e direto'] }),
+  p('Visual', 'referencias', 'Sites que você gosta (de qualquer ramo)', 'texto_longo', { ajuda: 'Cole os links e diga o que gosta em cada um.' }),
+  p('Visual', 'evitar', 'Algo que você NÃO quer no site?', 'texto'),
+
+  p('Contato e lançamento', 'dominio', 'Já tem domínio (o endereço .com.br)?', 'escolha_unica', { opcoes: ['Sim, já tenho', 'Não, preciso registrar', 'Não sei'] }),
+  p('Contato e lançamento', 'dominio_nome', 'Qual domínio tem ou gostaria de ter?', 'texto', { placeholder: 'suaempresa.com.br' }),
+  p('Contato e lançamento', 'endereco', 'Endereço que vai no site', 'texto', { ajuda: 'Deixe em branco se não atende no local.' }),
+  p('Contato e lançamento', 'horario', 'Horário de atendimento', 'texto'),
+  p('Contato e lançamento', 'redes', 'Instagram e outras redes', 'texto', { placeholder: '@suaempresa' }),
+  p('Contato e lançamento', 'prazo', 'Tem alguma data importante para o lançamento?', 'texto'),
+  p('Contato e lançamento', 'observacoes', 'Mais alguma coisa?', 'texto_longo'),
+]
+
+export type AreaBriefing = 'social' | 'site'
+
+const TEXTOS_SOCIAL = {
+  area: 'social' as AreaBriefing,
+  topo: 'Briefing de social media',
+  titulo: 'Vamos conhecer a sua loja',
+  intro: 'Leva uns 5 minutos.',
+  obrigado: 'Em breve te enviamos o planejamento.',
+}
+
 export const MODELOS_BRIEFING = {
-  perfil_novo:      { label: 'Perfil novo',      descricao: 'A Slick vai criar o Instagram do zero.', perguntas: PERFIL_NOVO },
-  perfil_existente: { label: 'Perfil existente', descricao: 'O cliente já tem Instagram ativo.',      perguntas: PERFIL_EXISTENTE },
-} as const
+  perfil_novo:      { label: 'Perfil novo',      descricao: 'A Slick vai criar o Instagram do zero.', perguntas: PERFIL_NOVO, ...TEXTOS_SOCIAL },
+  perfil_existente: { label: 'Perfil existente', descricao: 'O cliente já tem Instagram ativo.',      perguntas: PERFIL_EXISTENTE, ...TEXTOS_SOCIAL },
+  site: {
+    label: 'Site', descricao: 'Desenvolvimento de site ou landing page.', perguntas: SITE,
+    area: 'site' as AreaBriefing,
+    topo: 'Briefing do seu site',
+    titulo: 'Vamos montar o seu site',
+    intro: 'Leva uns 10 minutos. Quanto mais detalhe, mais o site fica com a cara da sua empresa.',
+    obrigado: 'Agora a gente começa a desenhar o seu site. Qualquer dúvida, chamamos no WhatsApp.',
+  },
+}
 export type ModeloBriefing = keyof typeof MODELOS_BRIEFING
+
+export const modelosDaArea = (area: AreaBriefing) =>
+  (Object.keys(MODELOS_BRIEFING) as ModeloBriefing[]).filter((k) => MODELOS_BRIEFING[k].area === area)
 
 export const isModelo = (v: unknown): v is ModeloBriefing => typeof v === 'string' && v in MODELOS_BRIEFING
 
@@ -127,6 +191,7 @@ export type Briefing = {
   id: string
   cliente_id: string
   modelo: ModeloBriefing
+  projeto_id?: string | null
   token: string
   status: StatusBriefing
   respostas: Respostas
@@ -135,6 +200,7 @@ export type Briefing = {
 }
 
 export const ERRO_MIGRATION_BRIEFING = 'Rode a migration 20261027000000_social_briefings.sql no Supabase antes de usar.'
+export const ERRO_MIGRATION_BRIEFING_SITE = 'Rode a migration 20261108000000_briefing_site.sql no Supabase antes de usar.'
 
 // ─── Validação (usada no formulário e de novo no servidor) ───
 
@@ -186,8 +252,10 @@ export function limparRespostas(modelo: ModeloBriefing, bruto: unknown): Respost
 export const linkBriefing = (token: string) =>
   typeof window !== 'undefined' ? `${window.location.origin}/briefing/${token}` : `/briefing/${token}`
 
-export const mensagemWhatsappBriefing = (nome: string, link: string) =>
-  `Oi, ${nome}! Tudo bem? 😊\nPara eu montar o planejamento do seu Instagram, preciso conhecer melhor a sua loja.\nResponde esse formulário rapidinho (leva uns 5 minutos):\n${link}`
+export const mensagemWhatsappBriefing = (nome: string, link: string, modelo: ModeloBriefing = 'perfil_novo') =>
+  MODELOS_BRIEFING[modelo].area === 'site'
+    ? `Oi, ${nome}! Tudo bem? 😊\nPara começarmos o seu site, preciso conhecer melhor a sua empresa.\nResponde esse formulário (leva uns 10 minutos):\n${link}`
+    : `Oi, ${nome}! Tudo bem? 😊\nPara eu montar o planejamento do seu Instagram, preciso conhecer melhor a sua loja.\nResponde esse formulário rapidinho (leva uns 5 minutos):\n${link}`
 
 export const formatarResposta = (v: Resposta | undefined) => (Array.isArray(v) ? v.join(', ') : v?.trim()) || '—'
 

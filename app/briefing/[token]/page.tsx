@@ -29,7 +29,7 @@ export default async function BriefingPage({ params }: { params: Promise<{ token
     )
   }
 
-  if (briefing.status === 'respondido') return <BriefingObrigado {...agencia} />
+  if (briefing.status === 'respondido') return <BriefingObrigado {...agencia} modelo={briefing.modelo} />
 
   return <BriefingFormulario token={token} modelo={briefing.modelo} contatoNome={briefing.contatoNome} {...agencia} />
 }

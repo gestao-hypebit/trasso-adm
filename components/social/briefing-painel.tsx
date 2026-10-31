@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ERRO_MIGRATION_BRIEFING, MODELOS_BRIEFING, STATUS_BRIEFING, etapasDoModelo, formatarResposta, linkBriefing, mensagemWhatsappBriefing, textoRespostas,
-  type Briefing, type ModeloBriefing,
+  ERRO_MIGRATION_BRIEFING, ERRO_MIGRATION_BRIEFING_SITE, MODELOS_BRIEFING, STATUS_BRIEFING, etapasDoModelo, formatarResposta, linkBriefing,
+  mensagemWhatsappBriefing, modelosDaArea, textoRespostas,
+  type AreaBriefing, type Briefing, type ModeloBriefing,
 } from '@/lib/social/briefing'
 import { cn, formatDate, whatsappUrl } from '@/lib/utils'
 
@@ -19,22 +20,33 @@ type Opcao = { id: string; nome: string; empresa: string | null }
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
 
+// Tabela inexistente, coluna projeto_id inexistente ou modelo 'site' barrado pelo check: falta migration.
+function mensagemErro(error: { code?: string; message: string }, area: AreaBriefing) {
+  if (error.code === '42P01') return ERRO_MIGRATION_BRIEFING
+  if (area === 'site' && ['42703', 'PGRST204', '23514'].includes(error.code ?? '')) return ERRO_MIGRATION_BRIEFING_SITE
+  return error.message
+}
+
 // Cria o briefing com o modelo escolhido. Sem `clienteId`, pede o cliente também.
-export function GerarBriefingDialog({ aberto, onClose, clienteId, clientes, onCriado }: {
+// Com `projetoId`, o briefing fica ligado ao projeto (briefing de site).
+export function GerarBriefingDialog({ aberto, onClose, clienteId, clientes, onCriado, area = 'social', projetoId }: {
   aberto: boolean
   onClose: () => void
   clienteId?: string
   clientes?: Opcao[]
   onCriado: (b: Briefing) => void
+  area?: AreaBriefing
+  projetoId?: string
 }) {
+  const modelos = modelosDaArea(area)
   const [cliente, setCliente] = useState('')
   const [modelo, setModelo] = useState<ModeloBriefing | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
-    if (aberto) { setCliente(clienteId ?? ''); setModelo(null); setErro(null) }
-  }, [aberto, clienteId])
+    if (aberto) { setCliente(clienteId ?? ''); setModelo(modelos.length === 1 ? modelos[0] : null); setErro(null) }
+  }, [aberto, clienteId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function criar() {
     if (!cliente || !modelo) return
@@ -42,11 +54,11 @@ export function GerarBriefingDialog({ aberto, onClose, clienteId, clientes, onCr
     setErro(null)
     const { data, error } = await (createClient() as any)
       .from('social_briefings')
-      .insert({ cliente_id: cliente, modelo })
+      .insert({ cliente_id: cliente, modelo, ...(projetoId ? { projeto_id: projetoId } : {}) })
       .select('*')
       .single()
     setSalvando(false)
-    if (error) { setErro(error.code === '42P01' ? ERRO_MIGRATION_BRIEFING : error.message); return }
+    if (error) { setErro(mensagemErro(error, area)); return }
     onCriado(data)
     onClose()
   }
@@ -75,7 +87,7 @@ export function GerarBriefingDialog({ aberto, onClose, clienteId, clientes, onCr
           <div className="space-y-1.5">
             <Label>Modelo *</Label>
             <div className="grid gap-2 sm:grid-cols-2">
-              {(Object.entries(MODELOS_BRIEFING) as [ModeloBriefing, (typeof MODELOS_BRIEFING)[ModeloBriefing]][]).map(([k, m]) => (
+              {modelos.map((k) => [k, MODELOS_BRIEFING[k]] as const).map(([k, m]) => (
                 <button key={k} type="button" onClick={() => setModelo(k)}
                   className={cn('rounded-lg border p-3 text-left transition-colors', modelo === k ? 'border-brand-lima/60 bg-brand-lima/[0.06]' : 'border-white/[0.1] hover:border-white/[0.2]')}>
                   <p className={cn('text-sm font-medium', modelo === k ? 'text-brand-lima' : 'text-brand-lavanda')}>{m.label}</p>
@@ -96,8 +108,9 @@ export function GerarBriefingDialog({ aberto, onClose, clienteId, clientes, onCr
   )
 }
 
-// Bloco de briefing na página do cliente: o mais recente em destaque, os anteriores no histórico.
-export function BriefingPainel({ cliente }: { cliente: Cliente }) {
+// Bloco de briefing: o mais recente em destaque, os anteriores no histórico.
+// Social: briefings do cliente. Site: briefings do projeto.
+export function BriefingPainel({ cliente, area = 'social', projetoId }: { cliente: Cliente; area?: AreaBriefing; projetoId?: string }) {
   const [briefings, setBriefings] = useState<Briefing[] | null>(null)
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [gerar, setGerar] = useState(false)
@@ -105,11 +118,12 @@ export function BriefingPainel({ cliente }: { cliente: Cliente }) {
   const [copiado, setCopiado] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
-    const { data, error } = await (createClient() as any)
-      .from('social_briefings').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false })
-    if (error) setErro(error.code === '42P01' ? ERRO_MIGRATION_BRIEFING : error.message)
+    const base = (createClient() as any).from('social_briefings').select('*')
+    const filtrada = projetoId ? base.eq('projeto_id', projetoId) : base.eq('cliente_id', cliente.id).in('modelo', modelosDaArea(area))
+    const { data, error } = await filtrada.order('created_at', { ascending: false })
+    if (error) setErro(mensagemErro(error, area))
     setBriefings(data ?? [])
-  }, [cliente.id])
+  }, [cliente.id, area, projetoId])
 
   useEffect(() => { carregar() }, [carregar])
 
@@ -129,7 +143,7 @@ export function BriefingPainel({ cliente }: { cliente: Cliente }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-brand-lima" />
-            <h2 className="font-semibold text-brand-lavanda">Briefing</h2>
+            <h2 className="font-semibold text-brand-lavanda">{area === 'site' ? 'Briefing do site' : 'Briefing'}</h2>
             {briefings && <Badge variant={STATUS_BRIEFING[briefings[0]?.status ?? 'sem'].variant}>{STATUS_BRIEFING[briefings[0]?.status ?? 'sem'].label}</Badge>}
           </div>
           <Button size="sm" variant={atual ? 'outline' : 'default'} onClick={() => setGerar(true)}>
@@ -169,7 +183,7 @@ export function BriefingPainel({ cliente }: { cliente: Cliente }) {
         )}
       </CardContent>
 
-      <GerarBriefingDialog aberto={gerar} onClose={() => setGerar(false)} clienteId={cliente.id}
+      <GerarBriefingDialog aberto={gerar} onClose={() => setGerar(false)} clienteId={cliente.id} area={area} projetoId={projetoId}
         onCriado={(b) => { setSelecionado(b.id); carregar() }} />
     </Card>
   )
@@ -185,7 +199,7 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
   copiar: (chave: string, texto: string) => void
 }) {
   const link = linkBriefing(b.token)
-  const mensagem = mensagemWhatsappBriefing(contato, link)
+  const mensagem = mensagemWhatsappBriefing(contato, link, b.modelo)
   const wa = whatsappUrl(telefone, mensagem)
   const modelo = MODELOS_BRIEFING[b.modelo]
   const Icone = (chave: string) => (copiado === chave ? <Check className="h-3.5 w-3.5 text-brand-lima" /> : <Copy className="h-3.5 w-3.5" />)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MODELOS_BRIEFING, errosDoBriefing, etapasDoModelo, limparRespostas, textoRespostas } from '@/lib/social/briefing'
+import { MODELOS_BRIEFING, errosDoBriefing, etapasDoModelo, limparRespostas, mensagemWhatsappBriefing, modelosDaArea, textoRespostas } from '@/lib/social/briefing'
 
 const NOVO_OK = {
   nome_loja: 'Loja da Ana', responsavel: 'Ana', whatsapp: '(11) 98765-4321',
@@ -69,5 +69,26 @@ describe('textoRespostas', () => {
     expect(texto).toContain('## 3. Como você vende')
     expect(texto).toContain('- Formas de pagamento: Pix, Cartão')
     expect(texto).toContain('- Cores da marca: —')
+  })
+})
+
+describe('briefing de site', () => {
+  it('fica separado dos modelos de social', () => {
+    expect(modelosDaArea('social')).toEqual(['perfil_novo', 'perfil_existente'])
+    expect(modelosDaArea('site')).toEqual(['site'])
+  })
+
+  it('obrigatórios e etapas', () => {
+    expect(etapasDoModelo('site').map((e) => e.titulo)).toEqual(['Sobre a empresa', 'O site', 'Conteúdo', 'Visual', 'Contato e lançamento'])
+    expect(Object.keys(errosDoBriefing('site', {}))).toEqual(['nome_empresa', 'responsavel', 'whatsapp', 'descricao', 'objetivo', 'servicos'])
+    expect(errosDoBriefing('site', {
+      nome_empresa: 'Clínica Sorriso', responsavel: 'Ana', whatsapp: '(11) 98765-4321',
+      descricao: 'Odontologia', objetivo: ['Aparecer no Google'], servicos: 'Implante',
+    })).toEqual({})
+  })
+
+  it('mensagem do WhatsApp fala do site', () => {
+    expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'site')).toContain('seu site')
+    expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'perfil_novo')).toContain('Instagram')
   })
 })

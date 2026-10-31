@@ -32,7 +32,8 @@ export const getBriefingPorToken = cache(async (token: string) => {
   const supabase = createServiceClient() as any
   const { data } = await supabase
     .from('social_briefings')
-    .select('id, modelo, status, clientes(nome, empresa)')
+    // `*` e não a lista de colunas: projeto_id só existe depois da migration do briefing de site.
+    .select('*, clientes(nome, empresa)')
     .eq('token', token)
     .maybeSingle()
   if (!data || !isModelo(data.modelo)) return null
@@ -40,6 +41,7 @@ export const getBriefingPorToken = cache(async (token: string) => {
     id: data.id as string,
     modelo: data.modelo as ModeloBriefing,
     status: data.status as StatusBriefing,
+    projetoId: (data.projeto_id ?? null) as string | null,
     clienteNome: (data.clientes?.empresa || data.clientes?.nome || 'Cliente') as string,
     contatoNome: (data.clientes?.nome ?? '') as string,
   }

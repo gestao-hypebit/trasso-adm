@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GerarBriefingDialog } from '@/components/social/briefing-painel'
 import { createClient } from '@/lib/supabase/client'
-import { ERRO_MIGRATION_BRIEFING, STATUS_BRIEFING, type StatusBriefing } from '@/lib/social/briefing'
+import { ERRO_MIGRATION_BRIEFING, STATUS_BRIEFING, modelosDaArea, type StatusBriefing } from '@/lib/social/briefing'
 import { ERRO_MIGRATION, ERRO_MIGRATION_PERIODO, STATUS_PLANEJAMENTO, fimDoPeriodo, nomeMes, nomePeriodo, umMesDepois } from '@/lib/social/tipos'
 import { cn, formatDate } from '@/lib/utils'
 import { SkeletonLista } from '@/components/ui/skeleton'
@@ -68,7 +68,7 @@ export default function SocialPage() {
         .order('mes', { ascending: false })
         .order('created_at', { ascending: false }),
       db.from('clientes').select('id, nome, empresa').order('nome'),
-      db.from('social_briefings').select('cliente_id, status, created_at').order('created_at', { ascending: false }),
+      db.from('social_briefings').select('cliente_id, status, created_at').in('modelo', modelosDaArea('social')).order('created_at', { ascending: false }),
     ]).then(([p, c, b]: { data: any[] | null; error: { code?: string; message: string } | null }[]) => {
       if (p.error) setErro(p.error.code === '42P01' ? ERRO_MIGRATION : p.error.message)
       if (b.error) setErroBriefing(b.error.code === '42P01' ? ERRO_MIGRATION_BRIEFING : b.error.message)

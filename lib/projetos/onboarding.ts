@@ -46,9 +46,11 @@ const perguntasBase: PerguntaBriefing[] = [
 ]
 
 const modelos: Record<string, { itens: ItemModelo[]; perguntas: PerguntaBriefing[] }> = {
+  // Site usa o briefing por link (aba "Briefing" do projeto, lib/social/briefing.ts):
+  // sem perguntas aqui para o cliente não responder dois briefings.
   site: {
     itens: [
-      { titulo: 'Responder o briefing', responsavel: 'cliente' },
+      { titulo: 'Responder o briefing', descricao: 'Pelo link que enviamos no WhatsApp. Marca sozinho quando você enviar.', responsavel: 'cliente' },
       { titulo: 'Enviar logo em boa qualidade', descricao: 'De preferência em PNG com fundo transparente, SVG ou PDF.', responsavel: 'cliente' },
       { titulo: 'Enviar textos e fotos do negócio', descricao: 'Pode ser um link do Google Drive com tudo junto.', responsavel: 'cliente' },
       { titulo: 'Informar acesso ao domínio', descricao: 'Onde o domínio está registrado (Registro.br, GoDaddy…) e o login, ou nos adicionar como técnicos.', responsavel: 'cliente' },
@@ -57,12 +59,7 @@ const modelos: Record<string, { itens: ItemModelo[]; perguntas: PerguntaBriefing
       { titulo: 'Configurar hospedagem e domínio', responsavel: 'agencia' },
       { titulo: 'Criar grupo de acompanhamento com o cliente', responsavel: 'agencia' },
     ],
-    perguntas: [
-      ...perguntasBase,
-      P('paginas', 'Quais páginas/seções o site precisa ter?', 'textarea', true, 'Ex.: início, sobre, serviços, depoimentos, contato.'),
-      P('dominio', 'Já tem domínio? Qual?', 'texto', false),
-      P('materiais', 'Link da pasta com logo, fotos e textos', 'link', false),
-    ],
+    perguntas: [],
   },
   software: {
     itens: [
@@ -149,6 +146,7 @@ export async function criarOnboarding(supabase: any, projetoId: string, tipo: st
     modelo.itens.map((item, ordem) => ({ projeto_id: projetoId, titulo: item.titulo, descricao: item.descricao ?? null, responsavel: item.responsavel, ordem }))
   )
   if (error) throw error
+  if (!modelo.perguntas.length) return
   const { error: errBriefing } = await supabase
     .from('briefings')
     .upsert({ projeto_id: projetoId, perguntas: modelo.perguntas }, { onConflict: 'projeto_id', ignoreDuplicates: true })

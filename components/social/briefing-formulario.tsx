@@ -10,10 +10,11 @@ import { MODELOS_BRIEFING, errosDoBriefing, etapasDoModelo, type ModeloBriefing,
 import { cn } from '@/lib/utils'
 
 type Agencia = { nome: string; logoUrl: string | null }
+type ComModelo = { modelo?: ModeloBriefing }
 
 const chaveRascunho = (token: string) => `slick-briefing-${token}`
 
-export function BriefingTopo({ nome, logoUrl }: Agencia) {
+export function BriefingTopo({ nome, logoUrl, modelo }: Agencia & ComModelo) {
   return (
     <header className="border-b border-white/[0.06]">
       <div className="mx-auto flex max-w-xl items-center gap-2 px-5 py-3">
@@ -25,21 +26,21 @@ export function BriefingTopo({ nome, logoUrl }: Agencia) {
         </div>
         <div>
           <p className="text-sm font-bold leading-none text-brand-lavanda">{nome.toLowerCase()}</p>
-          <p className="mt-0.5 text-[10px] text-brand-lavanda/40">Briefing de social media</p>
+          <p className="mt-0.5 text-[10px] text-brand-lavanda/40">{modelo ? MODELOS_BRIEFING[modelo].topo : 'Briefing'}</p>
         </div>
       </div>
     </header>
   )
 }
 
-export function BriefingObrigado(agencia: Agencia) {
+export function BriefingObrigado(agencia: Agencia & ComModelo) {
   return (
     <div className="min-h-screen bg-brand-noite">
       <BriefingTopo {...agencia} />
       <div className="mx-auto max-w-md px-5 py-20 text-center">
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-brand-lima" />
         <h1 className="mb-2 text-2xl font-bold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Recebemos tudo!</h1>
-        <p className="text-brand-lavanda/60">Em breve te enviamos o planejamento.</p>
+        <p className="text-brand-lavanda/60">{agencia.modelo ? MODELOS_BRIEFING[agencia.modelo].obrigado : 'Em breve entramos em contato.'}</p>
       </div>
     </div>
   )
@@ -108,11 +109,11 @@ export function BriefingFormulario({ token, modelo, contatoNome, nome, logoUrl }
     })
   }
 
-  if (enviado) return <BriefingObrigado nome={nome} logoUrl={logoUrl} />
+  if (enviado) return <BriefingObrigado nome={nome} logoUrl={logoUrl} modelo={modelo} />
 
   return (
     <div className="min-h-screen bg-brand-noite">
-      <BriefingTopo nome={nome} logoUrl={logoUrl} />
+      <BriefingTopo nome={nome} logoUrl={logoUrl} modelo={modelo} />
 
       <form onSubmit={enviar} noValidate className="mx-auto max-w-xl space-y-10 px-5 pb-16 pt-6">
         <p className="flex items-center gap-2 rounded-lg border border-brand-lima/20 bg-brand-lima/[0.06] px-3 py-2 text-sm text-brand-lima">
@@ -120,8 +121,8 @@ export function BriefingFormulario({ token, modelo, contatoNome, nome, logoUrl }
         </p>
 
         <section>
-          <h1 className="text-3xl font-bold leading-tight text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Vamos conhecer a sua loja</h1>
-          <p className="mt-2 text-brand-lavanda/60">Leva uns 5 minutos. O que você digitar fica salvo neste aparelho até você enviar.</p>
+          <h1 className="text-3xl font-bold leading-tight text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{MODELOS_BRIEFING[modelo].titulo}</h1>
+          <p className="mt-2 text-brand-lavanda/60">{MODELOS_BRIEFING[modelo].intro} O que você digitar fica salvo neste aparelho até você enviar.</p>
           <p className="mt-1 text-sm text-brand-lavanda/40">Campos com <span className="text-brand-rosa">*</span> são obrigatórios.</p>
         </section>
 

@@ -25,6 +25,7 @@ import { RentabilidadeProjeto } from '@/components/projetos/rentabilidade-projet
 import { OnboardingProjeto } from '@/components/projetos/onboarding-projeto'
 import { EntregasProjeto } from '@/components/projetos/entregas-projeto'
 import { ExcluirProjetoDialog } from '@/components/projetos/excluir-projeto-dialog'
+import { BriefingPainel } from '@/components/social/briefing-painel'
 import type { ClientePortal } from '@/components/projetos/portal-link-acoes'
 import { SkeletonLista } from '@/components/ui/skeleton'
 
@@ -36,7 +37,7 @@ type Projeto = {
   horas_estimadas: number | null
   cliente_id: string | null
   revisoes_inclusas: number | null
-  clientes: ClientePortal | null
+  clientes: (ClientePortal & { empresa: string | null }) | null
 }
 type Tarefa = {
   id: string; titulo: string; status: string; prioridade: string; data_vencimento: string | null
@@ -99,6 +100,13 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
   const [tarefaForm, setTarefaForm] = useState(TAREFA_VAZIA)
   const [salvandoTarefa, setSalvandoTarefa] = useState(false)
   const [tarefaAtiva, setTarefaAtiva] = useState<Tarefa | null>(null)
+  const [aba, setAba] = useState('tarefas')
+
+  // ?aba=briefing abre direto na aba (link da notificação de briefing respondido).
+  useEffect(() => {
+    const inicial = new URLSearchParams(window.location.search).get('aba')
+    if (inicial) setAba(inicial)
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -151,7 +159,7 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
     const supabase = createClient()
     async function load() {
       const [{ data: p }, { data: t }] = await Promise.all([
-        supabase.from('projetos').select('*, clientes(nome, telefone, whatsapp, portal_token, portal_ativo)').eq('id', id).single(),
+        supabase.from('projetos').select('*, clientes(nome, empresa, telefone, whatsapp, portal_token, portal_ativo)').eq('id', id).single(),
         supabase.from('tarefas').select('id, titulo, status, prioridade, data_vencimento').eq('projeto_id', id).order('ordem'),
       ])
       setProjeto(p as unknown as Projeto)
@@ -227,9 +235,10 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="tarefas">
+        <Tabs value={aba} onValueChange={setAba}>
           <TabsList className="mb-4 max-w-full overflow-x-auto">
             <TabsTrigger value="tarefas">Tarefas ({tarefas.length})</TabsTrigger>
+            {projeto.tipo === 'site' && <TabsTrigger value="briefing">Briefing</TabsTrigger>}
             <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
             <TabsTrigger value="entregas">Entregas</TabsTrigger>
             <TabsTrigger value="financeiro">Rentabilidade</TabsTrigger>
@@ -270,6 +279,20 @@ export default function ProjetoDetailPage({ params }: { params: Promise<{ id: st
               </DndContext>
             )}
           </TabsContent>
+
+          {projeto.tipo === 'site' && (
+            <TabsContent value="briefing">
+              {projeto.cliente_id && projeto.clientes ? (
+                <BriefingPainel
+                  area="site"
+                  projetoId={id}
+                  cliente={{ id: projeto.cliente_id, nome: projeto.clientes.nome, empresa: projeto.clientes.empresa, telefone: projeto.clientes.telefone, whatsapp: projeto.clientes.whatsapp }}
+                />
+              ) : (
+                <p className="py-12 text-center text-sm text-brand-lavanda/40">Vincule um cliente ao projeto para gerar o briefing.</p>
+              )}
+            </TabsContent>
+          )}
 
           <TabsContent value="onboarding">
             <OnboardingProjeto projetoId={id} tipo={projeto.tipo} cliente={projeto.clientes} />
