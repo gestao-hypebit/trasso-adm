@@ -2,7 +2,7 @@ import 'server-only'
 
 // Envio do código de acesso pelo Resend (API REST, sem dependência).
 // Variáveis: RESEND_API_KEY e RESEND_FROM_EMAIL (remetente de um domínio
-// verificado no Resend, ex.: "Slick <acesso@slick.com.br>").
+// verificado no Resend, ex.: "Slick <acesso@agenciaslick.com.br>").
 // Em desenvolvimento sem RESEND_API_KEY, o código sai no terminal.
 
 export async function enviarCodigoPorEmail(email: string, codigo: string): Promise<boolean> {

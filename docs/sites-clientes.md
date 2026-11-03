@@ -82,7 +82,7 @@ Variáveis no administrativo (Vercel):
 
 ```
 RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=Slick <acesso@slick.com.br>   # domínio verificado no Resend
+RESEND_FROM_EMAIL=Slick <acesso@agenciaslick.com.br>   # domínio verificado no Resend
 ```
 
 Sem `RESEND_API_KEY`, em desenvolvimento o código aparece no terminal; em produção o login não funciona.
