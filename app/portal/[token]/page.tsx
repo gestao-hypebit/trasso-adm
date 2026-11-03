@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { FolderOpen, FileText, FileSignature, Layers, ClipboardList, PackageCheck, Megaphone, ChevronRight, Globe } from 'lucide-react'
+import { FolderOpen, FileText, FileSignature, Layers, ClipboardList, PackageCheck, Megaphone, ChevronRight, Globe, PenLine } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getClienteByToken } from '@/lib/portal/auth'
 import { getServicosContratados } from '@/lib/portal/servicos'
@@ -17,6 +17,8 @@ import type { Briefing, OnboardingItem } from '@/lib/projetos/onboarding'
 import { nomePeriodo } from '@/lib/social/tipos'
 import { SiteLeadsLista } from '@/components/sites-clientes/site-leads-lista'
 import { SITE_LEAD_SELECT, type SiteLead } from '@/lib/sites-clientes/leads'
+import { COPY_SECAO_SELECT, type CopySecao } from '@/lib/sites-clientes/copy'
+import { CopySite, type CopySiteData } from '@/components/portal/copy-site'
 
 export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -61,8 +63,19 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
   ])
   // Sites do cliente e os leads deles (aba "Meu site"). Tabela pode não existir
   // ainda (migration de sites dos clientes não rodada): o portal segue sem a aba.
-  const { data: sitesRaw } = await db.from('sites_clientes').select('id, nome, dominio').eq('cliente_id', cliente.id).eq('ativo', true).order('created_at')
-  const sites = (sitesRaw ?? []) as { id: string; nome: string; dominio: string | null }[]
+  const { data: sitesRaw } = await db.from('sites_clientes').select('id, nome, dominio, chave_prefixo').eq('cliente_id', cliente.id).eq('ativo', true).order('created_at')
+  const todosSites = (sitesRaw ?? []) as { id: string; nome: string; dominio: string | null; chave_prefixo: string | null }[]
+  // "Meu site" só depois que o site está ligado ao painel (tem chave); antes disso ele existe só para a copy.
+  const sites = todosSites.filter((s) => s.chave_prefixo)
+  // Copy do site: seções já enviadas ao cliente (rascunho é só da equipe). Tabela pode não existir ainda.
+  const { data: copyRaw } = todosSites.length > 0
+    ? await db.from('site_copy_secoes').select(COPY_SECAO_SELECT).in('site_id', todosSites.map((s) => s.id)).neq('status', 'rascunho').order('ordem')
+    : { data: [] }
+  const copySecoes = (copyRaw ?? []) as CopySecao[]
+  const copySites: CopySiteData[] = todosSites
+    .map((s) => ({ id: s.id, nome: s.nome, secoes: copySecoes.filter((c) => c.site_id === s.id) }))
+    .filter((s) => s.secoes.length > 0)
+  const copyPendentes = copySecoes.filter((c) => c.status === 'aguardando').length
   const { data: siteLeadsRaw } = sites.length > 0
     ? await db.from('site_leads').select(SITE_LEAD_SELECT).in('site_id', sites.map((s) => s.id)).neq('status', 'descartado').order('created_at', { ascending: false }).limit(300)
     : { data: [] }
@@ -83,7 +96,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
   const entregasPendentes = entregas.filter((e) => e.status === 'aguardando').length
   const planos = (planosRaw ?? []) as { token: string; mes: string; data_fim: string | null; status: string; social_posts: { aprovacao: string }[] }[]
   const postsPendentes = planos.reduce((n, p) => n + p.social_posts.filter((x) => x.aprovacao === 'pendente').length, 0)
-  const abaInicial = entregasPendentes > 0 ? 'entregas' : postsPendentes > 0 ? 'social' : onboardingPendente ? 'onboarding' : 'projetos'
+  const abaInicial = entregasPendentes > 0 ? 'entregas' : copyPendentes > 0 ? 'copy' : postsPendentes > 0 ? 'social' : onboardingPendente ? 'onboarding' : 'projetos'
 
   const agenciaNome = config?.nome ?? 'Slick'
   const logoUrl = config?.logo_url ?? null
@@ -119,6 +132,12 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
           <TabsTrigger value="social" className="gap-1.5">
             <Megaphone className="h-4 w-4" /> Social media
             {postsPendentes > 0 && <span className="rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{postsPendentes}</span>}
+          </TabsTrigger>
+        )}
+        {copySites.length > 0 && (
+          <TabsTrigger value="copy" className="gap-1.5">
+            <PenLine className="h-4 w-4" /> Copy do site
+            {copyPendentes > 0 && <span className="rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{copyPendentes}</span>}
           </TabsTrigger>
         )}
         {sites.length > 0 && (
@@ -169,6 +188,10 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
             </Link>
           )
         })}
+      </TabsContent>
+
+      <TabsContent value="copy">
+        <CopySite token={token} sites={copySites} />
       </TabsContent>
 
       <TabsContent value="site" className="space-y-4">

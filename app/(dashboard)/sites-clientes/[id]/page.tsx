@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, KeyRound, Copy, Check, Save, Inbox, Loader2, AlertTriangle, PenLine } from 'lucide-react'
+import { ArrowLeft, KeyRound, Copy, Check, Save, Inbox, Loader2, AlertTriangle, PenLine, FileText } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -130,7 +130,10 @@ export default function SiteClientePage({ params }: { params: Promise<{ id: stri
             <ArrowLeft className="h-4 w-4" /> Sites
           </Link>
           <Badge variant={site.ativo ? 'ativo' : 'inativo'}>{site.ativo ? 'No ar' : 'Desativado'}</Badge>
-          <Button size="sm" variant="violeta" className="ml-auto gap-1.5" asChild>
+          <Button size="sm" variant="outline" className="ml-auto gap-1.5" asChild>
+            <Link href={`/sites-clientes/${site.id}/copy`}><FileText className="h-3.5 w-3.5" /> Copy para aprovação</Link>
+          </Button>
+          <Button size="sm" variant="violeta" className="gap-1.5" asChild>
             <Link href={`/sites-clientes/${site.id}/conteudo`}><PenLine className="h-3.5 w-3.5" /> Editar conteúdo</Link>
           </Button>
           {site.clientes && (

@@ -150,7 +150,7 @@ function NovoSiteDialog({ open, onOpenChange, onCriado }: {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Novo site</DialogTitle>
-          <DialogDescription>Depois de salvar, gere a chave e coloque no projeto do site.</DialogDescription>
+          <DialogDescription>Dá para cadastrar antes de o site existir, para mandar a copy para aprovação. A chave e o domínio vêm depois.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 pt-2">
           <div className="space-y-1.5">
