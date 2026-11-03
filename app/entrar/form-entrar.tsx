@@ -74,6 +74,9 @@ export function FormEntrar() {
       <Button type="submit" className="w-full gap-2" disabled={carregando || codigo.length !== 6}>
         {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Entrar
       </Button>
+      <p className="text-xs text-brand-lavanda/40">
+        Não chegou em alguns minutos? Confira se digitou o e-mail certo ou peça para a equipe da Slick liberar o seu acesso.
+      </p>
       <div className="flex justify-between text-xs">
         <button type="button" onClick={() => { setEtapa('email'); setErro(null) }} className="flex items-center gap-1 text-brand-lavanda/50 hover:text-brand-lavanda">
           <ArrowLeft className="h-3 w-3" /> Outro e-mail

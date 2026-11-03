@@ -6,7 +6,7 @@ import { EditorConteudo } from '@/components/sites-clientes/editor-conteudo'
 
 export default async function ConteudoClientePage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params
-  const auth = await autorizarSite(siteId)
+  const auth = await autorizarSite(siteId, 'cliente')
   if (!auth) notFound()
   const dados = await dadosEditor(siteId)
   return <EditorConteudo siteId={siteId} siteUrl={auth.site.dominio ? urlDoSite(auth.site.dominio) : null} dados={dados} equipe={false} />

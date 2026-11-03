@@ -6,7 +6,7 @@ import { AbasSite } from './abas'
 
 export default async function SiteLayout({ children, params }: { children: React.ReactNode; params: Promise<{ siteId: string }> }) {
   const { siteId } = await params
-  const auth = await autorizarSite(siteId)
+  const auth = await autorizarSite(siteId, 'cliente')
   if (!auth) notFound()
   if (auth.editor.tipo !== 'cliente') redirect(`/sites-clientes/${siteId}/conteudo`)
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
-import { autorizarSite } from '@/lib/sites-clientes/acesso'
+import { autorizarSite, type Papel } from '@/lib/sites-clientes/acesso'
 import { igual, limparConteudo, problemasConteudo, validarEstrutura, type Conteudo, type Estrutura } from '@/lib/sites-clientes/conteudo'
 import { urlDoSite } from '@/lib/sites-clientes/url'
 
@@ -27,8 +27,8 @@ function revalidarTelas(siteId: string) {
   revalidatePath(`/sites-clientes/${siteId}/conteudo`)
 }
 
-export async function salvarRascunho(siteId: string, valores: Conteudo): Promise<Resultado> {
-  const auth = await autorizarSite(siteId)
+export async function salvarRascunho(siteId: string, valores: Conteudo, papel: Papel = 'equipe'): Promise<Resultado> {
+  const auth = await autorizarSite(siteId, papel)
   if (!auth) return { ok: false, erro: SEM_PERMISSAO }
   const estrutura = await estruturaDo(siteId)
   if (!estrutura) return { ok: false, erro: 'O site ainda não enviou a estrutura de conteúdo.' }
@@ -42,8 +42,8 @@ export async function salvarRascunho(siteId: string, valores: Conteudo): Promise
   return { ok: true }
 }
 
-export async function publicar(siteId: string, valores: Conteudo): Promise<Resultado<{ noAr: boolean }>> {
-  const auth = await autorizarSite(siteId)
+export async function publicar(siteId: string, valores: Conteudo, papel: Papel = 'equipe'): Promise<Resultado<{ noAr: boolean }>> {
+  const auth = await autorizarSite(siteId, papel)
   if (!auth) return { ok: false, erro: SEM_PERMISSAO }
   const estrutura = await estruturaDo(siteId)
   if (!estrutura) return { ok: false, erro: 'O site ainda não enviou a estrutura de conteúdo.' }
@@ -84,8 +84,8 @@ async function avisarSite(dominio: string | null, chaveHash: string | null) {
   }
 }
 
-export async function descartarRascunho(siteId: string): Promise<Resultado<{ conteudo: Conteudo }>> {
-  const auth = await autorizarSite(siteId)
+export async function descartarRascunho(siteId: string, papel: Papel = 'equipe'): Promise<Resultado<{ conteudo: Conteudo }>> {
+  const auth = await autorizarSite(siteId, papel)
   if (!auth) return { ok: false, erro: SEM_PERMISSAO }
   const supabase = db()
   const { data } = await supabase.from('site_conteudos').select('publicado').eq('site_id', siteId).maybeSingle()
@@ -96,8 +96,8 @@ export async function descartarRascunho(siteId: string): Promise<Resultado<{ con
   return { ok: true, conteudo }
 }
 
-export async function restaurarVersao(siteId: string, versaoId: string): Promise<Resultado<{ conteudo: Conteudo }>> {
-  const auth = await autorizarSite(siteId)
+export async function restaurarVersao(siteId: string, versaoId: string, papel: Papel = 'equipe'): Promise<Resultado<{ conteudo: Conteudo }>> {
+  const auth = await autorizarSite(siteId, papel)
   if (!auth) return { ok: false, erro: SEM_PERMISSAO }
   const supabase = db()
   const [{ data: versao }, estrutura] = await Promise.all([
@@ -113,8 +113,8 @@ export async function restaurarVersao(siteId: string, versaoId: string): Promise
 }
 
 // URL assinada para o navegador enviar a imagem direto ao Storage.
-export async function prepararUpload(siteId: string, tipo: string, tamanho: number): Promise<Resultado<{ path: string; token: string; url: string }>> {
-  const auth = await autorizarSite(siteId)
+export async function prepararUpload(siteId: string, tipo: string, tamanho: number, papel: Papel = 'equipe'): Promise<Resultado<{ path: string; token: string; url: string }>> {
+  const auth = await autorizarSite(siteId, papel)
   if (!auth) return { ok: false, erro: SEM_PERMISSAO }
   const ext = TIPOS_IMAGEM[tipo]
   if (!ext) return { ok: false, erro: 'Envie uma imagem JPG, PNG, WEBP ou AVIF.' }
@@ -130,8 +130,8 @@ export async function prepararUpload(siteId: string, tipo: string, tamanho: numb
 
 // Busca a estrutura (seções e campos) no próprio site e guarda.
 export async function sincronizarEstrutura(siteId: string): Promise<Resultado<{ secoes: number }>> {
-  const auth = await autorizarSite(siteId)
-  if (!auth) return { ok: false, erro: SEM_PERMISSAO }
+  const auth = await autorizarSite(siteId, 'equipe')
+  if (!auth || auth.editor.tipo !== 'equipe') return { ok: false, erro: SEM_PERMISSAO }
   if (!auth.site.dominio) return { ok: false, erro: 'Cadastre o domínio do site primeiro.' }
 
   let estrutura: Estrutura

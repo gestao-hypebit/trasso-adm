@@ -16,6 +16,7 @@ import {
 } from '@/lib/sites-clientes/conteudo'
 import { descartarRascunho, prepararUpload, publicar, restaurarVersao, salvarRascunho, sincronizarEstrutura } from '@/lib/sites-clientes/editor-actions'
 import type { DadosEditor } from '@/lib/sites-clientes/editor-dados'
+import type { Papel } from '@/lib/sites-clientes/acesso'
 
 type Status = { tipo: 'ok' | 'erro' | 'info'; texto: string } | null
 
@@ -36,6 +37,7 @@ export function EditorConteudo({ siteId, siteUrl, dados, equipe }: {
   const [sincronizando, setSincronizando] = useState(false)
   const [status, setStatus] = useState<Status>(null)
   const [historico, setHistorico] = useState(false)
+  const papel = equipe ? 'equipe' : 'cliente'
 
   const limpo = useMemo(() => (estrutura ? limparConteudo(estrutura, conteudo) : {}), [estrutura, conteudo])
   const limpoPublicado = useMemo(() => (estrutura ? limparConteudo(estrutura, publicado ?? {}) : {}), [estrutura, publicado])
@@ -45,11 +47,11 @@ export function EditorConteudo({ siteId, siteUrl, dados, equipe }: {
   // Salva o rascunho sozinho 1,5 s depois da última mudança.
   const salvar = useCallback(async (valores: Conteudo) => {
     setSalvando(true)
-    const r = await salvarRascunho(siteId, valores)
+    const r = await salvarRascunho(siteId, valores, papel)
     setSalvando(false)
     if (r.ok) setSalvo(valores)
     else setStatus({ tipo: 'erro', texto: r.erro })
-  }, [siteId])
+  }, [siteId, papel])
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -86,7 +88,7 @@ export function EditorConteudo({ siteId, siteUrl, dados, equipe }: {
     if (problemas.length > 0) return setStatus({ tipo: 'erro', texto: problemas.join(' ') })
     if (timer.current) clearTimeout(timer.current)
     setPublicando(true)
-    const r = await publicar(siteId, conteudo)
+    const r = await publicar(siteId, conteudo, papel)
     setPublicando(false)
     if (!r.ok) return setStatus({ tipo: 'erro', texto: r.erro })
     setSalvo(conteudo)
@@ -99,7 +101,7 @@ export function EditorConteudo({ siteId, siteUrl, dados, equipe }: {
 
   async function descartar() {
     if (!window.confirm('Descartar todas as mudanças que ainda não foram publicadas?')) return
-    const r = await descartarRascunho(siteId)
+    const r = await descartarRascunho(siteId, papel)
     if (!r.ok) return setStatus({ tipo: 'erro', texto: r.erro })
     setConteudo(r.conteudo)
     setSalvo(r.conteudo)
@@ -108,7 +110,7 @@ export function EditorConteudo({ siteId, siteUrl, dados, equipe }: {
 
   async function restaurar(versaoId: string) {
     if (!window.confirm('Carregar esta versão no editor? Ela só vai para o site quando você publicar.')) return
-    const r = await restaurarVersao(siteId, versaoId)
+    const r = await restaurarVersao(siteId, versaoId, papel)
     if (!r.ok) return setStatus({ tipo: 'erro', texto: r.erro })
     setConteudo(r.conteudo)
     setSalvo(r.conteudo)
@@ -248,6 +250,7 @@ export function EditorConteudo({ siteId, siteUrl, dados, equipe }: {
               <CampoEditor
                 key={`${secao.id}.${campo.id}`}
                 siteId={siteId}
+                papel={papel}
                 siteUrl={siteUrl}
                 campo={campo}
                 valor={valorAtual(conteudo, secao, campo)}
@@ -275,8 +278,9 @@ function StatusLinha({ status, className }: { status: NonNullable<Status>; class
   )
 }
 
-function CampoEditor({ siteId, siteUrl, campo, valor, alterado, onChange, onPadrao }: {
+function CampoEditor({ siteId, papel, siteUrl, campo, valor, alterado, onChange, onPadrao }: {
   siteId: string
+  papel: Papel
   siteUrl: string | null
   campo: Campo
   valor: ValorCampo
@@ -296,21 +300,22 @@ function CampoEditor({ siteId, siteUrl, campo, valor, alterado, onChange, onPadr
       </div>
       {campo.ajuda && <p className="text-xs text-brand-lavanda/40">{campo.ajuda}</p>}
       {campo.tipo === 'lista'
-        ? <ListaEditor siteId={siteId} siteUrl={siteUrl} campo={campo} itens={valor as ItemLista[]} onChange={onChange} />
-        : <ValorSimples siteId={siteId} siteUrl={siteUrl} campo={campo} valor={valor as string} onChange={onChange} />}
+        ? <ListaEditor siteId={siteId} papel={papel} siteUrl={siteUrl} campo={campo} itens={valor as ItemLista[]} onChange={onChange} />
+        : <ValorSimples siteId={siteId} papel={papel} siteUrl={siteUrl} campo={campo} valor={valor as string} onChange={onChange} />}
     </div>
   )
 }
 
-function ValorSimples({ siteId, siteUrl, campo, valor, onChange }: {
+function ValorSimples({ siteId, papel, siteUrl, campo, valor, onChange }: {
   siteId: string
+  papel: Papel
   siteUrl: string | null
   campo: Subcampo | (Campo & { tipo: Subcampo['tipo'] })
   valor: string
   onChange: (v: string) => void
 }) {
   const max = limiteCampo(campo)
-  if (campo.tipo === 'imagem') return <ImagemEditor siteId={siteId} siteUrl={siteUrl} valor={valor} onChange={onChange} />
+  if (campo.tipo === 'imagem') return <ImagemEditor siteId={siteId} papel={papel} siteUrl={siteUrl} valor={valor} onChange={onChange} />
   if (campo.tipo === 'textarea') {
     return (
       <div>
@@ -332,7 +337,7 @@ function Contador({ n, max }: { n: number; max: number }) {
   return <p className={cn('mt-1 text-right text-[11px]', n >= max ? 'text-brand-rosa' : 'text-brand-lavanda/35')}>{n}/{max}</p>
 }
 
-function ImagemEditor({ siteId, siteUrl, valor, onChange }: { siteId: string; siteUrl: string | null; valor: string; onChange: (v: string) => void }) {
+function ImagemEditor({ siteId, papel, siteUrl, valor, onChange }: { siteId: string; papel: Papel; siteUrl: string | null; valor: string; onChange: (v: string) => void }) {
   const input = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -343,7 +348,7 @@ function ImagemEditor({ siteId, siteUrl, valor, onChange }: { siteId: string; si
     setErro(null)
     setEnviando(true)
     try {
-      const r = await prepararUpload(siteId, arquivo.type, arquivo.size)
+      const r = await prepararUpload(siteId, arquivo.type, arquivo.size, papel)
       if (!r.ok) return setErro(r.erro)
       const { error } = await createClient().storage.from('sites-conteudo').uploadToSignedUrl(r.path, r.token, arquivo, { contentType: arquivo.type })
       if (error) return setErro('Não foi possível enviar a imagem. Tente de novo.')
@@ -376,8 +381,9 @@ function ImagemEditor({ siteId, siteUrl, valor, onChange }: { siteId: string; si
   )
 }
 
-function ListaEditor({ siteId, siteUrl, campo, itens, onChange }: {
+function ListaEditor({ siteId, papel, siteUrl, campo, itens, onChange }: {
   siteId: string
+  papel: Papel
   siteUrl: string | null
   campo: CampoLista
   itens: ItemLista[]
@@ -436,7 +442,7 @@ function ListaEditor({ siteId, siteUrl, campo, itens, onChange }: {
                   <div key={sub.id} className="space-y-1.5">
                     <Label className="text-xs text-brand-lavanda/70">{sub.rotulo}</Label>
                     {sub.ajuda && <p className="text-[11px] text-brand-lavanda/40">{sub.ajuda}</p>}
-                    <ValorSimples siteId={siteId} siteUrl={siteUrl} campo={sub} valor={item[sub.id] ?? ''}
+                    <ValorSimples siteId={siteId} papel={papel} siteUrl={siteUrl} campo={sub} valor={item[sub.id] ?? ''}
                       onChange={(v) => onChange(itens.map((x, k) => (k === i ? { ...x, [sub.id]: v } : x)))} />
                   </div>
                 ))}

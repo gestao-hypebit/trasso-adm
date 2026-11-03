@@ -6,7 +6,7 @@ import { LeadsCliente } from './leads-cliente'
 
 export default async function LeadsClientePage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params
-  const auth = await autorizarSite(siteId)
+  const auth = await autorizarSite(siteId, 'cliente')
   if (!auth) notFound()
 
   const { data } = await (createServiceClient() as any)
