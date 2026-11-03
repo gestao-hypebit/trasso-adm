@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, KeyRound, Copy, Check, Save, Inbox, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, KeyRound, Copy, Check, Save, Inbox, Loader2, AlertTriangle, PenLine } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,12 +14,13 @@ import { Carregando } from '@/components/ui/carregando'
 import { EstadoVazio } from '@/components/ui/estado-vazio'
 import { useAviso } from '@/components/ui/toaster'
 import { SiteLeadsLista } from '@/components/sites-clientes/site-leads-lista'
+import { AcessosCliente } from '@/components/sites-clientes/acessos-cliente'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
 import { gerarChave, hashChave, prefixoVisivel } from '@/lib/sites-clientes/chave'
 import { SITE_LEAD_SELECT, SITE_SELECT, type SiteCliente, type SiteLead, type SiteLeadStatus } from '@/lib/sites-clientes/leads'
 
-type Site = SiteCliente & { clientes: { id: string; nome: string; empresa: string | null } | null }
+type Site = SiteCliente & { clientes: { id: string; nome: string; empresa: string | null; email: string | null } | null }
 
 export default function SiteClientePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -37,7 +38,7 @@ export default function SiteClientePage({ params }: { params: Promise<{ id: stri
     async function load() {
       const db = createClient() as any
       const [{ data: s }, { data: l }] = await Promise.all([
-        db.from('sites_clientes').select(`${SITE_SELECT}, clientes(id, nome, empresa)`).eq('id', id).maybeSingle(),
+        db.from('sites_clientes').select(`${SITE_SELECT}, clientes(id, nome, empresa, email)`).eq('id', id).maybeSingle(),
         db.from('site_leads').select(SITE_LEAD_SELECT).eq('site_id', id).order('created_at', { ascending: false }).limit(500),
       ])
       if (s) {
@@ -129,6 +130,9 @@ export default function SiteClientePage({ params }: { params: Promise<{ id: stri
             <ArrowLeft className="h-4 w-4" /> Sites
           </Link>
           <Badge variant={site.ativo ? 'ativo' : 'inativo'}>{site.ativo ? 'No ar' : 'Desativado'}</Badge>
+          <Button size="sm" variant="violeta" className="ml-auto gap-1.5" asChild>
+            <Link href={`/sites-clientes/${site.id}/conteudo`}><PenLine className="h-3.5 w-3.5" /> Editar conteúdo</Link>
+          </Button>
           {site.clientes && (
             <Link href={`/clientes/${site.clientes.id}`} className="text-xs text-brand-lavanda/50 underline-offset-4 hover:text-brand-lavanda hover:underline">
               Ver cliente
@@ -190,6 +194,8 @@ export default function SiteClientePage({ params }: { params: Promise<{ id: stri
                 </div>
               </CardContent>
             </Card>
+
+            <AcessosCliente clienteId={site.cliente_id} emailSugerido={site.clientes?.email ?? null} />
 
             {/* Dados */}
             <Card>

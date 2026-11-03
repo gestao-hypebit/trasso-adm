@@ -182,7 +182,12 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
                   <a href={`https://${site.dominio}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-brand-lavanda/50 hover:text-brand-lavanda">{site.dominio}</a>
                 )}
               </div>
-              <p className="mb-3 text-sm text-brand-lavanda/50">Contatos que chegaram pelo formulário do seu site. Clique em um para ver as respostas.</p>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-brand-lavanda/50">Contatos que chegaram pelo formulário do seu site. Clique em um para ver as respostas.</p>
+                <Link href="/entrar" className="rounded-lg bg-brand-lima px-3.5 py-2 text-xs font-semibold text-brand-noite hover:bg-brand-limaClaro">
+                  Editar meu site
+                </Link>
+              </div>
               {doSite.length === 0
                 ? <EmptyState texto="Nenhum contato pelo site ainda." />
                 : <SiteLeadsLista leads={doSite} />}
