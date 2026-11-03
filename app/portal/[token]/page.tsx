@@ -19,6 +19,7 @@ import { SiteLeadsLista } from '@/components/sites-clientes/site-leads-lista'
 import { SITE_LEAD_SELECT, type SiteLead } from '@/lib/sites-clientes/leads'
 import { COPY_SECAO_SELECT, type CopySecao } from '@/lib/sites-clientes/copy'
 import { CopySite, type CopySiteData } from '@/components/portal/copy-site'
+import { aprovarCopyRestante, responderCopy } from './actions'
 
 export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -191,7 +192,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
       </TabsContent>
 
       <TabsContent value="copy">
-        <CopySite token={token} sites={copySites} />
+        <CopySite sites={copySites} acoes={{ responder: responderCopy.bind(null, token), aprovarRestante: aprovarCopyRestante.bind(null, token) }} />
       </TabsContent>
 
       <TabsContent value="site" className="space-y-4">

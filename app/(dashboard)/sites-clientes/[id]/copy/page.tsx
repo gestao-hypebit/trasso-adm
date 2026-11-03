@@ -3,7 +3,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Check, ClipboardCopy, Copy, Eye, History, Loader2, Lock, MessageSquare, Plus, RotateCcw, Send, Sparkles, Trash2, X,
+  ArrowDown, ArrowLeft, ArrowUp, Check, ClipboardCopy, Copy, Eye, History, Loader2, Lock, MessageSquare, Plus, RefreshCw, RotateCcw, Send, Sparkles, Trash2, X,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -26,7 +26,7 @@ type Site = {
   nome: string
   copy_rodada: number
   copy_enviada_em: string | null
-  clientes: { nome: string; portal_token: string; portal_ativo: boolean } | null
+  copy_token: string
 }
 
 const db = () => createClient() as any
@@ -47,11 +47,11 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
   useEffect(() => {
     async function load() {
       const [{ data: s, error }, { data: sec }, { data: ev }] = await Promise.all([
-        db().from('sites_clientes').select('id, nome, copy_rodada, copy_enviada_em, clientes(nome, portal_token, portal_ativo)').eq('id', id).maybeSingle(),
+        db().from('sites_clientes').select('id, nome, copy_rodada, copy_enviada_em, copy_token').eq('id', id).maybeSingle(),
         db().from('site_copy_secoes').select(COPY_SECAO_SELECT).eq('site_id', id).order('ordem'),
         db().from('site_copy_eventos').select('id, secao_id, rodada, tipo, comentario, autor, created_at').eq('site_id', id).order('created_at', { ascending: false }).limit(200),
       ])
-      if (error) setErro('Não foi possível carregar. A migration 20261112000000_site_copy.sql já foi aplicada no Supabase?')
+      if (error) setErro('Não foi possível carregar. As migrations 20261112000000_site_copy.sql e 20261113000000_copy_link.sql já foram aplicadas no Supabase?')
       setSite(s)
       setSecoes((sec as CopySecao[]) ?? [])
       setEventos((ev as CopyEvento[]) ?? [])
@@ -156,13 +156,24 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
     setSite({ ...site, copy_rodada: rodada, copy_enviada_em: agora })
     setSecoes((ss) => ss.map((s) => (ids.includes(s.id) ? { ...s, status: 'aguardando', rodada, comentario_cliente: null, respondido_em: null, respondido_nome: null } : s)))
     setEnviando(false)
-    setAviso(`Rodada ${rodada} enviada. Mande o link do portal para o cliente; você recebe um aviso no sino quando ele responder.`)
+    setAviso(`Rodada ${rodada} enviada. Mande o link da copy para o cliente (é o mesmo link em todas as rodadas); você recebe um aviso no sino quando ele terminar de revisar.`)
   }
 
   async function copiarLink() {
-    if (!site?.clientes) return
-    await navigator.clipboard.writeText(`${window.location.origin}/portal/${site.clientes.portal_token}`)
-    setAviso('Link do portal copiado. A copy fica na aba "Copy do site".')
+    if (!site) return
+    await navigator.clipboard.writeText(`${window.location.origin}/copy/${site.copy_token}`)
+    setAviso('Link da copy copiado. Nele o cliente vê só a copy e aprova, sem o resto do portal.')
+  }
+
+  async function novoLink() {
+    if (!site) return
+    if (!window.confirm('Gerar um link novo? O link antigo para de funcionar na hora.')) return
+    const copy_token = crypto.randomUUID()
+    const { error } = await db().from('sites_clientes').update({ copy_token }).eq('id', id)
+    if (error) return setErro('Não foi possível gerar o link.')
+    setSite({ ...site, copy_token })
+    await navigator.clipboard.writeText(`${window.location.origin}/copy/${copy_token}`)
+    setAviso('Link novo gerado e copiado. O antigo já não funciona.')
   }
 
   async function copiarTexto() {
@@ -207,8 +218,11 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
                 <Eye className="h-3.5 w-3.5" /> {previa ? 'Editar' : 'Ver como o cliente'}
               </Button>
               {secoes.length > 0 && <Button size="sm" variant="ghost" className="gap-1.5" onClick={copiarTexto}><ClipboardCopy className="h-3.5 w-3.5" /> Copiar texto</Button>}
-              {site.clientes?.portal_ativo && site.copy_rodada > 0 && (
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={copiarLink}><Copy className="h-3.5 w-3.5" /> Link do portal</Button>
+              {site.copy_rodada > 0 && (
+                <>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={copiarLink}><Copy className="h-3.5 w-3.5" /> Copiar link da copy</Button>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-brand-lavanda/50" onClick={novoLink} title="Gera um link novo e desliga o antigo"><RefreshCw className="h-3.5 w-3.5" /> Novo link</Button>
+                </>
               )}
               <Button size="sm" className="gap-1.5" onClick={enviar} disabled={enviando || r.paraEnviar === 0}>
                 {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -218,9 +232,6 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
           </CardContent>
         </Card>
 
-        {site.clientes && !site.clientes.portal_ativo && (
-          <p className="rounded-lg bg-yellow-500/10 px-3 py-2 text-sm text-yellow-400">O portal deste cliente está desativado: reative na ficha do cliente para ele conseguir ver a copy.</p>
-        )}
         {erro && <p className="flex items-center justify-between rounded-lg bg-brand-rosa/10 px-3 py-2 text-sm text-brand-rosa">{erro}<button onClick={() => setErro(null)}><X className="h-4 w-4" /></button></p>}
         {aviso && <p className="rounded-lg bg-brand-lima/10 px-3 py-2 text-sm text-brand-lima">{aviso}</p>}
 

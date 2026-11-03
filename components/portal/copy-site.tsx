@@ -6,15 +6,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TextoCopy } from '@/components/sites-clientes/texto-copy'
-import { aprovarCopyRestante, responderCopy } from '@/app/portal/[token]/actions'
 import { cn } from '@/lib/utils'
 import { resumoCopy, type CopySecao } from '@/lib/sites-clientes/copy'
 
 export type CopySiteData = { id: string; nome: string; secoes: CopySecao[] }
 
+type Resultado = { success: true } | { success: false; error: string }
+// Ações já ligadas ao link (portal ou link só da copy), passadas pela página.
+export type AcoesCopy = {
+  responder: (secaoId: string, resposta: { aprovar: boolean; nome: string; comentario: string }) => Promise<Resultado>
+  aprovarRestante: (siteId: string, nome: string) => Promise<Resultado>
+}
+
 const CHAVE_NOME = 'slick-portal-nome'
 
-export function CopySite({ token, sites }: { token: string; sites: CopySiteData[] }) {
+export function CopySite({ acoes, sites }: { acoes: AcoesCopy; sites: CopySiteData[] }) {
   const [nome, setNome] = useState('')
 
   useEffect(() => {
@@ -38,12 +44,12 @@ export function CopySite({ token, sites }: { token: string; sites: CopySiteData[
           <Input id="copy-nome" value={nome} onChange={(e) => guardarNome(e.target.value)} placeholder="Nome completo" autoComplete="name" />
         </div>
       </div>
-      {sites.map((site) => <CopyDoSite key={site.id} token={token} site={site} nome={nome} varios={sites.length > 1} />)}
+      {sites.map((site) => <CopyDoSite key={site.id} acoes={acoes} site={site} nome={nome} varios={sites.length > 1} />)}
     </div>
   )
 }
 
-function CopyDoSite({ token, site, nome, varios }: { token: string; site: CopySiteData; nome: string; varios: boolean }) {
+function CopyDoSite({ acoes, site, nome, varios }: { acoes: AcoesCopy; site: CopySiteData; nome: string; varios: boolean }) {
   const [secoes, setSecoes] = useState(site.secoes)
   const [aprovandoTudo, setAprovandoTudo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -58,7 +64,7 @@ function CopyDoSite({ token, site, nome, varios }: { token: string; site: CopySi
     if (!window.confirm(`Aprovar as ${r.aguardando} seções que faltam?`)) return
     setAprovandoTudo(true)
     setErro(null)
-    const res = await aprovarCopyRestante(token, site.id, nome)
+    const res = await acoes.aprovarRestante(site.id, nome)
     setAprovandoTudo(false)
     if (!res.success) return setErro(res.error)
     const agora = new Date().toISOString()
@@ -86,14 +92,14 @@ function CopyDoSite({ token, site, nome, varios }: { token: string; site: CopySi
         <p className="rounded-lg bg-brand-lima/10 px-4 py-3 text-sm text-brand-lima">Tudo aprovado! Obrigado. Agora a gente parte para o desenvolvimento do site.</p>
       )}
       {secoes.filter((s) => s.status !== 'rascunho').map((s, i) => (
-        <SecaoCliente key={s.id} token={token} secao={s} numero={i + 1} nome={nome} onAtualizar={(p) => atualizar(s.id, p)} />
+        <SecaoCliente key={s.id} acoes={acoes} secao={s} numero={i + 1} nome={nome} onAtualizar={(p) => atualizar(s.id, p)} />
       ))}
     </div>
   )
 }
 
-function SecaoCliente({ token, secao: s, numero, nome, onAtualizar }: {
-  token: string
+function SecaoCliente({ acoes, secao: s, numero, nome, onAtualizar }: {
+  acoes: AcoesCopy
   secao: CopySecao
   numero: number
   nome: string
@@ -109,7 +115,7 @@ function SecaoCliente({ token, secao: s, numero, nome, onAtualizar }: {
     if (!aprovar && !comentario.trim()) return setErro('Conte o que precisa mudar.')
     setEnviando(true)
     setErro(null)
-    const r = await responderCopy(token, s.id, { aprovar, nome, comentario })
+    const r = await acoes.responder(s.id, { aprovar, nome, comentario })
     setEnviando(false)
     if (!r.success) return setErro(r.error)
     onAtualizar({

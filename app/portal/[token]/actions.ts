@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getClienteByToken } from '@/lib/portal/auth'
 import { createServiceClient } from '@/lib/supabase/service'
 import { TITULO_ITEM_BRIEFING } from '@/lib/projetos/onboarding'
+import { aprovarRestanteCopy, responderSecaoCopy, type RespostaCopy } from '@/lib/sites-clientes/copy-respostas'
 
 export type PortalActionResult = { success: true } | { success: false; error: string }
 
@@ -333,108 +334,26 @@ export async function responderAvaliacao(
 // Copy do site (aprovação por seção)
 // ------------------------------------------------------------------
 
-async function siteDoCliente(supabase: any, siteId: string, clienteId: string) {
-  const { data } = await supabase.from('sites_clientes').select('id, nome, cliente_id').eq('id', siteId).maybeSingle()
-  return data && data.cliente_id === clienteId ? (data as { id: string; nome: string }) : null
+async function siteDoCliente(token: string, siteId: string) {
+  const cliente = await clienteFromToken(token)
+  if (!cliente) return null
+  const { data } = await (createServiceClient() as any).from('sites_clientes').select('id, nome, cliente_id').eq('id', siteId).maybeSingle()
+  return data && data.cliente_id === cliente.id ? { id: data.id as string, nome: data.nome as string } : null
 }
 
-// Depois de cada resposta: se não sobrou nada "aguardando", avisa a equipe com o resumo.
-async function avisarSeCopyRevisada(supabase: any, site: { id: string; nome: string }, nome: string) {
-  const { data } = await supabase.from('site_copy_secoes').select('status').eq('site_id', site.id)
-  const lista = (data ?? []) as { status: string }[]
-  if (lista.some((s) => s.status === 'aguardando')) return
-  const aprovadas = lista.filter((s) => s.status === 'aprovada').length
-  const ajustes = lista.filter((s) => s.status === 'ajustes').length
-  await notificar(
-    supabase,
-    ajustes ? 'Copy revisada: tem ajustes ✍️' : 'Copy aprovada ✅',
-    `${nome} revisou a copy de "${site.nome}": ${aprovadas} aprovada${aprovadas === 1 ? '' : 's'}${ajustes ? `, ${ajustes} com ajuste` : ''}.`,
-    `/sites-clientes/${site.id}/copy`,
-    ajustes ? 'alerta' : 'sucesso',
-  )
+export async function responderCopy(token: string, secaoId: string, resposta: RespostaCopy): Promise<PortalActionResult> {
+  const { data: secao } = await (createServiceClient() as any).from('site_copy_secoes').select('site_id').eq('id', secaoId).maybeSingle()
+  const site = secao ? await siteDoCliente(token, secao.site_id) : null
+  if (!site) return { success: false, error: ERRO_LINK }
+  const r = await responderSecaoCopy(site, secaoId, resposta)
+  if (r.success) revalidatePath(`/portal/${token}`)
+  return r
 }
 
-export async function responderCopy(
-  token: string,
-  secaoId: string,
-  resposta: { aprovar: boolean; nome: string; comentario: string },
-): Promise<PortalActionResult> {
-  try {
-    const nome = resposta.nome.trim().slice(0, 200)
-    const comentario = resposta.comentario.trim().slice(0, 5000)
-    if (nome.length < 3) return { success: false, error: 'Informe seu nome.' }
-    if (!resposta.aprovar && !comentario) return { success: false, error: 'Conte o que precisa mudar.' }
-
-    const cliente = await clienteFromToken(token)
-    if (!cliente) return { success: false, error: ERRO_LINK }
-
-    const supabase = createServiceClient() as any
-    const { data: secao } = await supabase.from('site_copy_secoes').select('id, site_id, titulo, status, rodada').eq('id', secaoId).maybeSingle()
-    if (!secao) return { success: false, error: ERRO_LINK }
-    const site = await siteDoCliente(supabase, secao.site_id, cliente.id)
-    if (!site) return { success: false, error: ERRO_LINK }
-    if (secao.status !== 'aguardando') return { success: false, error: 'Esta seção já foi respondida.' }
-
-    const agora = new Date().toISOString()
-    const { data: atualizada, error } = await supabase
-      .from('site_copy_secoes')
-      .update({
-        status: resposta.aprovar ? 'aprovada' : 'ajustes',
-        comentario_cliente: resposta.aprovar ? null : comentario,
-        respondido_em: agora,
-        respondido_nome: nome,
-        updated_at: agora,
-      })
-      .eq('id', secaoId)
-      .eq('status', 'aguardando')
-      .select('id')
-    if (error) throw error
-    if (!atualizada?.length) return { success: false, error: 'Esta seção já foi respondida.' }
-
-    await supabase.from('site_copy_eventos').insert({
-      site_id: site.id, secao_id: secaoId, rodada: secao.rodada,
-      tipo: resposta.aprovar ? 'aprovada' : 'ajustes',
-      comentario: comentario || null, autor: nome,
-    })
-    await avisarSeCopyRevisada(supabase, site, nome)
-
-    revalidatePath(`/portal/${token}`)
-    return { success: true }
-  } catch (e) {
-    console.error('[portal] responderCopy', e)
-    return { success: false, error: ERRO_GENERICO }
-  }
-}
-
-export async function aprovarCopyRestante(token: string, siteId: string, nomeBruto: string): Promise<PortalActionResult> {
-  try {
-    const nome = nomeBruto.trim().slice(0, 200)
-    if (nome.length < 3) return { success: false, error: 'Informe seu nome.' }
-    const cliente = await clienteFromToken(token)
-    if (!cliente) return { success: false, error: ERRO_LINK }
-
-    const supabase = createServiceClient() as any
-    const site = await siteDoCliente(supabase, siteId, cliente.id)
-    if (!site) return { success: false, error: ERRO_LINK }
-
-    const agora = new Date().toISOString()
-    const { data: aprovadas, error } = await supabase
-      .from('site_copy_secoes')
-      .update({ status: 'aprovada', comentario_cliente: null, respondido_em: agora, respondido_nome: nome, updated_at: agora })
-      .eq('site_id', siteId)
-      .eq('status', 'aguardando')
-      .select('id, rodada')
-    if (error) throw error
-    if (aprovadas?.length) {
-      await supabase.from('site_copy_eventos').insert(
-        aprovadas.map((s: { id: string; rodada: number }) => ({ site_id: siteId, secao_id: s.id, rodada: s.rodada, tipo: 'aprovada', autor: nome })),
-      )
-      await avisarSeCopyRevisada(supabase, site, nome)
-    }
-    revalidatePath(`/portal/${token}`)
-    return { success: true }
-  } catch (e) {
-    console.error('[portal] aprovarCopyRestante', e)
-    return { success: false, error: ERRO_GENERICO }
-  }
+export async function aprovarCopyRestante(token: string, siteId: string, nome: string): Promise<PortalActionResult> {
+  const site = await siteDoCliente(token, siteId)
+  if (!site) return { success: false, error: ERRO_LINK }
+  const r = await aprovarRestanteCopy(site, nome)
+  if (r.success) revalidatePath(`/portal/${token}`)
+  return r
 }
