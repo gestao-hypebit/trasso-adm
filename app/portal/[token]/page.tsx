@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { FolderOpen, FileText, FileSignature, Layers, ClipboardList, PackageCheck, Megaphone, ChevronRight } from 'lucide-react'
+import { FolderOpen, FileText, FileSignature, Layers, ClipboardList, PackageCheck, Megaphone, ChevronRight, Globe } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getClienteByToken } from '@/lib/portal/auth'
 import { getServicosContratados } from '@/lib/portal/servicos'
@@ -15,6 +15,8 @@ import { AvaliacaoCard } from '@/components/portal/avaliacao-card'
 import { ENTREGA_SELECT, type Entrega } from '@/lib/projetos/entregas'
 import type { Briefing, OnboardingItem } from '@/lib/projetos/onboarding'
 import { nomePeriodo } from '@/lib/social/tipos'
+import { SiteLeadsLista } from '@/components/sites-clientes/site-leads-lista'
+import { SITE_LEAD_SELECT, type SiteLead } from '@/lib/sites-clientes/leads'
 
 export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -57,6 +59,16 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
     // Tabela pode não existir ainda (migration de social media não rodada): o portal segue sem a aba.
     db.from('social_planejamentos').select('token, mes, data_fim, status, social_posts(aprovacao)').eq('cliente_id', cliente.id).eq('link_ativo', true).neq('status', 'rascunho').order('mes', { ascending: false }),
   ])
+  // Sites do cliente e os leads deles (aba "Meu site"). Tabela pode não existir
+  // ainda (migration de sites dos clientes não rodada): o portal segue sem a aba.
+  const { data: sitesRaw } = await db.from('sites_clientes').select('id, nome, dominio').eq('cliente_id', cliente.id).eq('ativo', true).order('created_at')
+  const sites = (sitesRaw ?? []) as { id: string; nome: string; dominio: string | null }[]
+  const { data: siteLeadsRaw } = sites.length > 0
+    ? await db.from('site_leads').select(SITE_LEAD_SELECT).in('site_id', sites.map((s) => s.id)).neq('status', 'descartado').order('created_at', { ascending: false }).limit(300)
+    : { data: [] }
+  const siteLeads = (siteLeadsRaw ?? []) as SiteLead[]
+  const siteLeadsNovos = siteLeads.filter((l) => l.status === 'novo').length
+
   const itens = (itensRaw ?? []) as OnboardingItem[]
   const briefings = (briefingsRaw ?? []) as Briefing[]
   const entregas = (entregasRaw ?? []) as Entrega[]
@@ -109,6 +121,12 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
             {postsPendentes > 0 && <span className="rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{postsPendentes}</span>}
           </TabsTrigger>
         )}
+        {sites.length > 0 && (
+          <TabsTrigger value="site" className="gap-1.5">
+            <Globe className="h-4 w-4" /> Meu site
+            {siteLeadsNovos > 0 && <span className="rounded-full bg-brand-lima px-1.5 text-[10px] font-bold leading-4 text-brand-noite">{siteLeadsNovos}</span>}
+          </TabsTrigger>
+        )}
         <TabsTrigger value="propostas" className="gap-1.5"><FileText className="h-4 w-4" /> Propostas</TabsTrigger>
         <TabsTrigger value="contratos" className="gap-1.5"><FileSignature className="h-4 w-4" /> Contratos</TabsTrigger>
         <TabsTrigger value="servicos" className="gap-1.5"><Layers className="h-4 w-4" /> Serviços</TabsTrigger>
@@ -149,6 +167,26 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
               </div>
               <ChevronRight className="h-5 w-5 text-brand-lavanda/30" />
             </Link>
+          )
+        })}
+      </TabsContent>
+
+      <TabsContent value="site" className="space-y-4">
+        {sites.map((site) => {
+          const doSite = siteLeads.filter((l) => l.site_id === site.id)
+          return (
+            <div key={site.id} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-5">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-semibold text-brand-lavanda">{site.nome}</p>
+                {site.dominio && (
+                  <a href={`https://${site.dominio}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-brand-lavanda/50 hover:text-brand-lavanda">{site.dominio}</a>
+                )}
+              </div>
+              <p className="mb-3 text-sm text-brand-lavanda/50">Contatos que chegaram pelo formulário do seu site. Clique em um para ver as respostas.</p>
+              {doSite.length === 0
+                ? <EmptyState texto="Nenhum contato pelo site ainda." />
+                : <SiteLeadsLista leads={doSite} />}
+            </div>
           )
         })}
       </TabsContent>

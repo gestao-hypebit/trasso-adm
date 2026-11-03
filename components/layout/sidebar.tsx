@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, DollarSign, FileText,
   Settings, LogOut,
-  StickyNote, Inbox, Target, ChevronDown, CalendarDays, CalendarCheck, X, Megaphone,
+  StickyNote, Inbox, Target, ChevronDown, CalendarDays, CalendarCheck, X, Megaphone, Globe,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -47,6 +47,7 @@ const grupos: { titulo?: string; itens: NavItem[] }[] = [
       { href: '/clientes',      icon: Users,           label: 'Clientes' },
       { href: '/projetos',      icon: FolderOpen,      label: 'Projetos' },
       { href: '/social',        icon: Megaphone,       label: 'Social media' },
+      { href: '/sites-clientes', icon: Globe,          label: 'Sites' },
     ],
   },
   {
