@@ -1,17 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, MessageCircle, Mail } from 'lucide-react'
+import { ChevronDown, MessageCircle, Mail, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn, formatDate, whatsappUrl } from '@/lib/utils'
 import { SITE_LEAD_STATUS, siteLeadStatusConfig, valorResposta, type SiteLead, type SiteLeadStatus } from '@/lib/sites-clientes/leads'
 
-// Lista de leads de um site. Usada no administrativo (com troca de status) e
-// no portal do cliente (só leitura, sem onMudarStatus).
-export function SiteLeadsLista({ leads, onMudarStatus }: {
+// Lista de leads de um site. Usada no administrativo e na área do cliente
+// (com troca de status e exclusão) e no portal por link (só leitura).
+export function SiteLeadsLista({ leads, onMudarStatus, onExcluir }: {
   leads: SiteLead[]
   onMudarStatus?: (id: string, status: SiteLeadStatus) => void
+  onExcluir?: (id: string) => void
 }) {
   const [aberto, setAberto] = useState<string | null>(null)
 
@@ -58,6 +59,13 @@ export function SiteLeadsLista({ leads, onMudarStatus }: {
                   </Select>
                 ) : (
                   <Badge variant={status.variant}>{status.label}</Badge>
+                )}
+                {onExcluir && (
+                  <button type="button" title="Excluir contato" aria-label={`Excluir ${l.nome}`}
+                    onClick={() => { if (window.confirm(`Excluir o contato de ${l.nome}? Não dá para desfazer.`)) onExcluir(l.id) }}
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-brand-lavanda/35 hover:bg-white/[0.05] hover:text-brand-rosa">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
               </div>
             </div>

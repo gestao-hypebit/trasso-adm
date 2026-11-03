@@ -108,6 +108,18 @@ export default function SiteClientePage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function excluirLead(leadId: string) {
+    const anterior = leads
+    setLeads((ls) => ls.filter((l) => l.id !== leadId))
+    const { error } = await (createClient() as any).from('site_leads').delete().eq('id', leadId)
+    if (error) {
+      setLeads(anterior)
+      aviso('Não foi possível excluir o contato.', { tipo: 'erro' })
+    } else {
+      aviso('Contato excluído.')
+    }
+  }
+
   if (loading) return <Carregando />
   if (!site) {
     return (
@@ -156,7 +168,7 @@ export default function SiteClientePage({ params }: { params: Promise<{ id: stri
               {leads.length === 0 ? (
                 <EstadoVazio titulo="Nenhum lead ainda" texto="Assim que o formulário do site enviar o primeiro contato, ele aparece aqui e no portal do cliente." />
               ) : (
-                <SiteLeadsLista leads={leads} onMudarStatus={mudarStatus} />
+                <SiteLeadsLista leads={leads} onMudarStatus={mudarStatus} onExcluir={excluirLead} />
               )}
             </CardContent>
           </Card>
