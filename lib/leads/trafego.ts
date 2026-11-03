@@ -42,7 +42,7 @@ export function comTemperatura(respostas: Resposta[] | null, temperatura: Temper
 // ---------------------------------------------------------------
 // Origem: o que conta como tráfego pago
 // ---------------------------------------------------------------
-export const ORIGENS_TRAFEGO_PAGO = ['trafego_pago', 'trafego_pago_whatsapp', 'landing-site', 'landing-planejadores']
+export const ORIGENS_TRAFEGO_PAGO = ['trafego_pago', 'trafego_pago_whatsapp', 'landing-site', 'landing-planejadores', 'landing-clinicas']
 
 // Despesa conta como investimento em tráfego quando a categoria tem um destes nomes.
 export const CATEGORIA_TRAFEGO = /tr[aá]fego|an[uú]ncio|\bads\b/i
@@ -57,6 +57,7 @@ export function ehTrafegoPago(lead: { origem: string; utm: Record<string, unknow
 // Valor de partida do lead por formulário do site (o preço da oferta da landing).
 export const VALOR_PADRAO_POR_FORMULARIO: Record<string, number> = {
   'landing-planejadores': 947,
+  'landing-clinicas': 947,
   'landing-site': 750,
 }
 

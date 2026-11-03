@@ -16,6 +16,7 @@ export const origemOpcoes = [
   { value: 'trafego_pago', label: 'Tráfego pago' },
   { value: 'trafego_pago_whatsapp', label: 'Tráfego pago · WhatsApp' },
   { value: 'landing-planejadores', label: 'Landing · Planejadores' },
+  { value: 'landing-clinicas', label: 'Landing · Clínicas de estética' },
   { value: 'landing-site', label: 'Landing · Criação de site' },
   { value: 'captacao_ativa', label: 'Captação ativa' },
   { value: 'representante_comercial', label: 'Prospecção por representante comercial' },

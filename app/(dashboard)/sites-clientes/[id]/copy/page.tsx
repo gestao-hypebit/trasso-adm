@@ -3,7 +3,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Check, ClipboardCopy, Copy, Eye, History, Loader2, Lock, MessageSquare, Plus, RefreshCw, RotateCcw, Send, Sparkles, Trash2, X,
+  ArrowDown, ArrowLeft, ArrowUp, Check, ClipboardCopy, Copy, Eye, History, Loader2, Lock, MessageSquare, Plus, RefreshCw, RotateCcw, Send, Sparkles, Trash2, Undo2, X,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -117,6 +117,26 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
     if (error) return setErro('Não foi possível reabrir.')
     await registrar([{ secao_id: s.id, rodada: s.rodada, tipo: 'reaberta' }])
     setSecoes((ss) => ss.map((x) => (x.id === s.id ? { ...x, status: 'rascunho' } : x)))
+  }
+
+  // Cliente aprovou sem querer (ou a seção foi reaberta à toa): volta para ele na mesma
+  // rodada, sem abrir uma rodada nova. Vale para aprovada e para rascunho já enviado antes.
+  async function devolver(s: CopySecao) {
+    if (!secaoTemConteudo(s)) return setErro('Escreva o texto da seção antes de devolver ao cliente.')
+    if (!window.confirm(`Devolver "${s.titulo}" para o cliente revisar de novo? Ela aparece para ele no mesmo link da copy.`)) return
+    // Salva antes o que ainda esperava o salvamento automático.
+    if (timers.current[s.id]) {
+      clearTimeout(timers.current[s.id])
+      delete timers.current[s.id]
+      await db().from('site_copy_secoes').update({ titulo: s.titulo, observacao: s.observacao || null, campos: s.campos }).eq('id', s.id)
+    }
+    const agora = new Date().toISOString()
+    const limpar = { status: 'aguardando' as const, comentario_cliente: null, respondido_em: null, respondido_nome: null }
+    const { error } = await db().from('site_copy_secoes').update({ ...limpar, updated_at: agora }).eq('id', s.id).eq('status', s.status)
+    if (error) return setErro('Não foi possível devolver ao cliente.')
+    await registrar([{ secao_id: s.id, rodada: s.rodada, tipo: 'enviada' }])
+    setSecoes((ss) => ss.map((x) => (x.id === s.id ? { ...x, ...limpar } : x)))
+    setAviso(`"${s.titulo}" voltou para o cliente. Ele vê no mesmo link da copy.`)
   }
 
   async function registrar(itens: { secao_id: string; rodada: number; tipo: CopyEvento['tipo'] }[]) {
@@ -267,6 +287,7 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
                 onMover={(d) => mover(i, d)}
                 onRemover={() => remover(s)}
                 onReabrir={() => reabrir(s)}
+                onDevolver={() => devolver(s)}
               />
             ))}
             {!previa && (
@@ -281,7 +302,7 @@ export default function CopySitePage({ params }: { params: Promise<{ id: string 
   )
 }
 
-function SecaoCard({ secao: s, numero, previa, eventos, primeira, ultima, onAlterar, onMover, onRemover, onReabrir }: {
+function SecaoCard({ secao: s, numero, previa, eventos, primeira, ultima, onAlterar, onMover, onRemover, onReabrir, onDevolver }: {
   secao: CopySecao
   numero: number
   previa: boolean
@@ -292,6 +313,7 @@ function SecaoCard({ secao: s, numero, previa, eventos, primeira, ultima, onAlte
   onMover: (d: -1 | 1) => void
   onRemover: () => void
   onReabrir: () => void
+  onDevolver: () => void
 }) {
   const [historico, setHistorico] = useState(false)
   const travada = s.status === 'aprovada'
@@ -336,7 +358,14 @@ function SecaoCard({ secao: s, numero, previa, eventos, primeira, ultima, onAlte
         {s.status === 'aprovada' && (
           <p className="flex items-center gap-1.5 text-xs text-brand-lima">
             <Check className="h-3.5 w-3.5" /> Aprovada por {s.respondido_nome || 'cliente'}{s.respondido_em && <> em {formatDate(s.respondido_em, "dd/MM 'às' HH:mm")}</>}
-            {!previa && <button onClick={onReabrir} className="ml-2 flex items-center gap-1 text-brand-lavanda/45 hover:text-brand-lavanda"><RotateCcw className="h-3 w-3" /> Reabrir</button>}
+            {!previa && <button onClick={onDevolver} className="ml-2 flex items-center gap-1 text-brand-lavanda/45 hover:text-brand-lavanda" title="Volta para o cliente aprovar ou pedir ajuste, sem mudar o texto"><Undo2 className="h-3 w-3" /> Devolver ao cliente</button>}
+            {!previa && <button onClick={onReabrir} className="ml-2 flex items-center gap-1 text-brand-lavanda/45 hover:text-brand-lavanda" title="Volta para rascunho para a Slick editar o texto"><RotateCcw className="h-3 w-3" /> Reabrir para editar</button>}
+          </p>
+        )}
+        {s.status === 'rascunho' && s.rodada > 0 && !previa && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-lavanda/40">
+            Reaberta: o cliente não está vendo esta seção.
+            <button onClick={onDevolver} className="flex items-center gap-1 text-brand-lavanda/60 hover:text-brand-lavanda"><Undo2 className="h-3 w-3" /> Devolver ao cliente</button>
           </p>
         )}
         {s.status === 'aguardando' && !previa && (
