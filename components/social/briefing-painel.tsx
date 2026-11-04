@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ERRO_MIGRATION_BRIEFING, ERRO_MIGRATION_BRIEFING_SITE, MODELOS_BRIEFING, STATUS_BRIEFING, etapasDoModelo, formatarResposta, linkBriefing,
+  ERRO_MIGRATION_BRIEFING, ERRO_MIGRATION_BRIEFING_EMPRESA, ERRO_MIGRATION_BRIEFING_SITE, MODELOS_BRIEFING, STATUS_BRIEFING, etapasDoModelo, formatarResposta, linkBriefing,
   mensagemWhatsappBriefing, modelosDaArea, perguntasDoBriefing, textoRespostas,
   type AreaBriefing, type Briefing, type ModeloBriefing,
 } from '@/lib/social/briefing'
@@ -25,6 +25,7 @@ const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
 function mensagemErro(error: { code?: string; message: string }, area: AreaBriefing) {
   if (error.code === '42P01') return ERRO_MIGRATION_BRIEFING
   if (area === 'site' && ['42703', 'PGRST204', '23514'].includes(error.code ?? '')) return ERRO_MIGRATION_BRIEFING_SITE
+  if (error.code === '23514') return ERRO_MIGRATION_BRIEFING_EMPRESA
   return error.message
 }
 

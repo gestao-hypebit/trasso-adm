@@ -97,6 +97,53 @@ const PERFIL_NOVO: Pergunta[] = [
   p('Estilo do perfil', 'observacoes', 'Mais alguma coisa?', 'texto_longo'),
 ]
 
+// Social media de quem não é loja: serviços, consultorias, profissionais liberais.
+// Vale para perfil novo ou existente, e as perguntas específicas de cada cliente
+// entram pelo "Editar perguntas".
+const EMPRESA: Pergunta[] = [
+  p('Sobre a empresa', 'nome_empresa', 'Nome da empresa', 'texto', OBRIG),
+  p('Sobre a empresa', 'responsavel', 'Seu nome', 'texto', OBRIG),
+  p('Sobre a empresa', 'whatsapp', 'WhatsApp de contato', 'telefone', { ...OBRIG, placeholder: '(00) 00000-0000' }),
+  p('Sobre a empresa', 'segmento', 'Ramo de atuação', 'texto', { placeholder: 'Ex.: consultoria, advocacia, clínica, engenharia' }),
+  p('Sobre a empresa', 'cidade', 'Cidade ou região onde atende', 'texto'),
+  p('Sobre a empresa', 'formato_atendimento', 'Como você atende?', 'multipla_escolha', { opcoes: ['Presencial', 'Online', 'Na casa ou empresa do cliente'] }),
+  p('Sobre a empresa', 'historia', 'Conte um pouco da história da empresa', 'texto_longo', { ajuda: 'Como começou, há quanto tempo existe, quem está à frente.' }),
+
+  p('O que você oferece', 'servicos', 'Quais serviços ou soluções a empresa oferece?', 'texto_longo', { ...OBRIG, ajuda: 'Explique como se fosse para alguém que nunca ouviu falar de vocês.' }),
+  p('O que você oferece', 'principal', 'Qual deles você mais quer divulgar?', 'texto'),
+  p('O que você oferece', 'como_cobra', 'Como você cobra pelo seu trabalho?', 'texto', { placeholder: 'Ex.: mensalidade, por projeto, por hora, porcentagem' }),
+  p('O que você oferece', 'como_funciona', 'Como funciona, do primeiro contato até o fechamento?', 'texto_longo'),
+  p('O que você oferece', 'diferencial', 'Por que o cliente escolhe vocês e não o concorrente?', 'texto_longo'),
+  p('O que você oferece', 'concorrentes', 'Principais concorrentes', 'texto'),
+
+  p('Seu cliente', 'publico_tipo', 'Você atende mais', 'escolha_unica', { opcoes: ['Pessoas físicas', 'Empresas', 'Os dois'] }),
+  p('Seu cliente', 'publico_quem', 'Quem é o seu cliente ideal?', 'texto_longo', { ajuda: 'Idade, profissão, momento de vida ou porte da empresa.' }),
+  p('Seu cliente', 'publico_problemas', 'Que problema ou desejo faz essa pessoa te procurar?', 'texto_longo'),
+  p('Seu cliente', 'publico_duvidas', 'Quais dúvidas e objeções você mais ouve antes de fechar?', 'texto_longo'),
+
+  p('Credibilidade e regras', 'credenciais', 'Registros, certificações ou prêmios que a empresa tem', 'texto_longo', { ajuda: 'Tudo que ajuda a mostrar que vocês são confiáveis.' }),
+  p('Credibilidade e regras', 'provas', 'Tem cases, números ou depoimentos que podem ser divulgados?', 'texto_longo'),
+  p('Credibilidade e regras', 'regras_setor', 'Existe alguma regra sobre o que a empresa pode publicar?', 'texto_longo', { ajuda: 'Órgão regulador, conselho de classe ou compliance: o que não pode ser dito ou prometido, avisos obrigatórios.' }),
+  p('Credibilidade e regras', 'aprovacao', 'Quem aprova os conteúdos antes de publicar?', 'texto'),
+
+  p('O Instagram', 'situacao_instagram', 'Como está o Instagram hoje?', 'escolha_unica', { opcoes: ['Ativo', 'Tenho, mas está parado', 'Ainda não tenho'] }),
+  p('O Instagram', 'instagram_atual', '@ do Instagram, se já tiver', 'texto', { placeholder: '@suaempresa' }),
+  p('O Instagram', 'sugestoes_arroba', 'Se ainda não tem, sugestões de @', 'texto', { ajuda: 'Mande 2 ou 3 opções. A gente confere quais estão livres.' }),
+  p('O Instagram', 'funciona', 'O que você sente que funciona bem no perfil?', 'texto_longo'),
+  p('O Instagram', 'nao_funciona', 'E o que não funciona ou te incomoda?', 'texto_longo'),
+  p('O Instagram', 'identidade_visual', 'A marca tem identidade visual definida?', 'escolha_unica', { opcoes: ['Sim, logo, cores e fontes definidas', 'Tenho logo e cores mais ou menos', 'Não tenho'] }),
+  p('O Instagram', 'quem_aparece', 'Quem pode aparecer em fotos e vídeos?', 'multipla_escolha', { opcoes: ['Sócios ou liderança', 'Equipe', 'Clientes, com autorização', 'Prefiro não mostrar pessoas'] }),
+  p('O Instagram', 'materiais', 'Link da pasta com logo, fotos e materiais', 'texto', { ajuda: 'Google Drive, Dropbox ou WeTransfer. Pode mandar depois também.' }),
+
+  p('Objetivos e estilo', 'objetivo', 'O que você mais quer agora?', 'multipla_escolha', { ...OBRIG, opcoes: ['Atrair novos clientes', 'Gerar contatos e reuniões', 'Passar mais credibilidade', 'Educar o público sobre o assunto', 'Fortalecer a marca', 'Ganhar seguidores'] }),
+  p('Objetivos e estilo', 'temas', 'Sobre quais assuntos você gostaria de falar?', 'texto_longo'),
+  p('Objetivos e estilo', 'datas', 'Tem alguma data, evento ou lançamento chegando?', 'texto_longo'),
+  p('Objetivos e estilo', 'tom_voz', 'Como a empresa conversa com o cliente?', 'escolha_unica', { opcoes: ['Próximo e acolhedor', 'Direto e profissional', 'Técnico e didático', 'Sofisticado', 'Descontraído'] }),
+  p('Objetivos e estilo', 'referencias', 'Perfis que você admira (de qualquer ramo)', 'texto'),
+  p('Objetivos e estilo', 'evitar', 'Algo que você NÃO quer no seu perfil?', 'texto'),
+  p('Objetivos e estilo', 'observacoes', 'Mais alguma coisa?', 'texto_longo'),
+]
+
 // Desenvolvimento de site. As opções de estilo e tom são as mesmas do
 // gerador de prévias (lib/sites/tipos.ts), para dar para levar as respostas para lá.
 const SITE: Pergunta[] = [
@@ -153,6 +200,12 @@ const TEXTOS_SOCIAL = {
 export const MODELOS_BRIEFING = {
   perfil_novo:      { label: 'Perfil novo',      descricao: 'A Slick vai criar o Instagram do zero.', perguntas: PERFIL_NOVO, ...TEXTOS_SOCIAL },
   perfil_existente: { label: 'Perfil existente', descricao: 'O cliente já tem Instagram ativo.',      perguntas: PERFIL_EXISTENTE, ...TEXTOS_SOCIAL },
+  empresa: {
+    label: 'Empresa / serviços', descricao: 'Para quem não é loja: serviços, consultorias, profissionais liberais.', perguntas: EMPRESA,
+    ...TEXTOS_SOCIAL,
+    titulo: 'Vamos conhecer a sua empresa',
+    intro: 'Leva uns 10 minutos. Quanto mais detalhe, mais o conteúdo fica com a cara da sua empresa.',
+  },
   site: {
     label: 'Site', descricao: 'Desenvolvimento de site ou landing page.', perguntas: SITE,
     area: 'site' as AreaBriefing,
@@ -210,6 +263,7 @@ export type Briefing = {
 
 export const ERRO_MIGRATION_BRIEFING = 'Rode a migration 20261027000000_social_briefings.sql no Supabase antes de usar.'
 export const ERRO_MIGRATION_BRIEFING_SITE = 'Rode a migration 20261108000000_briefing_site.sql no Supabase antes de usar.'
+export const ERRO_MIGRATION_BRIEFING_EMPRESA = 'Rode a migration 20261115000000_briefing_empresa.sql no Supabase antes de usar este modelo.'
 export const ERRO_MIGRATION_PERGUNTAS = 'Rode a migration 20261109000000_briefing_perguntas.sql no Supabase para editar perguntas.'
 
 // ─── Perguntas editáveis ───
@@ -337,7 +391,9 @@ export const linkBriefing = (token: string) =>
 export const mensagemWhatsappBriefing = (nome: string, link: string, modelo: ModeloBriefing = 'perfil_novo') =>
   MODELOS_BRIEFING[modelo].area === 'site'
     ? `Oi, ${nome}! Tudo bem? 😊\nPara começarmos o seu site, preciso conhecer melhor a sua empresa.\nResponde esse formulário (leva uns 10 minutos):\n${link}`
-    : `Oi, ${nome}! Tudo bem? 😊\nPara eu montar o planejamento do seu Instagram, preciso conhecer melhor a sua loja.\nResponde esse formulário rapidinho (leva uns 5 minutos):\n${link}`
+    : modelo === 'empresa'
+      ? `Oi, ${nome}! Tudo bem? 😊\nPara eu montar o planejamento do seu Instagram, preciso conhecer melhor a sua empresa.\nResponde esse formulário (leva uns 10 minutos):\n${link}`
+      : `Oi, ${nome}! Tudo bem? 😊\nPara eu montar o planejamento do seu Instagram, preciso conhecer melhor a sua loja.\nResponde esse formulário rapidinho (leva uns 5 minutos):\n${link}`
 
 export const formatarResposta = (v: Resposta | undefined) => (Array.isArray(v) ? v.join(', ') : v?.trim()) || '—'
 

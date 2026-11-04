@@ -74,7 +74,7 @@ describe('textoRespostas', () => {
 
 describe('briefing de site', () => {
   it('fica separado dos modelos de social', () => {
-    expect(modelosDaArea('social')).toEqual(['perfil_novo', 'perfil_existente'])
+    expect(modelosDaArea('social')).toEqual(['perfil_novo', 'perfil_existente', 'empresa'])
     expect(modelosDaArea('site')).toEqual(['site'])
   })
 
@@ -90,6 +90,20 @@ describe('briefing de site', () => {
   it('mensagem do WhatsApp fala do site', () => {
     expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'site')).toContain('seu site')
     expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'perfil_novo')).toContain('Instagram')
+  })
+})
+
+describe('briefing de empresa', () => {
+  it('obrigatórios e etapas', () => {
+    expect(etapasDoModelo('empresa').map((e) => e.titulo)).toEqual(['Sobre a empresa', 'O que você oferece', 'Seu cliente', 'Credibilidade e regras', 'O Instagram', 'Objetivos e estilo'])
+    expect(Object.keys(errosDoBriefing('empresa', {}))).toEqual(['nome_empresa', 'responsavel', 'whatsapp', 'servicos', 'objetivo'])
+  })
+
+  it('não fala de loja com o cliente', () => {
+    const { titulo, intro, perguntas } = MODELOS_BRIEFING.empresa
+    const textos = [titulo, intro, ...perguntas.flatMap((q) => [q.rotulo, q.ajuda ?? '', q.placeholder ?? '', ...(q.opcoes ?? [])])]
+    expect(textos.filter((t) => /\b(loja|produtos?)\b/i.test(t))).toEqual([])
+    expect(mensagemWhatsappBriefing('Ana', 'https://x/briefing/1', 'empresa')).toContain('sua empresa')
   })
 })
 
