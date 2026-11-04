@@ -1,7 +1,7 @@
 'use client'
 
 import { Search, Menu } from 'lucide-react'
-import { IndicadoresTopo } from '@/components/layout/indicadores'
+import { IndicadoresTopo, SinoRecebimentos } from '@/components/layout/indicadores'
 import { NotificacoesMenu } from '@/components/layout/notificacoes-menu'
 import { useCommandPalette } from '@/components/layout/command-palette'
 import { useMobileNav } from '@/components/layout/mobile-nav'
@@ -55,6 +55,7 @@ export function Header({ title, description }: HeaderProps) {
           <span className="flex-1 text-left">Buscar...</span>
           <kbd className="lg:hidden xl:inline text-[10px] px-1.5 py-0.5 rounded border border-white/[0.1] text-brand-lavanda/30">Ctrl K</kbd>
         </button>
+        <SinoRecebimentos />
         <NotificacoesMenu />
       </div>
     </header>

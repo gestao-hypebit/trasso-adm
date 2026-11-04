@@ -83,10 +83,14 @@ async function camposTaxa(ctx: Contexto, p: AsaasPayment) {
   return ctx.colunasTaxa ? { asaas_valor: Number(p.value), asaas_valor_liquido: liquido(p) } : {}
 }
 
-// Dia do pagamento informado pelo Asaas. Sem data (ou sem a migration), não manda
-// nada; com a coluna criada, o gatilho do banco preenche com o dia de hoje.
-async function campoRecebidoEm(ctx: Contexto, p: AsaasPayment) {
-  const pago = p.clientPaymentDate ?? p.paymentDate
+// Dia em que o pagamento entrou. Vale a liquidação no Asaas antes do dia em que o
+// cliente pagou: boleto pago na sexta e compensado na segunda conta na segunda.
+// Só é gravado na passagem para recebido (quem já está recebido não muda de dia),
+// senão o cartão contaria de novo quando o valor é creditado, semanas depois.
+// Sem data (ou sem a migration), não manda nada; o gatilho do banco preenche com hoje.
+async function campoRecebidoEm(ctx: Contexto, p: AsaasPayment, statusAtual?: string) {
+  const pago = p.paymentDate ?? p.clientPaymentDate
+  if (statusAtual === 'recebido') return {}
   if (statusDoLancamento(p.status) !== 'recebido' || !pago) return {}
   if (ctx.colunaRecebidoEm === undefined) {
     const { error } = await ctx.supabase.from('lancamentos').select('recebido_em').limit(1)
@@ -211,7 +215,6 @@ export async function processarCobranca(
     asaas_status: excluida ? 'DELETED' : p.status,
     asaas_invoice_url: p.invoiceUrl,
     ...(ctx.simular ? {} : await camposTaxa(ctx, p)),
-    ...(ctx.simular || excluida ? {} : await campoRecebidoEm(ctx, p)),
   }
 
   // 1. Já ligada
@@ -235,6 +238,7 @@ export async function processarCobranca(
     }
     const { error } = await ctx.supabase.from('lancamentos').update({
       ...camposAsaas,
+      ...(await campoRecebidoEm(ctx, p, ligado.status)),
       status: manterRecebido(ligado, status),
       forma_pagamento: ligado.forma_pagamento ?? formaPagamento[p.billingType] ?? null,
       ...(ligado.asaas_criado ? { valor: liquido(p), data: p.dueDate } : {}),
@@ -298,6 +302,7 @@ export async function processarCobranca(
     }
     const { error } = await ctx.supabase.from('lancamentos').update({
       ...camposAsaas,
+      ...(await campoRecebidoEm(ctx, p, c.status)),
       asaas_payment_id: p.id,
       status: manterRecebido({ asaas_criado: false, status: c.status }, status),
       updated_at: new Date().toISOString(),
@@ -328,6 +333,7 @@ export async function processarCobranca(
     asaas_payment_id: p.id,
     asaas_criado: true,
     ...camposAsaas,
+    ...(await campoRecebidoEm(ctx, p)),
   })
   // Outro aviso criou ao mesmo tempo (índice único): trata como já ligado.
   if (error?.code === '23505') return processarCobranca(ctx, p, opcoes)

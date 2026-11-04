@@ -42,9 +42,9 @@ set recebido_em = e.pago
 from (
   select distinct on (payload->'payment'->>'id')
     payload->'payment'->>'id' as payment_id,
-    left(coalesce(payload->'payment'->>'clientPaymentDate', payload->'payment'->>'paymentDate'), 10)::date as pago
+    left(coalesce(payload->'payment'->>'paymentDate', payload->'payment'->>'clientPaymentDate'), 10)::date as pago
   from asaas_eventos
-  where coalesce(payload->'payment'->>'clientPaymentDate', payload->'payment'->>'paymentDate') is not null
+  where coalesce(payload->'payment'->>'paymentDate', payload->'payment'->>'clientPaymentDate') is not null
   order by payload->'payment'->>'id', created_at desc
 ) e
 where l.asaas_payment_id = e.payment_id and l.status = 'recebido';

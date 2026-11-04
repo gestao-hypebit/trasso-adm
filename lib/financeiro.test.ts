@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { resumoRecebido, saldoDaConta } from '@/lib/financeiro'
+import { pagamentosNovos, resumoRecebido, saldoDaConta } from '@/lib/financeiro'
+
+describe('pagamentosNovos', () => {
+  const asaas = { id: 'a', valor: 97, asaas_payment_id: 'pay_1' }
+  const manual = { id: 'b', valor: 200, asaas_payment_id: null }
+
+  it('só avisa do que veio do Asaas e ainda não tinha sido visto', () => {
+    expect(pagamentosNovos(new Set(), [asaas, manual])).toEqual([asaas])
+    expect(pagamentosNovos(new Set(['a']), [asaas, manual])).toEqual([])
+  })
+
+  it('lançamento manual já visto e depois ligado a uma cobrança não toca', () => {
+    expect(pagamentosNovos(new Set(['b']), [{ ...manual, asaas_payment_id: 'pay_2' }])).toEqual([])
+  })
+})
 
 describe('saldoDaConta', () => {
   it('soma o recebido, tira o pago e ignora o que não foi liquidado', () => {

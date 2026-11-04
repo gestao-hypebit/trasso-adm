@@ -32,6 +32,14 @@ export function resumoRecebido(recebimentos: { valor: number | string | null }[]
   return { quantidade: recebimentos.length, total: recebimentos.reduce((s, r) => s + Number(r.valor ?? 0), 0) }
 }
 
+export type RecebimentoHoje = { id: string; valor: number | string | null; asaas_payment_id: string | null }
+
+// Recebimentos ainda não vistos que vieram do Asaas. O que foi marcado à mão fica
+// de fora: quem marcou já sabe que recebeu.
+export function pagamentosNovos(conhecidos: Set<string>, lista: RecebimentoHoje[]): RecebimentoHoje[] {
+  return lista.filter((l) => l.asaas_payment_id && !conhecidos.has(l.id))
+}
+
 export function situacaoDe(status: string, vencimento: string, hoje = hojeISO()): Situacao {
   if (status === 'cancelado') return 'cancelado'
   if (status !== 'pendente') return 'liquidado'
