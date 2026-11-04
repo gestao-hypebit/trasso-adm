@@ -56,7 +56,7 @@ function SituacaoBadge({ situacao, data, hoje, liquidadoLabel }: { situacao: Sit
   return <Badge variant="concluido">{liquidadoLabel}</Badge>
 }
 
-export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
+export function ContasPage({ tipo, abaInicial = 'aberto' }: { tipo: 'receita' | 'despesa'; abaInicial?: Aba }) {
   const pathname = usePathname()
   const ehReceber = tipo === 'receita'
   const statusLiquidado = ehReceber ? 'recebido' : 'pago'
@@ -68,7 +68,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
-  const [aba, setAba] = useState<Aba>('aberto')
+  const [aba, setAba] = useState<Aba>(abaInicial)
   const [periodo, setPeriodo] = useState<Periodo>(periodoInicial)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
