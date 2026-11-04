@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { TrendingUp, TrendingDown, Scale, Target, Wallet, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Scale, Target, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -111,6 +111,15 @@ export default function FinanceiroPage() {
     return s
   }, 0)
 
+  // Saldo previsto no fim do período: entra tudo em aberto até lá, inclusive o que
+  // já venceu em outros meses. Como o saldo, vale para a conta toda, sem filtro de linha.
+  // Mês que já acabou não tem previsão.
+  const emAbertoAteFim = lancamentos.filter(l => l.status === 'pendente' && l.data <= fim)
+  const entraAteFim = soma(emAbertoAteFim.filter(l => l.tipo === 'receita'))
+  const saiAteFim = soma(emAbertoAteFim.filter(l => l.tipo === 'despesa'))
+  const saldoPrevisto = saldoAtual + entraAteFim - saiAteFim
+  const mostrarPrevisao = fim >= hojeStr
+
   const cashflowData: DiaFluxo[] = (() => {
     if (periodo.tudo) {
       const porMes: Record<string, { entradas: number; saidas: number }> = {}
@@ -147,7 +156,7 @@ export default function FinanceiroPage() {
     { label: 'Recebido', valor: totalRecebido, sub: aReceber > 0 ? `Falta receber ${formatCurrency(aReceber)}` : 'Nada em aberto para receber', icon: TrendingUp, cor: 'text-brand-lima', bgIcon: 'bg-brand-lima/10' },
     { label: 'Pago', valor: totalPago, sub: aPagar > 0 ? `Falta pagar ${formatCurrency(aPagar)}` : 'Nada em aberto para pagar', icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10' },
     { label: 'Resultado', valor: resultado, sub: 'Recebido − pago', icon: Scale, cor: resultado >= 0 ? 'text-brand-lima' : 'text-brand-rosa', bgIcon: 'bg-brand-violeta/10' },
-    { label: 'Previsão de fechamento', valor: resultado + aReceber - aPagar, sub: 'Se tudo em aberto for pago', icon: Target, cor: 'text-brand-lavanda', bgIcon: 'bg-brand-violeta/10' },
+    { label: 'Resultado previsto', valor: resultado + aReceber - aPagar, sub: 'Se tudo em aberto for pago', icon: Target, cor: 'text-brand-lavanda', bgIcon: 'bg-brand-violeta/10' },
   ]
 
   // Resultado de cada linha de receita no período.
@@ -197,7 +206,7 @@ export default function FinanceiroPage() {
         </div>
 
         {/* Saldo em Conta */}
-        <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex items-center justify-between mb-6">
+        <div className="rounded-2xl border border-brand-lima/25 bg-gradient-to-r from-brand-lima/[0.07] to-transparent p-5 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 mb-6">
           <div>
             <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">Saldo em Conta</p>
             <p className={cn('text-3xl font-bold', saldoAtual >= 0 ? 'text-brand-lima' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
@@ -205,7 +214,19 @@ export default function FinanceiroPage() {
             </p>
             <p className="text-xs text-brand-lavanda/30 mt-1">Total recebido − total pago, em todos os meses</p>
           </div>
-          <Wallet className="h-8 w-8 text-brand-lima/25 shrink-0" />
+          {mostrarPrevisao && (
+            <div className="sm:text-right">
+              <p className="text-xs text-brand-lavanda/50 mb-1 uppercase tracking-wide">
+                {periodo.tudo ? 'Previsão de saldo' : `Previsão de saldo em ${formatDate(fim)}`}
+              </p>
+              <p className={cn('text-3xl font-bold', saldoPrevisto >= 0 ? 'text-brand-lavanda' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                {loading ? '...' : formatCurrency(saldoPrevisto)}
+              </p>
+              <p className="text-xs text-brand-lavanda/30 mt-1">
+                +{formatCurrency(entraAteFim)} a receber − {formatCurrency(saiAteFim)} a pagar, se tudo for pago
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
