@@ -111,23 +111,21 @@ export default function FinanceiroPage() {
     return s
   }, 0)
 
-  // Saldo previsto no fim do período: entra tudo em aberto até lá, inclusive o que
-  // já venceu em outros meses. Como o saldo, vale para a conta toda, sem filtro de linha.
-  // Mês que já acabou não tem previsão.
+  // Saldo previsto no fim do período. Como o saldo, vale para a conta toda, sem filtro
+  // de linha. Mês que já acabou não tem previsão.
+  // A receber: a partir do mês atual; atraso de meses anteriores pode nunca entrar.
+  // A pagar: tudo em aberto até lá; conta atrasada continua sendo dívida.
+  const inicioMesAtual = `${hojeStr.slice(0, 7)}-01`
   const emAbertoAteFim = lancamentos.filter(l => l.status === 'pendente' && l.data <= fim)
-  const entraAteFim = soma(emAbertoAteFim.filter(l => l.tipo === 'receita'))
-  const saiAteFim = soma(emAbertoAteFim.filter(l => l.tipo === 'despesa'))
+  const contasAteFim = emAbertoAteFim.filter(l => l.tipo === 'despesa')
+  const entraAteFim = soma(emAbertoAteFim.filter(l => l.tipo === 'receita' && l.data >= inicioMesAtual))
+  const saiAteFim = soma(contasAteFim)
+  const contasAnteriores = soma(contasAteFim.filter(l => l.data < inicio))
   const saldoPrevisto = saldoAtual + entraAteFim - saiAteFim
   const mostrarPrevisao = fim >= hojeStr
-  // Separa o que é do período do que ficou de meses anteriores: a parte do período
-  // é a mesma "Falta receber/pagar" dos cartões (com o filtro de linha em "Tudo").
-  const detalheAberto = (tipo: 'receita' | 'despesa') => {
-    const itens = emAbertoAteFim.filter(l => l.tipo === tipo)
-    const anteriores = soma(itens.filter(l => l.data < inicio))
-    const total = soma(itens)
-    if (anteriores === 0) return formatCurrency(total)
-    return `${formatCurrency(total - anteriores)} do mês + ${formatCurrency(anteriores)} de meses anteriores`
-  }
+  const rotuloAReceber = periodo.tudo
+    ? 'A receber (sem atrasos de meses anteriores)'
+    : inicio === inicioMesAtual ? 'A receber' : `A receber até ${formatDate(fim)}`
 
   const cashflowData: DiaFluxo[] = (() => {
     if (periodo.tudo) {
@@ -231,8 +229,10 @@ export default function FinanceiroPage() {
               <p className={cn('text-3xl font-bold', saldoPrevisto >= 0 ? 'text-brand-lavanda' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
                 {loading ? '...' : formatCurrency(saldoPrevisto)}
               </p>
-              <p className="text-xs text-brand-lavanda/30 mt-1">A receber: {detalheAberto('receita')}</p>
-              <p className="text-xs text-brand-lavanda/30">A pagar: {detalheAberto('despesa')}</p>
+              <p className="text-xs text-brand-lavanda/30 mt-1">{rotuloAReceber}: {formatCurrency(entraAteFim)}</p>
+              <p className="text-xs text-brand-lavanda/30">
+                A pagar: {formatCurrency(saiAteFim)}{contasAnteriores > 0 && ` (${formatCurrency(contasAnteriores)} de meses anteriores)`}
+              </p>
               <p className="text-xs text-brand-lavanda/30">{linha === 'todas' ? 'Se tudo for pago' : 'Se tudo for pago · todas as linhas'}</p>
             </div>
           )}
