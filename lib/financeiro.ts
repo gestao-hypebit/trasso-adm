@@ -15,6 +15,23 @@ export function diasEntre(a: string, b: string): number {
   return Math.round((Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da)) / 86400000)
 }
 
+export type LancamentoSaldo = { tipo: string; valor: number | string; status: string }
+
+// Saldo em conta: tudo que foi recebido menos tudo que foi pago.
+export function saldoDaConta(lancamentos: LancamentoSaldo[]): number {
+  return lancamentos.reduce((s, l) => {
+    if (l.tipo === 'receita' && l.status === 'recebido') return s + Number(l.valor)
+    if (l.tipo === 'despesa' && l.status === 'pago') return s - Number(l.valor)
+    return s
+  }, 0)
+}
+
+export type ResumoVendas = { quantidade: number; total: number }
+
+export function resumoVendas(vendas: { valor: number | string | null }[]): ResumoVendas {
+  return { quantidade: vendas.length, total: vendas.reduce((s, v) => s + Number(v.valor ?? 0), 0) }
+}
+
 export function situacaoDe(status: string, vencimento: string, hoje = hojeISO()): Situacao {
   if (status === 'cancelado') return 'cancelado'
   if (status !== 'pendente') return 'liquidado'

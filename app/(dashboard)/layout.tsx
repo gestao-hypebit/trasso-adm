@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { CommandPaletteProvider } from '@/components/layout/command-palette'
+import { IndicadoresProvider } from '@/components/layout/indicadores'
 import { MobileNavProvider } from '@/components/layout/mobile-nav'
 import { AvisoProvider } from '@/components/ui/toaster'
 
@@ -8,14 +9,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AvisoProvider>
       <CommandPaletteProvider>
         <MobileNavProvider>
-          <div className="flex min-h-screen bg-brand-noite">
-            <Sidebar />
-            <div className="flex-1 min-w-0 md:pl-60">
-              <main className="min-h-screen">
-                {children}
-              </main>
+          <IndicadoresProvider>
+            <div className="flex min-h-screen bg-brand-noite">
+              <Sidebar />
+              <div className="flex-1 min-w-0 md:pl-60">
+                <main className="min-h-screen">
+                  {children}
+                </main>
+              </div>
             </div>
-          </div>
+          </IndicadoresProvider>
         </MobileNavProvider>
       </CommandPaletteProvider>
     </AvisoProvider>

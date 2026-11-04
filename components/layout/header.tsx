@@ -1,6 +1,7 @@
 'use client'
 
 import { Search, Menu } from 'lucide-react'
+import { IndicadoresTopo } from '@/components/layout/indicadores'
 import { NotificacoesMenu } from '@/components/layout/notificacoes-menu'
 import { useCommandPalette } from '@/components/layout/command-palette'
 import { useMobileNav } from '@/components/layout/mobile-nav'
@@ -15,7 +16,8 @@ export function Header({ title, description }: HeaderProps) {
   const { abrir } = useMobileNav()
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 md:gap-4 border-b border-white/[0.06] bg-brand-noite/95 backdrop-blur-sm px-4 md:px-6">
+    // Abaixo de lg os indicadores descem para uma segunda linha, em toda a largura.
+    <header className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-x-3 md:gap-x-4 border-b border-white/[0.06] bg-brand-noite/95 backdrop-blur-sm px-4 md:px-6 pb-2 lg:h-14 lg:flex-nowrap lg:pb-0">
       <button
         type="button"
         onClick={abrir}
@@ -24,7 +26,7 @@ export function Header({ title, description }: HeaderProps) {
       >
         <Menu className="h-5 w-5" />
       </button>
-      <div className="flex-1 min-w-0">
+      <div className="flex h-14 flex-1 min-w-0 items-center">
         {title && (
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-base md:text-lg font-semibold text-brand-lavanda" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
@@ -35,6 +37,7 @@ export function Header({ title, description }: HeaderProps) {
           </div>
         )}
       </div>
+      <IndicadoresTopo className="order-last w-full lg:order-none lg:w-auto lg:shrink-0" />
       <div className="flex items-center gap-1 md:gap-2">
         <button
           type="button"
@@ -46,11 +49,11 @@ export function Header({ title, description }: HeaderProps) {
         </button>
         <button
           onClick={open}
-          className="hidden md:flex items-center gap-2 h-9 w-64 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 text-sm text-brand-lavanda/40 hover:border-white/[0.16] hover:text-brand-lavanda/60 transition-colors"
+          className="hidden md:flex items-center gap-2 h-9 w-64 lg:w-40 xl:w-64 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 text-sm text-brand-lavanda/40 hover:border-white/[0.16] hover:text-brand-lavanda/60 transition-colors"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Buscar...</span>
-          <kbd className="text-[10px] px-1.5 py-0.5 rounded border border-white/[0.1] text-brand-lavanda/30">Ctrl K</kbd>
+          <kbd className="lg:hidden xl:inline text-[10px] px-1.5 py-0.5 rounded border border-white/[0.1] text-brand-lavanda/30">Ctrl K</kbd>
         </button>
         <NotificacoesMenu />
       </div>

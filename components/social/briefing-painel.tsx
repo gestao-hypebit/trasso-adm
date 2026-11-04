@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, ClipboardList, Copy, ExternalLink, ListChecks, Loader2, MessageCircle, Plus } from 'lucide-react'
+import { Check, ClipboardList, Copy, ExternalLink, ListChecks, Loader2, MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { EditorPerguntasDialog, perguntasPadrao } from '@/components/social/editor-perguntas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -140,6 +140,18 @@ export function BriefingPainel({ cliente, area = 'social', projetoId }: { client
     setTimeout(() => setCopiado((c) => (c === chave ? null : c)), 1500)
   }
 
+  async function excluir(b: Briefing) {
+    const aviso = b.status === 'respondido'
+      ? 'Excluir este briefing? As respostas do cliente serão apagadas e não dá para desfazer.'
+      : 'Excluir este briefing? O link enviado para o cliente vai parar de funcionar e não dá para desfazer.'
+    if (!window.confirm(aviso)) return
+    setErro(null)
+    const { error } = await (createClient() as any).from('social_briefings').delete().eq('id', b.id)
+    if (error) { setErro(error.message); return }
+    setSelecionado(null)
+    carregar()
+  }
+
   const nomeCliente = cliente.empresa || cliente.nome
   const atual = briefings?.find((b) => b.id === selecionado) ?? briefings?.[0]
   const anteriores = briefings?.slice(1) ?? []
@@ -174,6 +186,7 @@ export function BriefingPainel({ cliente, area = 'social', projetoId }: { client
             copiado={copiado}
             copiar={copiar}
             onEditar={() => setEditando(true)}
+            onExcluir={area === 'social' ? () => excluir(atual) : undefined}
           />
         )}
 
@@ -200,7 +213,7 @@ export function BriefingPainel({ cliente, area = 'social', projetoId }: { client
   )
 }
 
-function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telefone, copiado, copiar, onEditar }: {
+function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telefone, copiado, copiar, onEditar, onExcluir }: {
   briefing: Briefing
   maisRecente: boolean
   nomeCliente: string
@@ -209,6 +222,7 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
   copiado: string | null
   copiar: (chave: string, texto: string) => void
   onEditar: () => void
+  onExcluir?: () => void
 }) {
   const perguntas = perguntasDoBriefing(b)
   const link = linkBriefing(b.token)
@@ -238,6 +252,9 @@ function BriefingDetalhe({ briefing: b, maisRecente, nomeCliente, contato, telef
         <Button size="sm" variant="ghost" asChild><a href={`/briefing/${b.token}`} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /> Ver</a></Button>
         {b.status === 'enviado' && (
           <Button size="sm" variant="ghost" onClick={onEditar}><ListChecks className="h-3.5 w-3.5" /> Editar perguntas</Button>
+        )}
+        {onExcluir && (
+          <Button size="sm" variant="ghost" className="hover:text-brand-rosa" onClick={onExcluir}><Trash2 className="h-3.5 w-3.5" /> Excluir</Button>
         )}
         {b.status === 'respondido' && (
           <Button size="sm" className="sm:ml-auto" onClick={() => copiar('respostas', textoRespostas(nomeCliente, b))}>{Icone('respostas')} Copiar respostas</Button>
