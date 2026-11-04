@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { asaasConfigurado, cobrancasDoCliente } from '@/lib/asaas/api'
 import { usuarioLogado } from '@/lib/asaas/auth'
+import { formaAindaIndefinida } from '@/lib/asaas/taxas'
 
 // Faturas de um cliente do Asaas, direto da API (sempre a situação atual).
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ customerId: string }> }) {
@@ -17,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cus
           id: c.id,
           assinaturaId: c.subscription,
           valor: Number(c.value),
-          valorLiquido: c.netValue != null ? Number(c.netValue) : null,
+          valorLiquido: c.netValue != null && !formaAindaIndefinida(c) ? Number(c.netValue) : null,
           vencimento: c.dueDate,
           pagoEm: c.clientPaymentDate ?? c.paymentDate,
           status: c.status,

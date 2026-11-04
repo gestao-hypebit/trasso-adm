@@ -1,5 +1,6 @@
 import 'server-only'
-import { buscarAssinatura, buscarClienteAsaas, cobrancasDaAssinatura, type AsaasPayment } from '@/lib/asaas/api'
+import { antecipacoesDaCobranca, buscarAssinatura, buscarClienteAsaas, cobrancasDaAssinatura, type AsaasPayment } from '@/lib/asaas/api'
+import { descontarAntecipacoes, formaAindaIndefinida, liquidoAntesDaAntecipacao } from '@/lib/asaas/taxas'
 import { ehLinhaSaas, labelLinha, linhaDoProduto, linhaPelaDescricao, type LinhaSaas } from '@/lib/financeiro/linhas'
 
 // Transforma uma cobrança do Asaas em lançamento, sem nunca duplicar:
@@ -15,6 +16,8 @@ import { ehLinhaSaas, labelLinha, linhaDoProduto, linhaPelaDescricao, type Linha
 //    - vários → vira pendência para decidir na tela
 // Lançamentos criados pela integração são salvos pelo valor LÍQUIDO (o que cai
 // na conta, já sem a taxa do Asaas). Lançamento manual ligado mantém o seu valor.
+// Enquanto o cliente não escolhe a forma de pagamento a taxa não é conhecida: o
+// lançamento fica com o valor cheio e o líquido fica vazio.
 
 export type Acao = 'ignorado' | 'atualizado' | 'ligado' | 'criado' | 'pendencia'
 
@@ -75,12 +78,12 @@ export type Contexto = {
 
 // Sem a migration das taxas as colunas não existem: grava sem elas, para a
 // integração não parar.
-async function camposTaxa(ctx: Contexto, p: AsaasPayment) {
+async function camposTaxa(ctx: Contexto, p: AsaasPayment, liquidoConhecido: number | null) {
   if (ctx.colunasTaxa === undefined) {
     const { error } = await ctx.supabase.from('lancamentos').select('asaas_valor').limit(1)
     ctx.colunasTaxa = !error
   }
-  return ctx.colunasTaxa ? { asaas_valor: Number(p.value), asaas_valor_liquido: liquido(p) } : {}
+  return ctx.colunasTaxa ? { asaas_valor: Number(p.value), asaas_valor_liquido: liquidoConhecido } : {}
 }
 
 // Dia em que o pagamento entrou. Vale a liquidação no Asaas antes do dia em que o
@@ -126,9 +129,21 @@ function manterRecebido(l: { asaas_criado: boolean; status: string }, novo: 'rec
   return !l.asaas_criado && l.status === 'recebido' && novo === 'pendente' ? 'recebido' : novo
 }
 
-// Valor que cai na conta. Antes do pagamento o Asaas já informa a estimativa;
-// quando o pagamento cai, o webhook atualiza com o valor final.
-const liquido = (p: AsaasPayment) => Number(Number(p.netValue ?? p.value).toFixed(2))
+// Valor que cai na conta (nulo = ainda não dá para saber). Antes do pagamento o
+// Asaas já informa a estimativa; quando o pagamento cai, o webhook atualiza com o
+// valor final. Antecipada: o líquido dos avisos anteriores menos o custo da antecipação.
+async function liquidoDaCobranca(ctx: Contexto, p: AsaasPayment): Promise<number | null> {
+  if (formaAindaIndefinida(p)) return null
+  if (!p.anticipated) return Number(Number(p.netValue ?? p.value).toFixed(2))
+
+  const { data } = await ctx.supabase.from('asaas_eventos').select('payload').eq('payment_id', p.id).order('created_at')
+  const avisos = ((data ?? []) as { payload: { payment?: AsaasPayment } }[]).flatMap((e) => e.payload.payment ?? [])
+  const antecipacoes = await antecipacoesDaCobranca(p.id).catch((e) => {
+    console.error('[asaas] buscar antecipações', p.id, e)
+    return []
+  })
+  return descontarAntecipacoes(liquidoAntesDaAntecipacao(p, avisos), antecipacoes)
+}
 
 const formaPagamento: Record<string, string> = { PIX: 'pix', BOLETO: 'boleto', CREDIT_CARD: 'cartao_credito', DEBIT_CARD: 'cartao_debito' }
 
@@ -208,13 +223,17 @@ export async function processarCobranca(
   p: AsaasPayment,
   opcoes: { excluida?: boolean; lancamentoEscolhido?: string } = {},
 ): Promise<Resultado> {
-  const base = { paymentId: p.id, vencimento: p.dueDate, valorAsaas: Number(p.value), valorLiquido: liquido(p), status: p.status }
+  const liquidoConhecido = await liquidoDaCobranca(ctx, p)
+  // Sem taxa conhecida, o lançamento fica com o valor cheio.
+  const valorLancamento = liquidoConhecido ?? Number(p.value)
+  const forma = formaPagamento[p.billingType]
+  const base = { paymentId: p.id, vencimento: p.dueDate, valorAsaas: Number(p.value), valorLiquido: valorLancamento, status: p.status }
   const excluida = opcoes.excluida || p.deleted
   const status = statusDoLancamento(p.status)
   const camposAsaas = {
     asaas_status: excluida ? 'DELETED' : p.status,
     asaas_invoice_url: p.invoiceUrl,
-    ...(ctx.simular ? {} : await camposTaxa(ctx, p)),
+    ...(ctx.simular ? {} : await camposTaxa(ctx, p, liquidoConhecido)),
   }
 
   // 1. Já ligada
@@ -240,8 +259,9 @@ export async function processarCobranca(
       ...camposAsaas,
       ...(await campoRecebidoEm(ctx, p, ligado.status)),
       status: manterRecebido(ligado, status),
-      forma_pagamento: ligado.forma_pagamento ?? formaPagamento[p.billingType] ?? null,
-      ...(ligado.asaas_criado ? { valor: liquido(p), data: p.dueDate } : {}),
+      // A forma informada pelo Asaas vale mais que a do lançamento.
+      forma_pagamento: forma ?? ligado.forma_pagamento ?? null,
+      ...(ligado.asaas_criado ? { valor: valorLancamento, data: p.dueDate } : {}),
       updated_at: new Date().toISOString(),
     }).eq('id', ligado.id)
     if (error) throw error
@@ -304,6 +324,7 @@ export async function processarCobranca(
       ...camposAsaas,
       ...(await campoRecebidoEm(ctx, p, c.status)),
       asaas_payment_id: p.id,
+      ...(forma ? { forma_pagamento: forma } : {}),
       status: manterRecebido({ asaas_criado: false, status: c.status }, status),
       updated_at: new Date().toISOString(),
     }).eq('id', c.id).is('asaas_payment_id', null)
@@ -313,7 +334,7 @@ export async function processarCobranca(
   }
 
   // Nenhum: cria
-  const resultado = { ...base, acao: 'criado' as const, cliente: cliente.nome, valorSistema: liquido(p) }
+  const resultado = { ...base, acao: 'criado' as const, cliente: cliente.nome, valorSistema: valorLancamento }
   if (ctx.simular) return resultado
   // A categoria de cada SaaS tem o nome dele ("Catálogo Place", "Clubelly").
   const saas = saasDaCobranca(p, cliente) ?? (await saasDaAssinatura(ctx, p))
@@ -323,12 +344,12 @@ export async function processarCobranca(
   const { error } = await ctx.supabase.from('lancamentos').insert({
     tipo: 'receita',
     descricao: p.description || `${saas ? labelLinha(saas) : 'Cobrança'} — ${cliente.nome}`,
-    valor: liquido(p),
+    valor: valorLancamento,
     data: p.dueDate,
     status,
     categoria_id: categoria,
     cliente_id: cliente.id,
-    forma_pagamento: formaPagamento[p.billingType] ?? null,
+    forma_pagamento: forma ?? null,
     recorrente: false,
     asaas_payment_id: p.id,
     asaas_criado: true,

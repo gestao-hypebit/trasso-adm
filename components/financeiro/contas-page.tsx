@@ -481,6 +481,9 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                               taxa Asaas {formatCurrency(Number(l.asaas_valor) - Number(l.asaas_valor_liquido))}{l.status !== 'recebido' && ' (estimada)'}
                             </span>
                           )}
+                          {l.asaas_valor != null && l.asaas_valor_liquido == null && l.status === 'pendente' && (
+                            <span className="block text-[11px] text-brand-lavanda/40">taxa depende da forma de pagamento</span>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center whitespace-nowrap">
                           <SituacaoBadge situacao={situacao} data={l.data} hoje={hoje} liquidadoLabel={t.liquidado} />

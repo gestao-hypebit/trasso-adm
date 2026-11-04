@@ -22,6 +22,14 @@ export type AsaasPayment = {
   invoiceNumber?: string | null
   description: string | null
   deleted?: boolean
+  anticipated?: boolean
+}
+
+export type AsaasAntecipacao = {
+  id: string
+  payment: string | null
+  status: string // PENDING | DENIED | CREDITED | DEBITED | CANCELLED | OVERDUE | SCHEDULED
+  fee: number | null
 }
 
 export type AsaasSubscription = {
@@ -120,6 +128,8 @@ export async function cobrancasDoCliente(customerId: string): Promise<AsaasPayme
 // Cobranças de uma assinatura (opcionalmente só de uma situação, ex.: PENDING).
 export const cobrancasDaAssinatura = (id: string, status?: string) =>
   listarTudo<AsaasPayment>(`subscriptions/${encodeURIComponent(id)}/payments`, status ? `status=${status}` : '')
+
+export const antecipacoesDaCobranca = (id: string) => listarTudo<AsaasAntecipacao>('anticipations', `payment=${encodeURIComponent(id)}`)
 
 // ---- Alterações (mexem na conta do Asaas) ----
 

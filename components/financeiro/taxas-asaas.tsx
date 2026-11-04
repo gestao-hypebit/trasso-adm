@@ -42,6 +42,7 @@ export function TaxasAsaas() {
       .eq('tipo', 'receita')
       .eq('status', 'recebido')
       .not('asaas_valor', 'is', null)
+      .not('asaas_valor_liquido', 'is', null)
       .gte('data', de)
       .lte('data', ate)
       .order('data', { ascending: false })
