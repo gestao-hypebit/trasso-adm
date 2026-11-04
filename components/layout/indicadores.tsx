@@ -5,39 +5,38 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Landmark, TrendingUp } from 'lucide-react'
 import { buscarTudo } from '@/lib/anuncios/consulta'
-import { hojeISO, resumoVendas, saldoDaConta, type LancamentoSaldo, type ResumoVendas } from '@/lib/financeiro'
+import { hojeISO, resumoRecebido, saldoDaConta, type LancamentoSaldo, type ResumoRecebido } from '@/lib/financeiro'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatCurrency } from '@/lib/utils'
 
-type Indicadores = { vendas: ResumoVendas | null; saldo: number | null }
+type Indicadores = { recebido: ResumoRecebido | null; faltaMigration: boolean; saldo: number | null }
 
-const IndicadoresContext = createContext<Indicadores>({ vendas: null, saldo: null })
+const IndicadoresContext = createContext<Indicadores>({ recebido: null, faltaMigration: false, saldo: null })
 
 const ATUALIZAR_A_CADA_MS = 60_000
+const AVISO_MIGRATION = 'Rode a migration 20261116000000_lancamentos_recebido_em.sql no Supabase para ver este valor.'
 
 // Fica no layout porque cada página monta o próprio Header: assim os valores
 // não somem a cada troca de tela. Se uma busca falhar, mantém o último valor.
 export function IndicadoresProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const [indicadores, setIndicadores] = useState<Indicadores>({ vendas: null, saldo: null })
+  const [indicadores, setIndicadores] = useState<Indicadores>({ recebido: null, faltaMigration: false, saldo: null })
   const ultimaBusca = useRef(0)
 
   const carregar = useCallback(async () => {
     const busca = ++ultimaBusca.current
     const db = createClient() as any
-    const [vendas, saldo] = await Promise.allSettled([
-      db.from('metas_movimentacoes').select('valor').eq('tipo', 'novo').eq('data', hojeISO()).then(({ data, error }: any) => {
-        if (error) throw new Error(error.message)
-        return resumoVendas(data ?? [])
-      }),
+    const [hoje, saldo] = await Promise.all([
+      db.from('lancamentos').select('valor').eq('tipo', 'receita').eq('status', 'recebido').eq('recebido_em', hojeISO()),
       buscarTudo<LancamentoSaldo>((de, ate) =>
         db.from('lancamentos').select('tipo, valor, status').in('status', ['recebido', 'pago']).order('id').range(de, ate),
-      ).then(saldoDaConta),
+      ).then(saldoDaConta, () => null),
     ])
     if (busca !== ultimaBusca.current) return
     setIndicadores((atual) => ({
-      vendas: vendas.status === 'fulfilled' ? vendas.value : atual.vendas,
-      saldo: saldo.status === 'fulfilled' ? saldo.value : atual.saldo,
+      recebido: hoje.error ? atual.recebido : resumoRecebido(hoje.data ?? []),
+      faltaMigration: hoje.error?.code === '42703',
+      saldo: saldo ?? atual.saldo,
     }))
   }, [])
 
@@ -60,21 +59,21 @@ const rotulo = 'block text-[10px] font-semibold uppercase leading-tight tracking
 const valor = 'block truncate text-sm font-bold leading-tight tabular-nums'
 
 export function IndicadoresTopo({ className }: { className?: string }) {
-  const { vendas, saldo } = useContext(IndicadoresContext)
-  const vendeuHoje = (vendas?.quantidade ?? 0) > 0
-  const quantidade = vendas?.quantidade ?? 0
+  const { recebido, faltaMigration, saldo } = useContext(IndicadoresContext)
+  const quantidade = recebido?.quantidade ?? 0
+  const recebeuHoje = quantidade > 0
 
   return (
     <div className={cn('grid grid-cols-2 gap-2', className)}>
       <Link
-        href="/metas"
-        title="Clientes novos registrados hoje nas Metas"
-        className={cn(chip, vendeuHoje ? 'bg-brand-lima text-brand-noite' : 'border border-brand-lima/40 bg-brand-lima/10 text-brand-lima')}
+        href="/financeiro/receitas"
+        title={faltaMigration ? AVISO_MIGRATION : 'Tudo que entrou hoje. Nas cobranças do Asaas, já sem a taxa.'}
+        className={cn(chip, recebeuHoje ? 'bg-brand-lima text-brand-noite' : 'border border-brand-lima/40 bg-brand-lima/10 text-brand-lima')}
       >
         <TrendingUp className="h-4 w-4 shrink-0" />
         <span className="min-w-0">
-          <span className={rotulo}>Vendas hoje{vendeuHoje && ` · ${quantidade}`}</span>
-          <span className={valor}>{vendas ? formatCurrency(vendas.total) : '...'}</span>
+          <span className={rotulo}>Recebido hoje{recebeuHoje && ` · ${quantidade}`}</span>
+          <span className={valor}>{recebido ? formatCurrency(recebido.total) : faltaMigration ? '—' : '...'}</span>
         </span>
       </Link>
       <Link

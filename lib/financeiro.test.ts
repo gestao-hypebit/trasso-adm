@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resumoVendas, saldoDaConta } from '@/lib/financeiro'
+import { resumoRecebido, saldoDaConta } from '@/lib/financeiro'
 
 describe('saldoDaConta', () => {
   it('soma o recebido, tira o pago e ignora o que não foi liquidado', () => {
@@ -18,12 +18,12 @@ describe('saldoDaConta', () => {
   })
 })
 
-describe('resumoVendas', () => {
-  it('conta as vendas e soma os valores', () => {
-    expect(resumoVendas([{ valor: 97 }, { valor: '850.00' }, { valor: null }])).toEqual({ quantidade: 3, total: 947 })
+describe('resumoRecebido', () => {
+  it('conta os recebimentos e soma os valores', () => {
+    expect(resumoRecebido([{ valor: 97 }, { valor: '850.00' }, { valor: null }])).toEqual({ quantidade: 3, total: 947 })
   })
 
-  it('dia sem venda', () => {
-    expect(resumoVendas([])).toEqual({ quantidade: 0, total: 0 })
+  it('dia sem recebimento', () => {
+    expect(resumoRecebido([])).toEqual({ quantidade: 0, total: 0 })
   })
 })

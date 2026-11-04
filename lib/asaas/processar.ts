@@ -69,6 +69,8 @@ export type Contexto = {
   motivoCliente?: string
   // Já existem as colunas de taxa (migration 20261023000000_asaas_taxas.sql)?
   colunasTaxa?: boolean
+  // Já existe a coluna recebido_em (migration 20261116000000_lancamentos_recebido_em.sql)?
+  colunaRecebidoEm?: boolean
 }
 
 // Sem a migration das taxas as colunas não existem: grava sem elas, para a
@@ -79,6 +81,18 @@ async function camposTaxa(ctx: Contexto, p: AsaasPayment) {
     ctx.colunasTaxa = !error
   }
   return ctx.colunasTaxa ? { asaas_valor: Number(p.value), asaas_valor_liquido: liquido(p) } : {}
+}
+
+// Dia do pagamento informado pelo Asaas. Sem data (ou sem a migration), não manda
+// nada; com a coluna criada, o gatilho do banco preenche com o dia de hoje.
+async function campoRecebidoEm(ctx: Contexto, p: AsaasPayment) {
+  const pago = p.clientPaymentDate ?? p.paymentDate
+  if (statusDoLancamento(p.status) !== 'recebido' || !pago) return {}
+  if (ctx.colunaRecebidoEm === undefined) {
+    const { error } = await ctx.supabase.from('lancamentos').select('recebido_em').limit(1)
+    ctx.colunaRecebidoEm = !error
+  }
+  return ctx.colunaRecebidoEm ? { recebido_em: pago.slice(0, 10) } : {}
 }
 
 const so = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '')
@@ -197,6 +211,7 @@ export async function processarCobranca(
     asaas_status: excluida ? 'DELETED' : p.status,
     asaas_invoice_url: p.invoiceUrl,
     ...(ctx.simular ? {} : await camposTaxa(ctx, p)),
+    ...(ctx.simular || excluida ? {} : await campoRecebidoEm(ctx, p)),
   }
 
   // 1. Já ligada

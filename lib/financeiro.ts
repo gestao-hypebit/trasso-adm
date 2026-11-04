@@ -26,10 +26,10 @@ export function saldoDaConta(lancamentos: LancamentoSaldo[]): number {
   }, 0)
 }
 
-export type ResumoVendas = { quantidade: number; total: number }
+export type ResumoRecebido = { quantidade: number; total: number }
 
-export function resumoVendas(vendas: { valor: number | string | null }[]): ResumoVendas {
-  return { quantidade: vendas.length, total: vendas.reduce((s, v) => s + Number(v.valor ?? 0), 0) }
+export function resumoRecebido(recebimentos: { valor: number | string | null }[]): ResumoRecebido {
+  return { quantidade: recebimentos.length, total: recebimentos.reduce((s, r) => s + Number(r.valor ?? 0), 0) }
 }
 
 export function situacaoDe(status: string, vencimento: string, hoje = hojeISO()): Situacao {
