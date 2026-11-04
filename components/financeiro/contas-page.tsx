@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { PageHeader } from '@/components/layout/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,7 +16,7 @@ import { LancamentoForm } from '@/components/financeiro/lancamento-form'
 import { FinanceiroSubNav } from '@/components/financeiro/financeiro-sub-nav'
 import { formatCurrency, formatDate, cn, whatsappUrl, addMonthsISO } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { hojeISO, diasEntre, situacaoDe, aging, baixarCSV, type Situacao } from '@/lib/financeiro'
+import { hojeISO, diasEntre, situacaoDe, baixarCSV, type Situacao } from '@/lib/financeiro'
 import { SeletorMes, periodoInicial, intervaloPeriodo, rotuloPeriodo, type Periodo } from '@/components/financeiro/seletor-mes'
 import { linhaOpcoes, type Linha } from '@/lib/financeiro/linhas'
 import { FiltroLinha, type FiltroLinhaValor } from '@/components/financeiro/filtro-linha'
@@ -61,13 +61,14 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const ehReceber = tipo === 'receita'
   const statusLiquidado = ehReceber ? 'recebido' : 'pago'
   const t = ehReceber
-    ? { titulo: 'Contas a Receber', liquidado: 'Recebido', liquidadas: 'Recebidas', baixa: 'Receber', cor: 'text-brand-lima' }
-    : { titulo: 'Contas a Pagar', liquidado: 'Pago', liquidadas: 'Pagas', baixa: 'Pagar', cor: 'text-brand-rosa' }
+    ? { titulo: 'Contas a Receber', liquidado: 'Recebido', liquidadas: 'Recebidas', item: 'cobrança', cor: 'text-brand-lima' }
+    : { titulo: 'Contas a Pagar', liquidado: 'Pago', liquidadas: 'Pagas', item: 'conta', cor: 'text-brand-rosa' }
+  const qtd = (n: number) => `${n} ${t.item}${n === 1 ? '' : 's'}`
 
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
-  const [aba, setAba] = useState<Aba>('todas')
+  const [aba, setAba] = useState<Aba>('aberto')
   const [periodo, setPeriodo] = useState<Periodo>(periodoInicial)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -162,40 +163,26 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   const liquidadoMes = noPeriodo.filter(l => l.status === statusLiquidado)
   const abertosPeriodo = noPeriodo.filter(l => l.status === 'pendente')
   const soma = (arr: Lancamento[]) => arr.reduce((s, l) => s + l.valor, 0)
-  const faixas = aging(abertos, hoje)
-  const maxFaixa = Math.max(...faixas.map(f => f.valor), 1)
 
-  // Quem mais deve (receber) ou para onde vai o dinheiro (pagar), considerando o que está em aberto.
-  const ranking = Object.entries(
-    abertos.reduce((acc, l) => {
-      const k = ehReceber ? (l.clientes?.nome ?? 'Sem cliente') : (l.categorias_financeiras?.nome ?? 'Sem categoria')
-      acc[k] = (acc[k] ?? 0) + l.valor
-      return acc
-    }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  // "Vencidas" e "Próx. 7 dias" mostram a situação de hoje, em qualquer mês: dívida
+  // antiga não some ao trocar de mês. As outras abas seguem o período escolhido.
+  // Cada aba e seu cartão usam a mesma lista, então os números sempre batem.
+  const porAba: Record<Aba, Lancamento[]> = {
+    aberto: abertosPeriodo,
+    vencidas: vencidos,
+    semana: em7,
+    liquidadas: liquidadoMes,
+    canceladas: noPeriodo.filter(l => l.status === 'cancelado'),
+    todas: noPeriodo,
+  }
+  const abaDeHoje = aba === 'vencidas' || aba === 'semana'
 
-  // As abas e os cartões "Total em aberto" e liquidado contam o período escolhido;
-  // "Vencido" e "Vence em 7 dias" mostram a situação de hoje.
-  const contagem: Record<Aba, number> = {
-    aberto: abertosPeriodo.length,
-    vencidas: noPeriodo.filter(l => l.status === 'pendente' && l.data < hoje).length,
-    semana: noPeriodo.filter(l => l.status === 'pendente' && l.data >= hoje && diasEntre(hoje, l.data) <= 7).length,
-    liquidadas: liquidadoMes.length,
-    canceladas: noPeriodo.filter(l => l.status === 'cancelado').length,
-    todas: noPeriodo.length,
+  function trocarAba(nova: Aba) {
+    setAba(nova)
+    setSelecionados(new Set())
   }
 
-  const filtradas = noPeriodo
-    .filter((l) => {
-      switch (aba) {
-        case 'aberto': return l.status === 'pendente'
-        case 'vencidas': return l.status === 'pendente' && l.data < hoje
-        case 'semana': return l.status === 'pendente' && l.data >= hoje && diasEntre(hoje, l.data) <= 7
-        case 'liquidadas': return l.status === statusLiquidado
-        case 'canceladas': return l.status === 'cancelado'
-        default: return true
-      }
-    })
+  const filtradas = porAba[aba]
     .filter((l) => {
       const q = busca.toLowerCase()
       return !q || l.descricao.toLowerCase().includes(q)
@@ -239,10 +226,10 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
   }
 
   const kpis = [
-    { label: 'Vencido', valor: soma(vencidos), sub: `${vencidos.length} título(s) em atraso`, icon: AlertTriangle, cor: 'text-brand-rosa', bg: 'bg-brand-rosa/10', aba: 'vencidas' as Aba },
-    { label: 'Vence em 7 dias', valor: soma(em7), sub: `${em7.length} título(s)`, icon: CalendarClock, cor: 'text-yellow-400', bg: 'bg-yellow-400/10', aba: 'semana' as Aba },
-    { label: `Em aberto · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(abertosPeriodo), sub: `${abertosPeriodo.length} título(s)`, icon: Wallet, cor: 'text-brand-lavanda', bg: 'bg-brand-violeta/10', aba: 'aberto' as Aba },
-    { label: `${t.liquidado} · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(liquidadoMes), sub: `${liquidadoMes.length} baixa(s)`, icon: CheckCircle2, cor: t.cor, bg: ehReceber ? 'bg-brand-lima/10' : 'bg-brand-rosa/10', aba: 'liquidadas' as Aba },
+    { label: 'Vencido', valor: soma(vencidos), sub: `${qtd(vencidos.length)} em atraso, de qualquer mês`, icon: AlertTriangle, cor: 'text-brand-rosa', bg: 'bg-brand-rosa/10', aba: 'vencidas' as Aba },
+    { label: 'Vence em 7 dias', valor: soma(em7), sub: `${qtd(em7.length)} a partir de hoje`, icon: CalendarClock, cor: 'text-yellow-400', bg: 'bg-yellow-400/10', aba: 'semana' as Aba },
+    { label: `Em aberto · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(abertosPeriodo), sub: qtd(abertosPeriodo.length), icon: Wallet, cor: 'text-brand-lavanda', bg: 'bg-brand-violeta/10', aba: 'aberto' as Aba },
+    { label: `${t.liquidado} · ${periodo.tudo ? 'total' : rotuloPeriodo(periodo).toLowerCase()}`, valor: soma(liquidadoMes), sub: qtd(liquidadoMes.length), icon: CheckCircle2, cor: t.cor, bg: ehReceber ? 'bg-brand-lima/10' : 'bg-brand-rosa/10', aba: 'liquidadas' as Aba },
   ]
 
   const abas: { key: Aba; label: string }[] = [
@@ -254,13 +241,13 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
     { key: 'todas', label: 'Todas' },
   ]
 
-  const colunas = ehReceber ? 9 : 8
+  const colunas = ehReceber ? 8 : 7
 
   return (
     <div className="flex flex-col min-h-screen">
       <Header title="Financeiro" description={t.titulo} />
       <main className="flex-1 p-4 md:p-6">
-        <PageHeader title={t.titulo} description={ehReceber ? 'Títulos a receber de clientes, vencimentos e inadimplência' : 'Obrigações da agência, vencimentos e pagamentos'}>
+        <PageHeader title={t.titulo} description={ehReceber ? 'O que os clientes têm para pagar e o que já entrou' : 'O que a agência tem para pagar e o que já saiu'}>
           <Button variant="outline" size="sm" onClick={exportar} disabled={!filtradas.length}>
             <Download className="h-4 w-4" /> Exportar CSV
           </Button>
@@ -271,7 +258,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
         {/* KPIs — clicar filtra a tabela */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {kpis.map((k) => (
-            <button key={k.label} type="button" onClick={() => { setAba(k.aba); if (k.aba !== 'liquidadas') setPeriodo(p => ({ ...p, tudo: true })) }} className="text-left">
+            <button key={k.label} type="button" onClick={() => trocarAba(k.aba)} className="text-left">
               <Card className={cn('transition-colors hover:border-white/[0.14]', aba === k.aba && 'border-white/[0.18]')}>
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', k.bg)}>
@@ -290,49 +277,14 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Aging {ehReceber ? '(inadimplência)' : '(atrasos)'}</CardTitle>
-              <p className="text-xs text-brand-lavanda/40">Títulos em aberto por dias de atraso</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {faixas.map((f) => (
-                <div key={f.key} className="flex items-center gap-3 text-xs">
-                  <span className="w-20 shrink-0 text-brand-lavanda/60">{f.label}</span>
-                  <div className="flex-1 h-2.5 rounded-full bg-white/[0.04] overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full', f.key === 'a_vencer' ? 'bg-brand-violeta' : f.key === '1_30' ? 'bg-yellow-400' : 'bg-brand-rosa')}
-                      style={{ width: `${(f.valor / maxFaixa) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-8 shrink-0 text-right text-brand-lavanda/40">{f.qtd}</span>
-                  <span className="w-28 shrink-0 text-right font-medium text-brand-lavanda">{formatCurrency(f.valor)}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{ehReceber ? 'Maiores devedores' : 'Em aberto por categoria'}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2.5">
-              {ranking.length === 0 ? (
-                <p className="text-xs text-brand-lavanda/40 py-6 text-center">Nada em aberto.</p>
-              ) : ranking.map(([nome, valor]) => (
-                <div key={nome} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="truncate text-brand-lavanda/70">{nome}</span>
-                  <span className="shrink-0 font-medium text-brand-lavanda">{formatCurrency(valor)}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
+        {/* Período, linha e busca */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <SeletorMes valor={periodo} onChange={(p) => { setPeriodo(p); setAba('todas'); setSelecionados(new Set()) }} permitirFuturo />
+          <SeletorMes valor={periodo} onChange={(p) => { setPeriodo(p); trocarAba(abaDeHoje ? 'aberto' : aba) }} permitirFuturo />
           {ehReceber && <FiltroLinha valor={linha} onChange={(v) => { setLinha(v); setSelecionados(new Set()) }} />}
+          <div className="relative min-w-[16rem] flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
+            <Input className="pl-9" placeholder={ehReceber ? 'Buscar por descrição, cliente ou categoria...' : 'Buscar por descrição ou categoria...'} value={busca} onChange={(e) => setBusca(e.target.value)} />
+          </div>
         </div>
 
         {/* Abas de situação */}
@@ -341,26 +293,22 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
             <button
               key={a.key}
               type="button"
-              onClick={() => { setAba(a.key); setSelecionados(new Set()) }}
+              onClick={() => trocarAba(a.key)}
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
                 aba === a.key ? 'bg-white/[0.08] text-brand-lavanda' : 'text-brand-lavanda/40 hover:text-brand-lavanda/70 hover:bg-white/[0.04]'
               )}
             >
               {a.label}
-              <span className={cn('rounded-full px-1.5 text-[10px] leading-4', a.key === 'vencidas' && contagem.vencidas > 0 ? 'bg-brand-rosa/15 text-brand-rosa' : 'bg-white/[0.06] text-brand-lavanda/50')}>
-                {contagem[a.key]}
+              <span className={cn('rounded-full px-1.5 text-[10px] leading-4', a.key === 'vencidas' && vencidos.length > 0 ? 'bg-brand-rosa/15 text-brand-rosa' : 'bg-white/[0.06] text-brand-lavanda/50')}>
+                {porAba[a.key].length}
               </span>
             </button>
           ))}
         </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-lavanda/40" />
-            <Input className="pl-9" placeholder={ehReceber ? 'Buscar por descrição, cliente ou categoria...' : 'Buscar por descrição ou categoria...'} value={busca} onChange={(e) => setBusca(e.target.value)} />
-          </div>
-        </div>
+        {abaDeHoje && (
+          <p className="-mt-2 mb-4 text-xs text-brand-lavanda/40">Esta aba mostra a situação de hoje, em qualquer mês. O período escolhido não muda esta lista.</p>
+        )}
 
         {selecionados.size > 0 && (
           <div className="flex items-center justify-between gap-3 mb-3 rounded-xl border border-brand-lima/20 bg-brand-lima/[0.05] px-4 py-2.5">
@@ -370,7 +318,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => setSelecionados(new Set())}>Limpar</Button>
               <Button size="sm" onClick={() => darBaixa([...selecionados])} disabled={baixando}>
-                <Check className="h-4 w-4" /> {baixando ? 'Salvando...' : `Dar baixa (${t.liquidado.toLowerCase()})`}
+                <Check className="h-4 w-4" /> {baixando ? 'Salvando...' : `Marcar como ${t.liquidado.toLowerCase()}`}
               </Button>
             </div>
           </div>
@@ -395,17 +343,16 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Descrição</th>
                     {ehReceber && <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Cliente</th>}
                     <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Categoria · linha</th>
-                    <th className="text-left text-xs text-brand-lavanda/50 font-medium px-3 py-3">Forma</th>
                     <th className="text-right text-xs text-brand-lavanda/50 font-medium px-3 py-3">Valor</th>
                     <th className="text-center text-xs text-brand-lavanda/50 font-medium px-3 py-3">Situação</th>
-                    <th className="w-36" />
+                    <th className="w-44" />
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr><td colSpan={colunas} className="p-4"><SkeletonLista linhas={4} /></td></tr>
                   ) : filtradas.length === 0 ? (
-                    <tr><td colSpan={colunas} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">Nenhum título nesta visão.</td></tr>
+                    <tr><td colSpan={colunas} className="px-6 py-12 text-center text-brand-lavanda/40 text-sm">{aba === 'vencidas' && !busca ? 'Nada vencido.' : `Nenhuma ${t.item} nesta lista.`}</td></tr>
                   ) : filtradas.map((l) => {
                     const situacao = situacaoDe(l.status, l.data, hoje)
                     const zap = ehReceber && situacao !== 'liquidado' && situacao !== 'cancelado'
@@ -422,12 +369,12 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                           {formatDate(l.data)}
                         </td>
                         <td className="px-3 py-3">
-                          <div className="flex items-center gap-1.5 max-w-xs">
+                          <div className="flex items-center gap-1.5 max-w-[15rem]">
                             {l.recorrente && <RefreshCw className="h-3 w-3 shrink-0 text-brand-violeta" aria-label="Recorrente" />}
-                            <span className="text-brand-lavanda font-medium truncate">{l.descricao}</span>
+                            <span className="text-brand-lavanda font-medium truncate" title={l.descricao}>{l.descricao}</span>
                           </div>
                         </td>
-                        {ehReceber && <td className="px-3 py-3 text-brand-lavanda/70 whitespace-nowrap">{l.clientes?.nome ?? '—'}</td>}
+                        {ehReceber && <td className="px-3 py-3 text-brand-lavanda/70"><span className="block max-w-[13rem] truncate" title={l.clientes?.nome}>{l.clientes?.nome ?? '—'}</span></td>}
                         <td className="px-3 py-3 text-xs text-brand-lavanda/60 whitespace-nowrap">
                           <select
                             value={l.categoria_id ?? ''}
@@ -448,7 +395,6 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                             {linhaOpcoes.map(f => <option key={f.value} value={f.value} className="bg-brand-noite">{f.label}</option>)}
                           </select>
                         </td>
-                        <td className="px-3 py-3 text-xs text-brand-lavanda/50 whitespace-nowrap">{formaLabel[l.forma_pagamento ?? ''] ?? '—'}</td>
                         <td className={cn('px-3 py-3 text-right font-semibold whitespace-nowrap', l.status === 'cancelado' ? 'text-brand-lavanda/30 line-through' : t.cor)}>
                           {editandoValor?.id === l.id ? (
                             <div className="flex flex-col items-end gap-1">
@@ -476,17 +422,19 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                               {formatCurrency(l.valor)}
                             </button>
                           )}
+                          {l.asaas_valor != null && l.asaas_valor_liquido == null && l.status === 'pendente' && (
+                            <span className="block text-[11px] font-normal text-brand-lavanda/40" title="O cliente ainda não escolheu a forma de pagamento. A taxa do Asaas entra quando ele pagar.">taxa a definir</span>
+                          )}
                           {l.asaas_valor != null && l.asaas_valor_liquido != null && Number(l.asaas_valor) > Number(l.asaas_valor_liquido) && (
                             <span className="block text-[11px] text-brand-lavanda/40" title={`Cobrado ${formatCurrency(Number(l.asaas_valor))} · caiu na conta ${formatCurrency(Number(l.asaas_valor_liquido))}`}>
-                              taxa Asaas {formatCurrency(Number(l.asaas_valor) - Number(l.asaas_valor_liquido))}{l.status !== 'recebido' && ' (estimada)'}
+                              cobrado {formatCurrency(Number(l.asaas_valor))}
+                              <span className="block">taxa {l.status !== 'recebido' && 'est. '}{formatCurrency(Number(l.asaas_valor) - Number(l.asaas_valor_liquido))}</span>
                             </span>
-                          )}
-                          {l.asaas_valor != null && l.asaas_valor_liquido == null && l.status === 'pendente' && (
-                            <span className="block text-[11px] text-brand-lavanda/40">taxa depende da forma de pagamento</span>
                           )}
                         </td>
                         <td className="px-3 py-3 text-center whitespace-nowrap">
                           <SituacaoBadge situacao={situacao} data={l.data} hoje={hoje} liquidadoLabel={t.liquidado} />
+                          {formaLabel[l.forma_pagamento ?? ''] && <span className="mt-0.5 block text-[11px] text-brand-lavanda/40">{formaLabel[l.forma_pagamento ?? '']}</span>}
                         </td>
                         <td className="px-3 py-3">
                           {deletingId === l.id ? (
@@ -506,7 +454,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                               {l.status === 'pendente' && (
                                 <Button size="sm" variant="outline" className="h-7 text-[11px] px-2 border-brand-lima/30 text-brand-lima hover:bg-brand-lima/10"
                                   onClick={() => darBaixa([l.id])} disabled={baixando}>
-                                  <Check className="h-3 w-3" /> {t.baixa}
+                                  <Check className="h-3 w-3" /> Marcar {t.liquidado.toLowerCase()}
                                 </Button>
                               )}
                               <button
@@ -527,7 +475,7 @@ export function ContasPage({ tipo }: { tipo: 'receita' | 'despesa' }) {
                   <tfoot>
                     <tr className="border-t border-white/[0.06]">
                       <td colSpan={colunas - 3} className="px-6 py-3 text-xs text-brand-lavanda/40">
-                        {filtradas.length} título{filtradas.length !== 1 ? 's' : ''}
+                        {qtd(filtradas.length)}
                       </td>
                       <td className="px-3 py-3 text-right font-bold text-brand-lavanda whitespace-nowrap">
                         {formatCurrency(soma(filtradas.filter(l => l.status !== 'cancelado')))}

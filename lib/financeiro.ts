@@ -48,25 +48,6 @@ export function situacaoDe(status: string, vencimento: string, hoje = hojeISO())
   return 'a_vencer'
 }
 
-export const FAIXAS_AGING = [
-  { key: 'a_vencer', label: 'A vencer', min: -Infinity, max: 0 },
-  { key: '1_30', label: '1–30 dias', min: 1, max: 30 },
-  { key: '31_60', label: '31–60 dias', min: 31, max: 60 },
-  { key: '61_90', label: '61–90 dias', min: 61, max: 90 },
-  { key: '90_mais', label: '+90 dias', min: 91, max: Infinity },
-] as const
-
-// Agrupa títulos em aberto por dias de atraso.
-export function aging<T extends { valor: number; data: string }>(abertos: T[], hoje = hojeISO()) {
-  return FAIXAS_AGING.map((f) => {
-    const itens = abertos.filter((l) => {
-      const atraso = diasEntre(l.data, hoje)
-      return atraso >= f.min && atraso <= f.max
-    })
-    return { ...f, qtd: itens.length, valor: itens.reduce((s, l) => s + l.valor, 0) }
-  })
-}
-
 export function baixarCSV(nome: string, cabecalho: string[], linhas: (string | number)[][]) {
   const esc = (v: string | number) => {
     const s = typeof v === 'number' ? v.toFixed(2).replace('.', ',') : v
