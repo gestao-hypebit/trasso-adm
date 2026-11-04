@@ -119,6 +119,15 @@ export default function FinanceiroPage() {
   const saiAteFim = soma(emAbertoAteFim.filter(l => l.tipo === 'despesa'))
   const saldoPrevisto = saldoAtual + entraAteFim - saiAteFim
   const mostrarPrevisao = fim >= hojeStr
+  // Separa o que é do período do que ficou de meses anteriores: a parte do período
+  // é a mesma "Falta receber/pagar" dos cartões (com o filtro de linha em "Tudo").
+  const detalheAberto = (tipo: 'receita' | 'despesa') => {
+    const itens = emAbertoAteFim.filter(l => l.tipo === tipo)
+    const anteriores = soma(itens.filter(l => l.data < inicio))
+    const total = soma(itens)
+    if (anteriores === 0) return formatCurrency(total)
+    return `${formatCurrency(total - anteriores)} do mês + ${formatCurrency(anteriores)} de meses anteriores`
+  }
 
   const cashflowData: DiaFluxo[] = (() => {
     if (periodo.tudo) {
@@ -153,8 +162,8 @@ export default function FinanceiroPage() {
   })()
 
   const kpis = [
-    { label: 'Recebido', valor: totalRecebido, sub: aReceber > 0 ? `Falta receber ${formatCurrency(aReceber)}` : 'Nada em aberto para receber', icon: TrendingUp, cor: 'text-brand-lima', bgIcon: 'bg-brand-lima/10' },
-    { label: 'Pago', valor: totalPago, sub: aPagar > 0 ? `Falta pagar ${formatCurrency(aPagar)}` : 'Nada em aberto para pagar', icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10' },
+    { label: 'Recebido', valor: totalRecebido, sub: aReceber > 0 ? `Falta receber${periodo.tudo ? '' : ' neste mês'}: ${formatCurrency(aReceber)}` : 'Nada em aberto para receber', icon: TrendingUp, cor: 'text-brand-lima', bgIcon: 'bg-brand-lima/10' },
+    { label: 'Pago', valor: totalPago, sub: aPagar > 0 ? `Falta pagar${periodo.tudo ? '' : ' neste mês'}: ${formatCurrency(aPagar)}` : 'Nada em aberto para pagar', icon: TrendingDown, cor: 'text-brand-rosa', bgIcon: 'bg-brand-rosa/10' },
     { label: 'Resultado', valor: resultado, sub: 'Recebido − pago', icon: Scale, cor: resultado >= 0 ? 'text-brand-lima' : 'text-brand-rosa', bgIcon: 'bg-brand-violeta/10' },
     { label: 'Resultado previsto', valor: resultado + aReceber - aPagar, sub: 'Se tudo em aberto for pago', icon: Target, cor: 'text-brand-lavanda', bgIcon: 'bg-brand-violeta/10' },
   ]
@@ -222,9 +231,9 @@ export default function FinanceiroPage() {
               <p className={cn('text-3xl font-bold', saldoPrevisto >= 0 ? 'text-brand-lavanda' : 'text-brand-rosa')} style={{ fontFamily: 'var(--font-space-grotesk)' }}>
                 {loading ? '...' : formatCurrency(saldoPrevisto)}
               </p>
-              <p className="text-xs text-brand-lavanda/30 mt-1">
-                +{formatCurrency(entraAteFim)} a receber − {formatCurrency(saiAteFim)} a pagar, se tudo for pago
-              </p>
+              <p className="text-xs text-brand-lavanda/30 mt-1">A receber: {detalheAberto('receita')}</p>
+              <p className="text-xs text-brand-lavanda/30">A pagar: {detalheAberto('despesa')}</p>
+              <p className="text-xs text-brand-lavanda/30">{linha === 'todas' ? 'Se tudo for pago' : 'Se tudo for pago · todas as linhas'}</p>
             </div>
           )}
         </div>
