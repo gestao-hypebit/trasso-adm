@@ -12,7 +12,7 @@ O que importa:
 - Mix equilibrado ao longo do período: conteúdo que educa, que gera conexão/bastidores, prova social e venda. Varie os formatos pedidos.
 - Use datas comemorativas do período só quando fizerem sentido para o negócio.
 - Distribua os posts nos dias e horários de mais engajamento (evite empilhar no mesmo dia, salvo stories).
-- "roteiro" é o que o designer ou videomaker precisa: para carrossel, o texto de cada slide (Slide 1: ..., Slide 2: ...); para reels/vídeo, o roteiro em cenas com a fala; para post e stories, a descrição da arte e o texto que vai nela.
+- "roteiro" é o que o designer ou videomaker precisa: para carrossel, o texto de cada slide (Slide 1: ..., Slide 2: ...); para reels/vídeo, o roteiro em cenas com a fala, sem observações internas, porque o cliente lê para aprovar e gravar; para post e stories, a descrição da arte e o texto que vai nela.
 - Não invente fatos como verdade (preços, números, prêmios, depoimentos). Quando precisar de um dado que não foi dado, use um marcador entre colchetes, por exemplo "[preço]".
 - De 5 a 12 hashtags relevantes por post, misturando amplas e de nicho/local.`
 

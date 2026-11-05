@@ -1,7 +1,7 @@
 'use client'
 
 import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
-import { APROVACAO, FORMATOS, REDES, nomePeriodo, ordenarPosts, type Post } from '@/lib/social/tipos'
+import { APROVACAO, FORMATOS, REDES, ehFormatoVideo, nomePeriodo, ordenarPosts, type Post } from '@/lib/social/tipos'
 import { formatDate } from '@/lib/utils'
 
 // Sem isso o react-pdf hifeniza palavras em português ("dig-ital").
@@ -136,8 +136,10 @@ export function PlanejamentoPDF({ cliente, mes, fim, objetivo, posts, logoUrl, a
           <Text style={s.secao} break={lista.length > 14}>Posts</Text>
           {lista.map((p) => {
             const img = imagemPdf(p.midias)
+            const roteiro = ehFormatoVideo(p.formato) ? p.roteiro : null
             return (
-              <View key={p.id} style={s.post} wrap={false}>
+              // Roteiro longo pode passar de uma página: deixa quebrar em vez de cortar a fala.
+              <View key={p.id} style={s.post} wrap={(roteiro?.length ?? 0) > 1500}>
                 {img
                   ? <Image src={img} style={s.midia} />
                   : <View style={s.semMidia}><Text style={s.semMidiaTxt}>{p.midias.length ? 'Vídeo / mídia no link do planejamento' : 'Arte em produção'}</Text></View>}
@@ -156,6 +158,12 @@ export function PlanejamentoPDF({ cliente, mes, fim, objetivo, posts, logoUrl, a
                     </>
                   )}
                   {p.hashtags && <Text style={s.hashtags}>{p.hashtags}</Text>}
+                  {roteiro && (
+                    <>
+                      <Text style={s.rotulo}>Roteiro do vídeo</Text>
+                      <Text style={s.texto}>{roteiro}</Text>
+                    </>
+                  )}
                   {p.cta && <Text style={s.extra}>CTA: {p.cta}</Text>}
                 </View>
               </View>

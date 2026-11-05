@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ehVideo } from '@/components/social/post-card'
 import { createClient } from '@/lib/supabase/client'
 import { ERRO_MIGRATION_ARTES, TIPOS_CONTEUDO } from '@/lib/social/artes'
-import { APROVACAO, FORMATOS, POST_VAZIO, PRODUCAO, REDES, fimDoPeriodo, type Formato, type Post, type Producao, type Rede } from '@/lib/social/tipos'
+import { APROVACAO, FORMATOS, POST_VAZIO, PRODUCAO, REDES, ehFormatoVideo, fimDoPeriodo, type Formato, type Post, type Producao, type Rede } from '@/lib/social/tipos'
 import { cn } from '@/lib/utils'
 
 type Form = typeof POST_VAZIO & { data: string }
@@ -228,8 +228,9 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
         </div>
 
         <div className="space-y-1.5">
-          <Label>{form.formato === 'reels' || form.formato === 'video' ? 'Roteiro do vídeo' : form.formato === 'carrossel' ? 'Texto dos slides' : 'Briefing da arte'}</Label>
-          <Textarea rows={4} value={form.roteiro} onChange={(e) => set('roteiro', e.target.value)} placeholder={form.formato === 'carrossel' ? 'Slide 1: ...\nSlide 2: ...' : 'O que vai na arte / no vídeo'} />
+          <Label>{ehFormatoVideo(form.formato) ? 'Roteiro do vídeo' : form.formato === 'carrossel' ? 'Texto dos slides' : 'Briefing da arte'}</Label>
+          <Textarea rows={ehFormatoVideo(form.formato) ? 8 : 4} value={form.roteiro} onChange={(e) => set('roteiro', e.target.value)} placeholder={ehFormatoVideo(form.formato) ? 'Cena 1: ...\nCena 2: ...' : form.formato === 'carrossel' ? 'Slide 1: ...\nSlide 2: ...' : 'O que vai na arte'} />
+          {ehFormatoVideo(form.formato) && <p className="text-xs text-brand-lavanda/50">O cliente vê este roteiro na tela de aprovação e no PDF. Não coloque observações internas aqui.</p>}
         </div>
 
         <div className="space-y-1.5">

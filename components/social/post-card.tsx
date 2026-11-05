@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Image as ImageIcon, Layers } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { APROVACAO, FORMATOS, PRODUCAO, REDES, type Post } from '@/lib/social/tipos'
+import { APROVACAO, FORMATOS, PRODUCAO, REDES, ehFormatoVideo, type Post } from '@/lib/social/tipos'
 import { TIPOS_CONTEUDO, type TipoConteudo } from '@/lib/social/artes'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -108,9 +108,9 @@ export function PostCard({ post, interno = false, acoes }: { post: Post; interno
           </Bloco>
         )}
         {!post.legenda && post.hashtags && <p className="text-sm text-brand-violeta">{post.hashtags}</p>}
-        {interno && post.roteiro && (
-          <Bloco titulo={post.formato === 'reels' || post.formato === 'video' ? 'Roteiro' : post.formato === 'carrossel' ? 'Slides' : 'Arte'}>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-lavanda/70">{post.roteiro}</p>
+        {(interno || ehFormatoVideo(post.formato)) && post.roteiro && (
+          <Bloco titulo={ehFormatoVideo(post.formato) ? 'Roteiro do vídeo' : post.formato === 'carrossel' ? 'Slides' : 'Arte'}>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-lavanda/85">{post.roteiro}</p>
           </Bloco>
         )}
         {post.cta && <p className="text-xs text-brand-lavanda/50"><span className="font-semibold uppercase tracking-wide text-brand-lavanda/40">CTA</span> · {post.cta}</p>}

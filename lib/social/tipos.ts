@@ -23,6 +23,10 @@ export const FORMATOS = {
 } as const
 export type Formato = keyof typeof FORMATOS
 
+// Em vídeo, `roteiro` é o que o cliente vai falar: ele vê para aprovar e gravar.
+// Nos outros formatos, é o briefing interno da arte.
+export const ehFormatoVideo = (formato: Formato) => formato === 'reels' || formato === 'video'
+
 export const PRODUCAO = {
   ideia:     { label: 'Ideia',       variant: 'default' as Variante },
   producao:  { label: 'Em produção', variant: 'lead' as Variante },

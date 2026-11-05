@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getPlanejamentoPorToken } from '@/lib/social/publico'
-import { ordenarPosts, type Post } from '@/lib/social/tipos'
+import { ehFormatoVideo, ordenarPosts, type Post } from '@/lib/social/tipos'
 import { AprovacaoCliente } from '@/components/social/aprovacao-cliente'
 
 export const metadata: Metadata = {
@@ -20,20 +20,22 @@ export default async function PlanoPage({ params, searchParams }: { params: Prom
   if (plano.status === 'rascunho' && admin !== '1') return <Aviso titulo="Planejamento em preparação" texto="Volte daqui a pouco." />
 
   const supabase = createServiceClient() as any
-  // roteiro fica de fora: é o briefing interno da arte, o cliente não vê.
   const [{ data: posts }, { data: config }] = await Promise.all([
     supabase.from('social_posts')
-      .select('id, planejamento_id, data, horario, redes, formato, titulo, legenda, hashtags, cta, midias, producao, aprovacao, comentario_cliente, respondido_nome, respondido_em')
+      .select('id, planejamento_id, data, horario, redes, formato, titulo, legenda, hashtags, roteiro, cta, midias, producao, aprovacao, comentario_cliente, respondido_nome, respondido_em')
       .eq('planejamento_id', plano.id),
     supabase.from('configuracoes_agencia').select('nome, logo_url').limit(1).maybeSingle(),
     admin !== '1' ? supabase.rpc('social_planejamento_visualizar', { p_token: token }) : null,
   ])
 
+  // Remove aqui, no servidor: o briefing interno da arte não pode chegar ao navegador do cliente.
+  const postsDoCliente = ((posts ?? []) as Post[]).map((p) => (ehFormatoVideo(p.formato) ? p : { ...p, roteiro: null }))
+
   return (
     <AprovacaoCliente
       token={token}
       plano={plano}
-      posts={ordenarPosts((posts ?? []) as Post[])}
+      posts={ordenarPosts(postsDoCliente)}
       agenciaNome={config?.nome ?? 'Slick'}
       logoUrl={config?.logo_url ?? null}
       previa={plano.status === 'rascunho'}
