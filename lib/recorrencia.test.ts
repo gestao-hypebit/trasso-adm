@@ -115,6 +115,26 @@ describe('ativas, canceladas e inadimplentes', () => {
     expect(r.mrrBruto).toBe(50)
   })
 
+  it('cancelada com fatura pendente vencida não entra como inadimplente', () => {
+    const d = dados({
+      clientes: [cliente('pagou', 'saas'), cliente('nunca', 'saas')],
+      assinaturas: [
+        sub('s1', 'cus_pagou', 49.9, { status: 'INACTIVE', removida: true }),
+        sub('s2', 'cus_nunca', 49.9, { status: 'INACTIVE', removida: true, jaPagou: false }),
+      ],
+      lancamentos: [
+        lanc('pagou', 'catalogo_place', '2026-08-11', 47.91, { asaas_payment_id: 'p1' }),
+        lanc('pagou', 'catalogo_place', '2026-09-11', 47.91, { asaas_payment_id: 'p2', status: 'pendente' }),
+        lanc('nunca', 'catalogo_place', '2026-09-11', 47.91, { asaas_payment_id: 'p3', status: 'pendente' }),
+      ],
+    })
+    const r = montarLinha('catalogo_place', d)
+    expect(r.inadimplentes).toBe(0)
+    expect(r.totalAtraso).toBe(0)
+    expect(r.contagem.atraso).toBe(0)
+    expect(r.linhas.find((l) => l.chave === 'pagou')?.cancelada).toBe(true)
+  })
+
   it('inadimplente não conta como ativa em dia, mas segue no MRR', () => {
     const d = dados({
       clientes: [cliente('ok', 'saas'), cliente('dev', 'saas')],

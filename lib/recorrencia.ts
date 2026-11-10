@@ -193,7 +193,6 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
   const ativosPorChave = new Map(mrr.ativos.map((a) => [a.chave, a]))
   const linhas: Assinante[] = base.map((c) => {
     const a = ativosPorChave.get(c.id)
-    const atraso = atrasoPorCliente.get(c.id)
     const subs = assinaturasDo(c)
     // As removidas não decidem a fonte: o cliente pode ter saído do Asaas e seguir pagando por fora.
     const peloAsaas = asaasCarregado && subs.daLinha.some((s) => !s.removida)
@@ -201,7 +200,11 @@ export function montarLinha(linha: LinhaRec, dados: Dados) {
     const pagamentos = pagos(c.id)
     // Cancelou no Asaas depois de ter pago e não está pagando por fora: saiu, mesmo
     // que ainda tenha fatura recente do Asaas lançada no financeiro.
-    const cancelada = asaasCarregado && subs.daLinha.length > 0 && ativas.length === 0 && pagamentos.length > 0 && !pagandoPorFora.has(c.id)
+    const semAssinaturaAtiva = asaasCarregado && subs.daLinha.length > 0 && ativas.length === 0 && !pagandoPorFora.has(c.id)
+    const cancelada = semAssinaturaAtiva && pagamentos.length > 0
+    // Assinatura cancelada não é inadimplência: fatura pendente que sobrou no
+    // financeiro depois do cancelamento não conta como atraso.
+    const atraso = semAssinaturaAtiva ? undefined : atrasoPorCliente.get(c.id)
     return {
       chave: c.id, clienteId: c.id, nome: c.nome.trim(), empresa: c.empresa, whatsapp: c.whatsapp ?? c.telefone,
       mensalidade: peloAsaas ? ativas.reduce((t, s) => t + valorMensal(s), 0) : a?.valorMensal ?? 0,
