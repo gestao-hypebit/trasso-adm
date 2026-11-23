@@ -19,13 +19,15 @@ type Acao = { tipo: 'aprovar' | 'ajustes'; post: Post } | { tipo: 'todos' }
 
 const CHAVE_NOME = 'slick-plano-nome'
 
-export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, previa }: {
+// `avulso`: link de um post só (/plano/<token>/post/<id>), sem calendário, progresso nem "aprovar todos".
+export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, previa, avulso = false }: {
   token: string
   plano: Plano
   posts: Post[]
   agenciaNome: string
   logoUrl: string | null
   previa: boolean
+  avulso?: boolean
 }) {
   const router = useRouter()
   const [acao, setAcao] = useState<Acao | null>(null)
@@ -56,7 +58,7 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
     startTransition(async () => {
       const r = acao.tipo === 'todos'
         ? await aprovarPendentes(token, nome)
-        : await responderPost(token, acao.post.id, { aprovar: acao.tipo === 'aprovar', nome, comentario })
+        : await responderPost(token, acao.post.id, { aprovar: acao.tipo === 'aprovar', nome, comentario }, avulso)
       if (r.success) {
         setAcao(null)
         router.refresh()
@@ -81,10 +83,10 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
             </div>
             <div>
               <p className="text-sm font-bold leading-none text-brand-lavanda">{agenciaNome.toLowerCase()}</p>
-              <p className="mt-0.5 text-[10px] text-brand-lavanda/40">Planejamento de conteúdo</p>
+              <p className="mt-0.5 text-[10px] text-brand-lavanda/40">{avulso ? 'Post para aprovação' : 'Planejamento de conteúdo'}</p>
             </div>
           </div>
-          <PdfBotao rotulo="Baixar PDF" cliente={plano.clienteNome} mes={plano.mes} fim={plano.fim} objetivo={plano.objetivo} posts={posts} logoUrl={logoUrl} agenciaNome={agenciaNome} comAprovacao={false} />
+          {!avulso && <PdfBotao rotulo="Baixar PDF" cliente={plano.clienteNome} mes={plano.mes} fim={plano.fim} objetivo={plano.objetivo} posts={posts} logoUrl={logoUrl} agenciaNome={agenciaNome} comAprovacao={false} />}
         </div>
       </header>
 
@@ -95,6 +97,14 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
           </p>
         )}
 
+        {avulso ? (
+          <section>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-lima">Post para aprovação</p>
+            <h1 className="text-3xl font-bold text-brand-lavanda md:text-4xl" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{plano.clienteNome}</h1>
+            <p className="mt-1 text-brand-lavanda/50">Veja o post abaixo e aprove ou peça um ajuste.</p>
+          </section>
+        ) : (
+          <>
         <section>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-lima">Planejamento de social media</p>
           <h1 className="text-3xl font-bold text-brand-lavanda md:text-4xl" style={{ fontFamily: 'var(--font-space-grotesk)' }}>{plano.clienteNome}</h1>
@@ -126,9 +136,11 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
           <CalendarioMes mes={plano.mes} fim={plano.fim} posts={posts} onPost={irPara} />
           <p className="text-xs text-brand-lavanda/40">Toque em um post para ver os detalhes. Contorno verde = aprovado; rosa = ajuste pedido.</p>
         </section>
+          </>
+        )}
 
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-lavanda/60">Posts</h2>
+          {!avulso && <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-lavanda/60">Posts</h2>}
           {posts.length === 0 && <p className="py-10 text-center text-sm text-brand-lavanda/40">Nenhum post neste planejamento ainda.</p>}
           {posts.map((p) => (
             <PostCard
@@ -144,10 +156,15 @@ export function AprovacaoCliente({ token, plano, posts, agenciaNome, logoUrl, pr
               }
             />
           ))}
+          {avulso && tudoAprovado && (
+            <div className="flex items-center gap-3 rounded-xl border border-brand-lima/25 bg-brand-lima/[0.06] p-4 text-sm text-brand-lima">
+              <PartyPopper className="h-5 w-5 shrink-0" /> Post aprovado! Obrigado. A {agenciaNome} já segue com a produção.
+            </div>
+          )}
         </section>
       </main>
 
-      {aguardando > 0 && (
+      {!avulso && aguardando > 0 && (
         <div className="sticky bottom-0 border-t border-white/[0.06] bg-brand-noite/95 backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 md:px-6">
             <p className="text-sm text-brand-lavanda/70">{aguardando} post{aguardando > 1 ? 's' : ''} aguardando aprovação</p>

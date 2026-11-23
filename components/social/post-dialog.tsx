@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Copy, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Copy, Loader2, Send, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,7 +20,7 @@ const LIMITE_LEGENDA = 2200 // Instagram
 const campo = 'h-9 w-full rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 text-sm text-brand-lavanda outline-none'
 
 // Cria ou edita um post. `post` nulo + `data` = post novo naquele dia.
-export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, fim, onSalvo, onArtes }: {
+export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, fim, onSalvo, onArtes, onEnviar }: {
   aberto: boolean
   onClose: () => void
   planejamentoId: string
@@ -30,6 +30,7 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
   fim: string | null
   onSalvo: () => void
   onArtes?: () => void
+  onEnviar?: () => void // manda só este post para o cliente
 }) {
   const [form, setForm] = useState<Form>({ ...POST_VAZIO, data: mes })
   const [salvando, setSalvando] = useState(false)
@@ -280,6 +281,7 @@ export function PostDialog({ aberto, onClose, planejamentoId, post, data, mes, f
               <>
                 <Button variant="ghost" size="sm" onClick={() => setConfirmarExclusao(true)} className="text-brand-lavanda/50 hover:text-brand-rosa"><Trash2 className="h-3.5 w-3.5" /> Excluir</Button>
                 <Button variant="ghost" size="sm" onClick={() => salvar(true)} disabled={salvando || enviando}><Copy className="h-3.5 w-3.5" /> Duplicar</Button>
+                {onEnviar && <Button variant="ghost" size="sm" onClick={onEnviar} disabled={salvando || enviando}><Send className="h-3.5 w-3.5" /> Enviar este post</Button>}
               </>
             )
           )}

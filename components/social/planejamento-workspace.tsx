@@ -38,7 +38,8 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
   const [editando, setEditando] = useState<{ post: Post | null; data: string | null } | null>(null)
   const [sugerir, setSugerir] = useState(false)
   const [artesDe, setArtesDe] = useState<Post | null>(null)
-  const [enviar, setEnviar] = useState(false)
+  // 'plano' = o planejamento inteiro; um Post = link só daquele post.
+  const [enviar, setEnviar] = useState<'plano' | Post | null>(null)
   const [mensagem, setMensagem] = useState('')
   const [copiado, setCopiado] = useState(false)
   const [textos, setTextos] = useState<{ objetivo: string; observacoes: string; inicio: string; fim: string } | null>(null)
@@ -82,13 +83,21 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
   const telefone = plano.clientes?.whatsapp ?? plano.clientes?.telefone
   const aprovados = posts.filter((p) => p.aprovacao === 'aprovado').length
   const ajustes = posts.filter((p) => p.aprovacao === 'ajustes')
+  const linkPost = (p: Post) => `${link}/post/${p.id}`
+  const primeiroNome = plano.clientes?.nome?.split(' ')[0] ?? ''
+  const textoPost = (p: Post) => `Olá, ${primeiroNome}! Segue o post de ${formatDate(p.data, 'dd/MM')} (“${p.titulo}”) para você aprovar ou pedir ajuste:
+${linkPost(p)}`
+  const enviandoPost = enviar && enviar !== 'plano' ? enviar : null
+  const linkEnvio = enviandoPost ? linkPost(enviandoPost) : link
+  const abrirEnvioPost = (p: Post) => { setMensagem(textoPost(p)); setEnviar(p) }
   const textoPadrao = `Olá, ${plano.clientes?.nome?.split(' ')[0] ?? ''}! O planejamento de conteúdo (${periodo}) está pronto 🎉\n\nSão ${posts.length} posts. Dá uma olhada e aprove (ou peça ajuste) em cada um por aqui:\n${link}`
   const periodoMudou = textos && (textos.inicio !== plano.mes || textos.fim !== fimDoPeriodo(plano.mes, plano.data_fim))
   const sujoTextos = textos && (periodoMudou || textos.objetivo !== (plano.objetivo ?? '') || textos.observacoes !== (plano.observacoes ?? ''))
   const foraDoPeriodo = textos ? posts.filter((p) => p.data < textos.inicio || p.data > textos.fim).length : 0
 
   async function marcarEnviado() {
-    if (!plano || plano.status !== 'rascunho') return
+    // Mandar um post só não envia o planejamento inteiro.
+    if (!plano || plano.status !== 'rascunho' || enviar !== 'plano') return
     await (createClient() as any).from('social_planejamentos')
       .update({ status: statusPelosPosts(posts, 'enviado'), enviado_em: new Date().toISOString(), link_ativo: true, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -139,7 +148,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
 
   const wa = whatsappUrl(telefone, mensagem)
   const mailto = plano.clientes?.email
-    ? `mailto:${plano.clientes.email}?subject=${encodeURIComponent(`Planejamento de conteúdo · ${periodo}`)}&body=${encodeURIComponent(mensagem)}`
+    ? `mailto:${plano.clientes.email}?subject=${encodeURIComponent(enviandoPost ? `Post para aprovação · ${enviandoPost.titulo}` : `Planejamento de conteúdo · ${periodo}`)}&body=${encodeURIComponent(mensagem)}`
     : null
 
   return (
@@ -162,7 +171,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
           <Button size="sm" variant="ghost" onClick={() => setSugerir(true)}><Wand2 className="h-3.5 w-3.5" /> Sugerir pauta</Button>
           <Button size="sm" variant="outline" onClick={() => setEditando({ post: null, data: plano.mes })}><Plus className="h-3.5 w-3.5" /> Post</Button>
           <PdfBotao cliente={nomeCliente} mes={plano.mes} fim={plano.data_fim} objetivo={plano.objetivo} posts={posts} logoUrl={agencia.logo_url} agenciaNome={agencia.nome} comAprovacao={plano.status !== 'rascunho'} />
-          <Button size="sm" onClick={() => { setMensagem(textoPadrao); setEnviar(true) }} disabled={!posts.length}>
+          <Button size="sm" onClick={() => { setMensagem(textoPadrao); setEnviar('plano') }} disabled={!posts.length}>
             <Send className="h-3.5 w-3.5" /> {plano.status === 'rascunho' ? 'Enviar para o cliente' : 'Reenviar'}
           </Button>
         </div>
@@ -213,6 +222,7 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
                   <>
                     <Button size="sm" variant="outline" onClick={() => setEditando({ post: p, data: null })}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
                     <Button size="sm" variant="outline" onClick={() => setArtesDe(p)}><Sparkles className="h-3.5 w-3.5" /> Artes{p.artes?.length ? ` (${p.artes.length})` : ''}</Button>
+                    <Button size="sm" variant="outline" onClick={() => abrirEnvioPost(p)}><Send className="h-3.5 w-3.5" /> Enviar este post</Button>
                   </>
                 } />
               ))}
@@ -312,16 +322,29 @@ export function PlanejamentoWorkspace({ id }: { id: string }) {
         fim={plano.data_fim}
         onSalvo={carregar}
         onArtes={() => { setArtesDe(editando?.post ?? null); setEditando(null) }}
+        onEnviar={editando?.post ? () => { abrirEnvioPost(editando.post!); setEditando(null) } : undefined}
       />
       <ArtesEditor aberto={!!artesDe} onClose={() => setArtesDe(null)} post={artesDe} planejamentoId={id} clienteId={plano.cliente_id} onSalvo={carregar} />
       <SugerirDialog aberto={sugerir} onClose={() => setSugerir(false)} planejamentoId={id} onAdicionados={carregar} />
 
-      <Dialog open={enviar} onOpenChange={setEnviar}>
+      <Dialog open={!!enviar} onOpenChange={(o) => !o && setEnviar(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enviar para o cliente</DialogTitle>
-            <DialogDescription>O cliente abre o link, vê o calendário e aprova ou pede ajuste em cada post. Você é avisado no sino.</DialogDescription>
+            <DialogTitle>{enviandoPost ? 'Enviar este post para o cliente' : 'Enviar para o cliente'}</DialogTitle>
+            <DialogDescription>
+              {enviandoPost
+                ? `O cliente abre o link e vê só “${enviandoPost.titulo}”, para aprovar ou pedir ajuste. Funciona mesmo com o planejamento em rascunho. Você é avisado no sino.`
+                : 'O cliente abre o link, vê o calendário e aprova ou pede ajuste em cada post. Você é avisado no sino.'}
+            </DialogDescription>
           </DialogHeader>
+          {!plano.link_ativo && <p className="rounded-lg bg-brand-rosa/[0.07] px-3 py-2 text-xs text-brand-rosa">O link do cliente está desligado. Marque “Link ativo” na lateral para o cliente conseguir abrir.</p>}
+          <div className="flex gap-2">
+            <Input readOnly value={linkEnvio} onFocus={(e) => e.currentTarget.select()} className="text-xs" />
+            <Button variant="outline" onClick={() => copiar(linkEnvio)} title="Copiar só o link">
+              {copiado ? <Check className="h-4 w-4 text-brand-lima" /> : <Copy className="h-4 w-4" />} Link
+            </Button>
+            <Button variant="outline" asChild title="Ver como o cliente"><a href={`${linkEnvio}?admin=1`} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
+          </div>
           <Textarea rows={7} value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" onClick={() => { copiar(mensagem); marcarEnviado() }}>

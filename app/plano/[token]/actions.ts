@@ -38,6 +38,7 @@ export async function responderPost(
   token: string,
   postId: string,
   resposta: { aprovar: boolean; nome: string; comentario: string },
+  avulso = false, // link de um post só: vale mesmo com o planejamento em rascunho
 ): Promise<RespostaResult> {
   try {
     const { nome, comentario } = limpar(resposta.nome, resposta.comentario)
@@ -46,7 +47,7 @@ export async function responderPost(
 
     const plano = await getPlanejamentoPorToken(token)
     if (!plano) return { success: false, error: ERRO_LINK }
-    if (plano.status === 'rascunho') return { success: false, error: ERRO_RASCUNHO }
+    if (plano.status === 'rascunho' && !avulso) return { success: false, error: ERRO_RASCUNHO }
 
     const supabase = createServiceClient() as any
     const { data: post } = await supabase.from('social_posts').select('id, titulo, planejamento_id').eq('id', postId).maybeSingle()
@@ -68,6 +69,7 @@ export async function responderPost(
     }
 
     revalidatePath(`/plano/${token}`)
+    revalidatePath(`/plano/${token}/post/${postId}`)
     return { success: true }
   } catch (e) {
     console.error('[plano] responderPost', e)

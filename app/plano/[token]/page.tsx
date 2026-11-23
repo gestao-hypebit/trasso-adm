@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getPlanejamentoPorToken } from '@/lib/social/publico'
 import { ehFormatoVideo, ordenarPosts, type Post } from '@/lib/social/tipos'
 import { AprovacaoCliente } from '@/components/social/aprovacao-cliente'
+import { AvisoPublico as Aviso } from '@/components/social/aviso-publico'
 
 export const metadata: Metadata = {
   title: 'Planejamento de conteúdo — Slick',
@@ -40,16 +41,5 @@ export default async function PlanoPage({ params, searchParams }: { params: Prom
       logoUrl={config?.logo_url ?? null}
       previa={plano.status === 'rascunho'}
     />
-  )
-}
-
-function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
-  return (
-    <div className="grid min-h-screen place-items-center bg-brand-noite p-6 text-center">
-      <div>
-        <p className="mb-2 text-xl font-semibold text-brand-lavanda">{titulo}</p>
-        <p className="text-brand-lavanda/60">{texto}</p>
-      </div>
-    </div>
   )
 }
